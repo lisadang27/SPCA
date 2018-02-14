@@ -156,16 +156,32 @@ def phase_curve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C=0, 
 	return f_total
 
 def detec_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
-	c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
+	c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0, order=2):
 	xdata, ydata, mid_x, mid_y = input_dat
 	x = xdata - mid_x
 	y = ydata - mid_y
-	det_sens = np.array(c1 + 
-		c2*x     + c3*y       + 
-		c4*x**2  + c5*x*y     + c6*y**2       + 
-		c7*x**3  + c8*x**2*y  + c9*x*y**2     + c10*y**3      + 
-		c11*x**4 + c12*x**3*y + c13*x**2*y**2 + c14*x*y**3    + c15*y**4   + 
-		c16*x**5 + c17*x**4*y + c18*x**3*y**2 + c19*x**2*y**3 + c20*x*y**4 + c21*y**5)
+	if (order ==2):
+		det_sens = np.array(c1 + 
+			c2*x     + c3*y       + 
+			c4*x**2  + c5*x*y     + c6*y**2)
+	elif(order==3):
+		det_sens = np.array(c1 + 
+			c2*x     + c3*y       + 
+			c4*x**2  + c5*x*y     + c6*y**2       + 
+			c7*x**3  + c8*x**2*y  + c9*x*y**2     + c10*y**3)
+	elif(order==4):
+		det_sens = np.array(c1 + 
+			c2*x     + c3*y       + 
+			c4*x**2  + c5*x*y     + c6*y**2       + 
+			c7*x**3  + c8*x**2*y  + c9*x*y**2     + c10*y**3      + 
+			c11*x**4 + c12*x**3*y + c13*x**2*y**2 + c14*x*y**3    + c15*y**4)
+	elif(order==5):
+		det_sens = np.array(c1 + 
+			c2*x     + c3*y       + 
+			c4*x**2  + c5*x*y     + c6*y**2       + 
+			c7*x**3  + c8*x**2*y  + c9*x*y**2     + c10*y**3      + 
+			c11*x**4 + c12*x**3*y + c13*x**2*y**2 + c14*x*y**3    + c15*y**4   + 
+			c16*x**5 + c17*x**4*y + c18*x**3*y**2 + c19*x**2*y**3 + c20*x*y**4 + c21*y**5)
 	return np.array(det_sens)
 
 def signal_poly(time, per, t0, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
