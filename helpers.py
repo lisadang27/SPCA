@@ -82,14 +82,14 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
     elif 'Poly4' in mode:
         pos = np.vstack((np.ones_like(x),x,y,x**2,x*y,y**2,
                         x**3,y*x**2,x*y**2,y**3,
-                        x**3*y,y**2*x**2,x*y**3,y**4))
+                        x**4,x**3*y,y**2*x**2,x*y**3,y**4))
         detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
                           c7,  c8,  c9,  c10,
-                          c11, c12, c13, c14, c15,])
+                          c11, c12, c13, c14, c15])
     elif 'Poly5' in mode:
         pos = np.vstack((np.ones_like(x),x,y,x**2,x*y,y**2,
                         x**3,y*x**2,x*y**2,y**3,
-                        x**3*y,y**2*x**2,x*y**3,y**4,
+                        x**4,x**3*y,y**2*x**2,x*y**3,y**4,
                         x**5,x**4*y,x**3*y**2,x**2*y**3,x*y**4,y**5))
         detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
                           c7,  c8,  c9,  c10,
