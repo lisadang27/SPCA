@@ -53,7 +53,6 @@ def get_data(path):
     return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
 
 def get_full_data(foldername, filename):
-    filename = filename[:13]+'full'+filename[19:]
     path = foldername + filename
     #Loading Data
     flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
