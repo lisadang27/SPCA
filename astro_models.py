@@ -72,10 +72,13 @@ def area(time, t_sec, per, rp, inc_raw, p0_phase, mode):
     f = arr[:,0,2]
     return np.pi/np.sqrt(3*b*f**2/a + 3*c*d**2/a + -6*d*e*f/a + b*c - e**2)/(np.pi*rp**2)
 
-def phase_variation(time, t_sec, per, p0_phase, mode):
-    t = time - t_sec
-    w = 2*np.pi/per
-    phi = (w*t)
+def phase_variation(time, t_sec, per, anom, w, p0_phase, mode):
+    if 'eccent' in mode:
+        phi = anom + w + np.pi/2
+    else:
+        t = time - t_sec
+        w = 2*np.pi/per
+        phi = (w*t)
     if 'v2' in mode:
         A, B, C, D = p0_phase[:4]
         phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi))) + C*(np.cos(2*phi)-1) + (D*np.sin(2*phi))
@@ -84,8 +87,8 @@ def phase_variation(time, t_sec, per, p0_phase, mode):
         phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi)))
     return phase
 
-def fplanet_model(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode):
-    phase = phase_variation(time, t_sec, per, p0_phase, mode)
+def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode):
+    phase = phase_variation(time, t_sec, per, anom, w, p0_phase, mode)
     eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
     if 'ellipsoid' in mode:
         sArea = area(time, t_sec, per, rp, inc, p0_phase, mode)
@@ -101,11 +104,11 @@ def ideal_lightcurve(time, p0, per, mode):
     u1  = 2*np.sqrt(q1)*q2
     u2  = np.sqrt(q1)*(1-2*q2)
     # create transit first and use orbital paramater to get time of superior conjunction
-    transit, t_sec, _ = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
+    transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     
     #ugly way of doing this as might pick up detector parameters, but thats alright - faster this way and still safe
     p0_phase = p0[9:13]
-    fplanet = fplanet_model(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode)
+    fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode)
     
     # add both light curves
     f_total = transit + fplanet
@@ -135,9 +138,10 @@ def check_phase(time, p0, per, mode):
     t_sec = m.get_t_secondary(params)
     params.t_secondary = t_sec
     m = batman.TransitModel(params, time, transittype="secondary")  #initializes model
+    anom = m.get_true_anomaly()
     flux = m.light_curve(params)
     
-    phase = phase_variation(time, t_sec, per, p0_phase, mode)
+    phase = phase_variation(time, t_sec, per, anom, w, p0_phase, mode)
     if 'ellipsoid' in mode:
         sArea = area(time, t_sec, per, rp, inc, p0_phase, mode)
     else:

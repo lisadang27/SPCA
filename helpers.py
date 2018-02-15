@@ -70,7 +70,7 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
     x = xdata - mid_x
     y = ydata - mid_y
     
-    if 'Poly2' in mode:
+    if   'Poly2' in mode:
         pos = np.vstack((np.ones_like(x),x,y,x**2,x*y,y**2))
         detec = np.array([c1, c2, c3, c4, c5, c6])
     elif 'Poly3' in mode:
@@ -81,14 +81,14 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
     elif 'Poly4' in mode:
         pos = np.vstack((np.ones_like(x),x,y,x**2,x*y,y**2,
                         x**3,y*x**2,x*y**2,y**3,
-                        x**4,x**3*y,y**2*x**2,x*y**3,y**4))
+                        x**3*y,y**2*x**2,x*y**3,y**4))
         detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
                           c7,  c8,  c9,  c10,
-                          c11, c12, c13, c14, c15])
+                          c11, c12, c13, c14, c15,])
     elif 'Poly5' in mode:
         pos = np.vstack((np.ones_like(x),x,y,x**2,x*y,y**2,
                         x**3,y*x**2,x*y**2,y**3,
-                        x**4,x**3*y,y**2*x**2,x*y**3,y**4,
+                        x**3*y,y**2*x**2,x*y**3,y**4,
                         x**5,x**4*y,x**3*y**2,x**2*y**3,x*y**4,y**5))
         detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
                           c7,  c8,  c9,  c10,
@@ -100,11 +100,11 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
 def signal(time, xdata, ydata, mid_x, mid_y, per, p0, mode):
     if 'Poly' in mode:
         input_data = (xdata, ydata, mid_x, mid_y, mode)
-        start = 11
+        start = 11        # first index for detector coeff 
         if 'ellipsoid' in mode:
-            start += 1
+            start += 1    # ellipsoidal params would shift index by 1
         elif 'v2' in mode:
-            start += 2
+            start += 2    # v2 would shift by 2
         p0_detec = p0[start:-1]
         return astro_models.ideal_lightcurve(time, p0, per, mode)*detec_model_poly(input_data, *p0_detec)
     else:
