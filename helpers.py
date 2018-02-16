@@ -6,6 +6,50 @@ from matplotlib import gridspec
 
 import astro_models
 
+class orb_params(object):
+    # class constructor
+    def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08, 
+                 a=7, inc=84.2, ecosw=0.1, esinw=0.1, q1=0.001, q2=0.001, 
+                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, mode=''):
+        self.name  = name  
+        self.t0    = t0    
+        self.per   = per   
+        self.rp    = rp    
+        self.a     = a     
+        self.inc   = inc   
+        self.ecosw = ecosw 
+        self.esinw = esinw 
+        self.q1    = q1    
+        self.q2    = q2    
+        self.fp    = fp    
+        self.A     = A     
+        self.B     = B     
+        self.C     = C     
+        self.D     = D     
+        self.r2    = r2    
+        self.mode  = mode  
+        self.c1    = 1.0
+        self.c2    = 0.0
+        self.c3    = 0.0
+        self.c4    = 0.0
+        self.c5    = 0.0
+        self.c6    = 0.0
+        self.c7    = 0.0
+        self.c8    = 0.0
+        self.c9    = 0.0
+        self.c10   = 0.0
+        self.c11   = 0.0
+        self.c12   = 0.0
+        self.c13   = 0.0
+        self.c14   = 0.0
+        self.c15   = 0.0
+        self.c16   = 0.0
+        self.c17   = 0.0
+        self.c18   = 0.0
+        self.c19   = 0.0
+        self.c20   = 0.0
+        self.c21   = 0.0
+
 def get_data(path):
     '''
     Retrieve binned data
@@ -116,6 +160,40 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
     detec = detec_model_poly(input_data[1:], c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
+
+def make_lambdafunc(lparams, dparam=[], obj):
+    '''
+    Params:
+    -------
+    lparams   : list
+        list of input all input parameters of the signal function.
+    dparams   : list
+        list of all input parameters the user does not wish to fit. 
+        Default is none.
+    obj       : object
+        object with all the possible fit parameters values with default 
+        values. If the user wish to not fit certain parameters and wants
+        to fixed it at a specific value, they will have to assess it to
+        the object. Otherwise, default values will be assumed.
+    
+    Return:
+    func .   : function
+        lamdba function with parameters fixed to the value oin obj.
+    '''
+    # get list of params you wish to fit
+    nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
+    # generate the line to execute
+    mystr = 'func  = lambda '
+    for i in range(len(nparams)):
+        mystr = mystr + nparams[i] +', '
+    mystr = mystr[:-2]
+    mystr = mystr +': func('
+    for i in range(len(lparams)):
+        mystr = mystr + lparams[i] +', '
+    mystr = mystr[:-2]
+    mystr = mystr+')'
+    exec(mystr)
+    return func
 
 def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
     t0_err, rp_err, a_err, inc_err = prior_errs
@@ -238,3 +316,5 @@ def triangle_colors(data1, data2, data3, data4, label, path):
     fig.subplots_adjust(wspace=0)
     fig.savefig(path, bbox_inches='tight')
     return
+
+
