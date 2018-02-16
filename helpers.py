@@ -143,14 +143,18 @@ def lnlike(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D
     
 def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, priorFN, lnlikeFN):
     #We need this passed in function to be a lambda function call to lnprior
-    lp = priorFN(priors, prior_errs, time, mode, p0)
+    lp = priorFN(priors, prior_errs, time, mode, *p0)
     if not np.isfinite(lp):
         return -np.inf
     #We need this passed in function to be a lambda function call to lnlike
-    loglike = lnlikeFN((flux, time, xdata, ydata, mid_x, mid_y, mode), p0)
-    if not np.isfinite(lnlike):
+    loglike = lnlikeFN((flux, time, xdata, ydata, mid_x, mid_y, mode), *p0)
+    if not np.isfinite(loglike):
         return -np.inf
-    return lp + lnlike
+    return lp + loglike
+
+#lnlikeFn = lambda input_data, ssdfsdjfbs: lnlike(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, sigF)
+
+#priorFN = lambda priors, prior_errs, time, mode, ssdfsdjfbs: lnlike(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2)
 
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     '''
