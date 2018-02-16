@@ -105,28 +105,26 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
 
     return np.dot(detec[np.newaxis,:], pos).reshape(-1)
 
-def signal(time, xdata, ydata, mid_x, mid_y, per, p0, mode):
-    if 'Poly' in mode:
-        input_data = (xdata, ydata, mid_x, mid_y, mode)
-        t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp = p0[:10]
-        A, B, C, D, r2 = p0[10:15]
-        p0_detec = p0[15:-1]
-        astr = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-        detec = detec_model_poly(input_data, *p0_detec)
-        return astr*detec
-    else:
-        print('CANNOT DEAL WITH NON-POLY DETECTOR MAPS YET!!!')
-        return np.zeros_like(time)
-
-def lnprior(p0, initial, errs, time, mode):
+def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
+                c16, c17, c18, c19, c20, c21):
+    (time, xdata, ydata, mid_x, mid_y, mode) = input_data
     t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp = p0[:10]
     A, B, C, D, r2 = p0[10:15]
-    t0_err, rp_err, a_err, inc_err = errs
+    p0_detec = p0[15:-1]
+    astr = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
+    detec = detec_model_poly(input_data[1:], c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
+                c16, c17, c18, c19, c20, c21)
+    return astr*detec
+
+def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
+    t0_err, rp_err, a_err, inc_err = prior_errs
+    t0_prior, rp_prior, a_prior, inc_prior = priors
     check = astro_models.check_phase(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-    lgpri_t0 = -0.5*(((t0 - initial[0])/t0_err)**2.0)
-    lgpri_rp = 0 # -0.5*(((rp - initial[1])/(rp_err))**2.0)
-    lgpri_a = -0.5*(((a - initial[2])/a_err)**2.0)
-    lgpri_i = -0.5*(((inc - initial[3])/inc_err)**2.0)
+    lgpri_t0 = -0.5*(((t0 - t0_prior)/t0_err)**2.0)
+    lgpri_rp = 0 # -0.5*(((rp - rp_prior)/(rp_err))**2.0)
+    lgpri_a = -0.5*(((a - a_prior)/a_err)**2.0)
+    lgpri_i = -0.5*(((inc - inc_prior)/inc_err)**2.0)
     # uniform prior for the rest
     if ((0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and 
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False)):
@@ -134,13 +132,22 @@ def lnprior(p0, initial, errs, time, mode):
     else:
         return -np.inf
 
-def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, per, initial, errs, mode):
-    lp = lnprior(p0, initial, errs, time, per, mode)
+def lnlike(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+                c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
+                c16, c17, c18, c19, c20, c21, sigF):
+    flux = input_data[0]
+    model = signalFN(input_data[1:], t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
+                c16, c17, c18, c19, c20, c21)
+    return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)
+    
+def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, priorFN, lnlikeFN):
+    #We need this passed in function to be a lambda function call to lnprior
+    lp = priorFN(priors, prior_errs, time, mode, p0)
     if not np.isfinite(lp):
         return -np.inf
-    model = signal(time, xdata, ydata, mid_x, mid_y, per, p0, mode)
-    flux_err = p0[-1]
-    lnlike = -0.5*np.sum((flux-model)**2)/(flux_err**2) - len(flux)*np.log(flux_err)
+    #We need this passed in function to be a lambda function call to lnlike
+    loglike = lnlikeFN((flux, time, xdata, ydata, mid_x, mid_y, mode), p0)
     if not np.isfinite(lnlike):
         return -np.inf
     return lp + lnlike
