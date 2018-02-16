@@ -38,14 +38,11 @@ def eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec):
     flux = m.light_curve(params)
     return flux
 
-def area(time, t_sec, per, rp, inc_raw, p0_phase, mode):
-    #FOR NOW I AM ASSUMING ONLY 1st ORDER VARIATIONS PERMITTED WITH AREA VARIATIONS!!!
-    r2 = p0_phase[2]
-    
+def area(time, t_sec, per, rp, inc_raw, r2):
     t = time - t_sec
     w = 2*np.pi/per
     phi = (w*t-np.pi)%(2*np.pi)
-    inc = inc_raw*np.pi/180
+    inc = inc_raw*np.pi/180 #converting inclination to degrees
     #R = np.array([[np.sin(inc)*np.cos(phi),   np.sin(phi),  np.cos(inc)*np.cos(phi)],
     #              [-np.sin(inc)*np.sin(phi),  np.cos(phi),  -np.cos(inc)*np.sin(phi)],
     #              [-np.cos(inc),              0,            np.sin(inc)]])
@@ -73,7 +70,7 @@ def area(time, t_sec, per, rp, inc_raw, p0_phase, mode):
     f = arr[:,0,2]
     return np.pi/np.sqrt(3*b*f**2/a + 3*c*d**2/a + -6*d*e*f/a + b*c - e**2)/(np.pi*rp**2)
 
-def phase_variation(time, t_sec, per, anom, w, p0_phase, mode):
+def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
     if 'eccent' in mode:
         phi = anom + w + np.pi/2
     else:
@@ -81,24 +78,21 @@ def phase_variation(time, t_sec, per, anom, w, p0_phase, mode):
         w = 2*np.pi/per
         phi = (w*t)
     if 'v2' in mode:
-        A, B, C, D = p0_phase[:4]
         phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi))) + C*(np.cos(2*phi)-1) + (D*np.sin(2*phi))
     else:
-        A, B = p0_phase[:2]
         phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi)))
     return phase
 
-def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode):
-    phase = phase_variation(time, t_sec, per, anom, w, p0_phase, mode)
+def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, mode):
+    phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
     eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
     if 'ellipsoid' in mode:
-        sArea = area(time, t_sec, per, rp, inc, p0_phase, mode)
+        sArea = area(time, t_sec, per, rp, inc, r2)
     else:
         sArea = 1
     return sArea*phase*(eclip - 1)
 
-def ideal_lightcurve(time, p0, per, mode):
-    t0, rp, a, inc, ecosw, esinw, q1, q2, fp = p0[:9]
+def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode):
     
     ecc = np.sqrt(ecosw**2 + esinw**2)
     w   = np.arctan2(esinw, ecosw)
@@ -108,18 +102,13 @@ def ideal_lightcurve(time, p0, per, mode):
     transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     
     #ugly way of doing this as might pick up detector parameters, but thats alright - faster this way and still safe
-    p0_phase = p0[9:13]
-    fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, p0_phase, mode)
+    fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, mode)
     
     # add both light curves
     f_total = transit + fplanet
     return f_total
 
-def check_phase(time, p0, per, mode):
-    t0, rp, a, inc, ecosw, esinw, q1, q2, fp = p0[:9]
-    #ugly way of doing this as might pick up detector parameters, but thats alright - faster this way and still safe
-    p0_phase = p0[9:13]
-    
+def check_phase(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode):    
     ecc = np.sqrt(ecosw**2 + esinw**2)
     w   = np.arctan2(esinw, ecosw)
     
@@ -142,9 +131,9 @@ def check_phase(time, p0, per, mode):
     anom = m.get_true_anomaly()
     flux = m.light_curve(params)
     
-    phase = phase_variation(time, t_sec, per, anom, w, p0_phase, mode)
+    phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
     if 'ellipsoid' in mode:
-        sArea = area(time, t_sec, per, rp, inc, p0_phase, mode)
+        sArea = area(time, t_sec, per, rp, inc_raw, r2)
     else:
         sArea = 1
     return np.any((sArea*phase*(flux-1)) < 0)
