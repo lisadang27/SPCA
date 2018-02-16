@@ -145,32 +145,6 @@ def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, per, initial, errs, mode)
         return -np.inf
     return lp + lnlike
 
-#Initial ML fit to detector parameters
-def fit_residual(flux, time, xdata, ydata, p0, u_detec, l_detec, per, mode):
-    # Use initial LC parameters
-    lcurve = astro_models.ideal_lightcurve(time, p0, per, mode)
-    # Get residuals
-    residuals = flux/lcurve
-    # Fit residual
-    coord = (xdata, ydata)
-    start = 11
-    if 'ellipsoid' in mode:
-        start += 1
-    elif 'v2' in mode:
-        start += 2
-    order = int(mode[mode.find('Poly')+4])
-    if order == 2:
-        func = det4fit_Poly2
-    elif order == 3:
-        func = det4fit_Poly3
-    elif order == 4:
-        func = det4fit_Poly4
-    elif order ==5:
-        func = det4fit_Poly5
-    p0_detec = p0[start:-1]
-    popt, pcov = spopt.curve_fit(func, coord, residuals, p0=p0_detec, bounds = (l_detec, u_detec))
-    return popt
-
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     '''
     input:
