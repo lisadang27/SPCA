@@ -181,8 +181,8 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
-'''def make_lambdafunc(lparams, dparam=[], obj):
-    
+def make_lambdafunc(function, dparams=[], obj=[], debug=False):
+    '''
     Params:
     -------
     lparams   : list
@@ -199,26 +199,32 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
     Return:
     func .   : function
         lamdba function with parameters fixed to the value oin obj.
-    
+    '''
+    #print(function)
+    lparams = inspect.getargspec(function).args
+    module = str(inspect.getmodule(function)).split('\'')[1]
+    funcName = function.__name__
+    fullName = module + '.' + funcName
     # get list of params you wish to fit
     nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
     # assign value to fixed variables
     varstr  = ''
-    for label in dparams:
-        varstr = label + ' = obj.' + label
-        exec(varstr)
+    for label in lparams:
+        if label in dparams:
+            varstr += 'obj.'
+        varstr += label + ', '
+    varstr = varstr[:-2]
+    
     # generate the line to execute
-    mystr = 'func  = lambda '
+    mystr = 'global '+funcName+'_dynamic; '+funcName+'_dynamic = lambda '
     for i in range(len(nparams)):
         mystr = mystr + nparams[i] +', '
     mystr = mystr[:-2]
-    mystr = mystr +': func('
-    for i in range(len(lparams)):
-        mystr = mystr + lparams[i] +', '
-    mystr = mystr[:-2]
-    mystr = mystr+')'
+    mystr = mystr +': '+fullName+'(' + varstr + ')'
+    if debug:
+        print(mystr)
     exec(mystr)
-    return func'''
+    return func
 
 def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
     #t0_err, rp_err, a_err, inc_err = prior_errs
