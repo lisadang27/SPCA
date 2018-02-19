@@ -1,8 +1,11 @@
 import numpy as np
 import scipy.optimize as spopt
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
+
+from astropy.stats import sigma_clip
 
 import astro_models
 
@@ -107,6 +110,43 @@ def get_full_data(foldername, filename):
     
     return flux, flux_err, time, xdata, ydata
 
+def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, nFrames=64, cut=0, ignore=[]):
+	# chronological order
+	index = np.argsort(TIME)
+	FLUX  = FLUX[index]
+	TIME  = TIME[index]
+	XDATA = XDATA[index]
+	YDATA = YDATA[index]
+
+	# crop the first AOR 
+	FLUX  = FLUX[int(cut*nFrames):]
+	TIME  = TIME[int(cut*nFrames):]
+	XDATA = XDATA[int(cut*nFrames):]
+	YDATA = YDATA[int(cut*nFrames):]
+
+	# Sigma clip per data cube (also masks invalids)
+	FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
+	XDATA_clip = sigma_clip(FLUX, sigma=6, iters=1)
+	YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
+
+	# Clip bad frames
+	ind = []
+	for i in ignore:
+		ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
+	mask_id = np.zeros(len(FLUX))
+	mask_id[ind.astype(int)] = 1
+	mask_id = np.ma.make_mask(mask_id)
+
+	# Ultimate Clipping
+	MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + mask_id
+	FLUX  = np.ma.masked_array(FLUX, mask=MASK)
+	XDATA = np.ma.masked_array(XDATA, mask=MASK)
+	YDATA = np.ma.masked_array(YDATA, mask=MASK)
+
+	# normalizing the flux
+	FLUX  = FLUX/np.ma.median(FLUX)
+	return FLUX, TIME, XDATA, YDATA
+
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
 	# sorting chronologically
 	index      = np.argsort(time)
@@ -128,7 +168,97 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
 	psfyw      = psfyw0[cut:]
 	return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
+def load_past_params(path):
+	'''
+	Params:
+	-------
+	path     : str
+		path to the file containing past mcmc result (must be a table saved as .npy)
 
+
+	'''
+    Result_MCMC = np.load(oldFname)
+
+    '''Initialize parameters'''
+
+    # Transit Parameters from Gillon 2010 (10 params)
+    t0   = Result_MCMC['t0'][0,0]   # initially in hrs
+    per  = per                      # initially in days
+    rp   = Result_MCMC['rp'][0,0]         # initially in jupiter radius
+    a    = Result_MCMC['a'][0,0]          # initially in AU
+    inc  = Result_MCMC['inc'][0,0]
+    ecosw= Result_MCMC['ecosw'][0,0]      # dimensionless [0,1]                   
+    esinw= Result_MCMC['esinw'][0,0]
+    q1   = Result_MCMC['q1'][0,0]
+    q2   = Result_MCMC['q2'][0,0]
+    fp   = Result_MCMC['fp'][0,0]
+
+    # Phase Variation Parameters (2 params)
+    A    = 0.3
+    B    = 0.
+    C    = 0.
+    D    = 0.
+    r2   = rp
+
+    # Detector initial parameters (10 params)
+    c1   = Result_MCMC['c1'][0,0]          # 1
+    c2   = Result_MCMC['c2'][0,0]          # x
+    c3   = Result_MCMC['c3'][0,0]          # y
+    c4   = Result_MCMC['c4'][0,0]          # x^2
+    c5   = Result_MCMC['c5'][0,0]          # xy
+    c6   = Result_MCMC['c6'][0,0]          # y^2
+    c7   = Result_MCMC['c7'][0,0]          # x^3
+    c8   = Result_MCMC['c8'][0,0]          # x^2y
+    c9   = Result_MCMC['c9'][0,0]          # xy^2
+    c10  = Result_MCMC['c10'][0,0]         # y^3
+    c11  = Result_MCMC['c11'][0,0]         # x^4
+    c12  = Result_MCMC['c12'][0,0]         # x^3y
+    c13  = Result_MCMC['c13'][0,0]         # x^2y^2
+    c14  = Result_MCMC['c14'][0,0]         # xy^3
+    c15  = Result_MCMC['c15'][0,0]         # y^4
+    c16  = Result_MCMC['c16'][0,0]         # x^5
+    c17  = Result_MCMC['c17'][0,0]         # x^4y
+    c18  = Result_MCMC['c18'][0,0]         # x^3y^2
+    c19  = Result_MCMC['c19'][0,0]         # x^2y^3
+    c20  = Result_MCMC['c20'][0,0]         # xy^4
+    c21  = Result_MCMC['c21'][0,0]         # y^5
+     
+    # Uncertainty
+    sigF = Result_MCMC['sigF'][0,0]
+
+    # pre-calculation
+    mid_x = np.mean(xdata)
+    mid_y = np.mean(ydata)
+
+    # Regroup into arrays
+    p0_astro = np.array([t0, rp, a, inc, ecosw, esinw, q1, q2, fp])
+    
+    if 'ellipse' in mode:
+        p0_phase = np.array([A, B, r2])
+    elif 'v2' in mode:
+        p0_phase = np.array([A, B, C, D])
+    else:
+        p0_phase = np.array([A, B])
+    
+    order = int(mode[mode.find('Poly')+4])
+    if order == 2:
+        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6])
+    elif order == 3:
+        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
+                             c7,  c8,  c9,  c10,])
+    elif order == 4:
+        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
+                             c7,  c8,  c9,  c10,
+                             c11, c12, c13, c14, c15,])
+    elif order == 5:
+        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
+                             c7,  c8,  c9,  c10,
+                             c11, c12, c13, c14, c15,
+                             c16, c17, c18, c19, c20, c21])
+    
+    # params only 
+    p0 = np.append(np.concatenate((p0_astro, p0_phase, p0_detec)), sigF)
+	return
 
 def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
                      c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
