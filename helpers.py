@@ -9,28 +9,27 @@ from astropy.stats import sigma_clip
 
 import astro_models
 
-class orb_params(object):
+class signal_params(object):
     # class constructor
-    def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08, 
-                 a=7, inc=84.2, ecosw=0.1, esinw=0.1, q1=0.001, q2=0.001, 
-                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, mode=''):
-        self.name  = name  
-        self.t0    = t0    
-        self.per   = per   
-        self.rp    = rp    
-        self.a     = a     
-        self.inc   = inc   
-        self.ecosw = ecosw 
-        self.esinw = esinw 
-        self.q1    = q1    
-        self.q2    = q2    
-        self.fp    = fp    
-        self.A     = A     
-        self.B     = B     
-        self.C     = C     
-        self.D     = D     
-        self.r2    = r2    
-        self.mode  = mode  
+    def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08,
+                 a=7, inc=84.2, ecosw=0.1, esinw=0.1, q1=0.001, q2=0.001,
+                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, sigF=0.008, mode=''):
+        self.name  = name
+        self.t0    = t0
+        self.per   = per
+        self.rp    = rp
+        self.a     = a
+        self.inc   = inc
+        self.ecosw = ecosw
+        self.esinw = esinw
+        self.q1    = q1
+        self.q2    = q2
+        self.fp    = fp
+        self.A     = A
+        self.B     = B
+        self.C     = C
+        self.D     = D
+        self.r2    = r2
         self.c1    = 1.0
         self.c2    = 0.0
         self.c3    = 0.0
@@ -43,15 +42,17 @@ class orb_params(object):
         self.c10   = 0.0
         self.c11   = 0.0
         self.c12   = 0.0
+        self.c15   = 0.0
         self.c13   = 0.0
         self.c14   = 0.0
-        self.c15   = 0.0
         self.c16   = 0.0
         self.c17   = 0.0
         self.c18   = 0.0
         self.c19   = 0.0
         self.c20   = 0.0
         self.c21   = 0.0
+        self.sigF  = sigF
+        self.mode  = mode
 
 def get_data(path):
     '''
@@ -148,25 +149,25 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, nFrames=64, cut=0, ignore=[])
 	return FLUX, TIME, XDATA, YDATA
 
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
-	# sorting chronologically
-	index      = np.argsort(time)
-	time0      = time[index]
-	flux0      = flux[index]
-	flux_err0  = flux_err[index]
-	xdata0     = xdata[index]
-	ydata0     = ydata[index]
-	psfxw0     = psfxw[index]
-	psfyw0     = psfyw[index]
+    # sorting chronologically
+    index      = np.argsort(time)
+    time0      = time[index]
+    flux0      = flux[index]
+    flux_err0  = flux_err[index]
+    xdata0     = xdata[index]
+    ydata0     = ydata[index]
+    psfxw0     = psfxw[index]
+    psfyw0     = psfyw[index]
 
-	# chop dithered-calibration AOR
-	time       = time0[cut:]
-	flux       = flux0[cut:]
-	flux_err   = flux_err0[cut:]
-	xdata      = xdata0[cut:]
-	ydata      = ydata0[cut:]
-	psfxw      = psfxw0[cut:]
-	psfyw      = psfyw0[cut:]
-	return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+    # chop dithered-calibration AOR
+    time       = time0[cut:]
+    flux       = flux0[cut:]
+    flux_err   = flux_err0[cut:]
+    xdata      = xdata0[cut:]
+    ydata      = ydata0[cut:]
+    psfxw      = psfxw0[cut:]
+    psfyw      = psfyw0[cut:]
+    return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def load_past_params(path):
 	'''
@@ -311,8 +312,8 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
-'''def make_lambdafunc(lparams, dparam=[], obj):
-    
+def make_lambdafunc(function, dparams=[], obj=[], debug=False):
+    '''
     Params:
     -------
     lparams   : list
@@ -329,26 +330,33 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
     Return:
     func .   : function
         lamdba function with parameters fixed to the value oin obj.
-    
+    '''
+    lparams = inspect.getargspec(function).args
+    module = str(inspect.getmodule(function)).split('\'')[1]
+    funcName = function.__name__
+    fullName = module + '.' + funcName
     # get list of params you wish to fit
     nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
     # assign value to fixed variables
     varstr  = ''
-    for label in dparams:
-        varstr = label + ' = obj.' + label
-        exec(varstr)
+    for label in lparams:
+        if label in dparams:
+            varstr += 'obj.'
+        varstr += label + ', '
+    #remove extra ', '
+    varstr = varstr[:-2]
+    
     # generate the line to execute
-    mystr = 'func  = lambda '
+    mystr = 'global '+funcName+'_dynamic; '+funcName+'_dynamic = lambda '
     for i in range(len(nparams)):
         mystr = mystr + nparams[i] +', '
+    #remove extra ', '
     mystr = mystr[:-2]
-    mystr = mystr +': func('
-    for i in range(len(lparams)):
-        mystr = mystr + lparams[i] +', '
-    mystr = mystr[:-2]
-    mystr = mystr+')'
+    mystr = mystr +': '+fullName+'(' + varstr + ')'
+    if debug:
+        print(mystr)
     exec(mystr)
-    return func'''
+    return func
 
 def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
     #t0_err, rp_err, a_err, inc_err = prior_errs
@@ -365,37 +373,22 @@ def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q
     else:
         return -np.inf
 
-
-def lnlike(input_data, signalFN, p0):
-    flux  = input_data[0]
-    model = signalFN(input_data[1:], *p0[:-1])
-    sigF  = p0[-1]
-    return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)
-
-
-'''def lnlike(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def lnlike(flux, time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
                 c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21, sigF):
-    flux = input_data[0]
-    model = signal_poly(input_data[1:], t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
-                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21)
-    return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)'''
+    model = signal_poly((time, xdata, ydata, mid_x, mid_y, mode), t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
+                        C, D, r2, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17,
+                        c18, c19, c20, c21)
+    return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)
     
-def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, priorFN, lnlikeFN):
-    #We need this passed in function to be a lambda function call to lnprior
-    lp = priorFN(priors, prior_errs, time, mode, *p0)
+def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, lnpriorFn, lnlikeFn):
+    lp = lnpriorFN(priors, prior_errs, time, mode, *p0)
     if not np.isfinite(lp):
         return -np.inf
-    #We need this passed in function to be a lambda function call to lnlike
-    loglike = lnlikeFN((flux, time, xdata, ydata, mid_x, mid_y, mode), *p0)
+    loglike = lnlikeFN(flux, time, xdata, ydata, mid_x, mid_y, mode, *p0)
     if not np.isfinite(loglike):
         return -np.inf
     return lp + loglike
-
-#lnlikeFn = lambda input_data, ssdfsdjfbs: lnlike(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, sigF)
-
-#priorFN = lambda priors, prior_errs, time, mode, ssdfsdjfbs: lnlike(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2)
 
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     '''
