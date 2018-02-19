@@ -7,6 +7,8 @@ from matplotlib import gridspec
 
 from astropy.stats import sigma_clip
 
+import inspect
+
 import astro_models
 
 class signal_params(object):
@@ -169,6 +171,32 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     psfyw      = psfyw0[cut:]
     return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
+def expand_dparams(dparams, mode):
+    if 'ellipse' not in mode:
+        dparams = np.append(dparams, 'r2')
+
+    if 'v2' not in mode:
+        dparams = np.append(dparams, ['C', 'D'])
+
+    if 'Poly2' in mode:
+        dparams = np.append(dparams, ['c7','c8', 'c9', 'c10', 'c11', 
+                                      'c12', 'c13', 'c14', 'c15', 'c16', 
+                                      'c17','c18', 'c19', 'c20', 'c21'])
+    elif 'Poly3' in mode:
+        dparams = np.append(dparams, ['c11', 'c12', 'c13', 'c14', 'c15', 'c16', 
+                                      'c17','c18', 'c19', 'c20', 'c21'])
+    elif 'Poly4' in mode:
+        dparams = np.append(dparams, ['c16', 'c17','c18', 'c19', 'c20', 'c21'])
+
+    return dparams
+
+def get_p0(lparams, dparams, obj):
+    nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
+    p0 = np.empty(len(nparams))
+    for i in range(len(nparams)):
+         p0[i] = eval('obj.'+ nparams[i])
+    return p0, nparams
+
 def load_past_params(path):
 	'''
 	Params:
@@ -178,87 +206,7 @@ def load_past_params(path):
 
 
 	'''
-    Result_MCMC = np.load(oldFname)
 
-    '''Initialize parameters'''
-
-    # Transit Parameters from Gillon 2010 (10 params)
-    t0   = Result_MCMC['t0'][0,0]   # initially in hrs
-    per  = per                      # initially in days
-    rp   = Result_MCMC['rp'][0,0]         # initially in jupiter radius
-    a    = Result_MCMC['a'][0,0]          # initially in AU
-    inc  = Result_MCMC['inc'][0,0]
-    ecosw= Result_MCMC['ecosw'][0,0]      # dimensionless [0,1]                   
-    esinw= Result_MCMC['esinw'][0,0]
-    q1   = Result_MCMC['q1'][0,0]
-    q2   = Result_MCMC['q2'][0,0]
-    fp   = Result_MCMC['fp'][0,0]
-
-    # Phase Variation Parameters (2 params)
-    A    = 0.3
-    B    = 0.
-    C    = 0.
-    D    = 0.
-    r2   = rp
-
-    # Detector initial parameters (10 params)
-    c1   = Result_MCMC['c1'][0,0]          # 1
-    c2   = Result_MCMC['c2'][0,0]          # x
-    c3   = Result_MCMC['c3'][0,0]          # y
-    c4   = Result_MCMC['c4'][0,0]          # x^2
-    c5   = Result_MCMC['c5'][0,0]          # xy
-    c6   = Result_MCMC['c6'][0,0]          # y^2
-    c7   = Result_MCMC['c7'][0,0]          # x^3
-    c8   = Result_MCMC['c8'][0,0]          # x^2y
-    c9   = Result_MCMC['c9'][0,0]          # xy^2
-    c10  = Result_MCMC['c10'][0,0]         # y^3
-    c11  = Result_MCMC['c11'][0,0]         # x^4
-    c12  = Result_MCMC['c12'][0,0]         # x^3y
-    c13  = Result_MCMC['c13'][0,0]         # x^2y^2
-    c14  = Result_MCMC['c14'][0,0]         # xy^3
-    c15  = Result_MCMC['c15'][0,0]         # y^4
-    c16  = Result_MCMC['c16'][0,0]         # x^5
-    c17  = Result_MCMC['c17'][0,0]         # x^4y
-    c18  = Result_MCMC['c18'][0,0]         # x^3y^2
-    c19  = Result_MCMC['c19'][0,0]         # x^2y^3
-    c20  = Result_MCMC['c20'][0,0]         # xy^4
-    c21  = Result_MCMC['c21'][0,0]         # y^5
-     
-    # Uncertainty
-    sigF = Result_MCMC['sigF'][0,0]
-
-    # pre-calculation
-    mid_x = np.mean(xdata)
-    mid_y = np.mean(ydata)
-
-    # Regroup into arrays
-    p0_astro = np.array([t0, rp, a, inc, ecosw, esinw, q1, q2, fp])
-    
-    if 'ellipse' in mode:
-        p0_phase = np.array([A, B, r2])
-    elif 'v2' in mode:
-        p0_phase = np.array([A, B, C, D])
-    else:
-        p0_phase = np.array([A, B])
-    
-    order = int(mode[mode.find('Poly')+4])
-    if order == 2:
-        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6])
-    elif order == 3:
-        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                             c7,  c8,  c9,  c10,])
-    elif order == 4:
-        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                             c7,  c8,  c9,  c10,
-                             c11, c12, c13, c14, c15,])
-    elif order == 5:
-        p0_detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                             c7,  c8,  c9,  c10,
-                             c11, c12, c13, c14, c15,
-                             c16, c17, c18, c19, c20, c21])
-    
-    # params only 
-    p0 = np.append(np.concatenate((p0_astro, p0_phase, p0_detec)), sigF)
 	return
 
 def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
@@ -312,51 +260,55 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
-def make_lambdafunc(function, dparams=[], obj=[], debug=False):
+def make_lambdafunc(lparams, namefunc, newname, dparams=[], nameobj='', debug=False):
     '''
+    Generates command line to create a lambda function where a subset of parameters (dparams)
+    are kept fixed. The command line will then have to be executed exec(mystr).
+
     Params:
     -------
     lparams   : list
         list of input all input parameters of the signal function.
-    dparams   : list
+    namefunc  : str
+        name of the original function.
+    newname   : str
+        name assigned to the lambda function.
+    dparams   : list (optional)
         list of all input parameters the user does not wish to fit. 
         Default is none.
-    obj       : object
-        object with all the possible fit parameters values with default 
-        values. If the user wish to not fit certain parameters and wants
-        to fixed it at a specific value, they will have to assess it to
-        the object. Otherwise, default values will be assumed.
+    nameobj    : str (optional)
+        name of object containing all initial and fixed parameter values.
+        Default is none.
+    debug      : bool (optional)
+        If true, will print mystr so the user can read the command because executing it.
     
     Return:
-    func .   : function
-        lamdba function with parameters fixed to the value oin obj.
+    -------
+    mystr      : 
+        string that will have to be executed.
     '''
-    lparams = inspect.getargspec(function).args
-    module = str(inspect.getmodule(function)).split('\'')[1]
-    funcName = function.__name__
-    fullName = module + '.' + funcName
     # get list of params you wish to fit
-    nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
+    index    = np.in1d(lparams, dparams)
+    nparams  = lparams[np.where(index==False)[0]]
     # assign value to fixed variables
     varstr  = ''
     for label in lparams:
         if label in dparams:
-            varstr += 'obj.'
+            varstr += nameobj + '.'
         varstr += label + ', '
     #remove extra ', '
     varstr = varstr[:-2]
     
     # generate the line to execute
-    mystr = 'global '+funcName+'_dynamic; '+funcName+'_dynamic = lambda '
+    mystr = newname + ' = lambda '
     for i in range(len(nparams)):
         mystr = mystr + nparams[i] +', '
     #remove extra ', '
     mystr = mystr[:-2]
-    mystr = mystr +': '+fullName+'(' + varstr + ')'
+    mystr = mystr +': '+namefunc+'(' + varstr + ')'
     if debug:
         print(mystr)
-    exec(mystr)
-    return func
+    return mystr
 
 def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
     #t0_err, rp_err, a_err, inc_err = prior_errs
