@@ -107,6 +107,27 @@ def get_full_data(foldername, filename):
     
     return flux, flux_err, time, xdata, ydata
 
+def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
+	# sorting chronologically
+	index      = np.argsort(time)
+	time0      = time[index]
+	flux0      = flux[index]
+	flux_err0  = flux_err[index]
+	xdata0     = xdata[index]
+	ydata0     = ydata[index]
+	psfxw0     = psfxw[index]
+	psfyw0     = psfyw[index]
+
+	# chop dithered-calibration AOR
+	time       = time0[cut:]
+	flux       = flux0[cut:]
+	flux_err   = flux_err0[cut:]
+	xdata      = xdata0[cut:]
+	ydata      = ydata0[cut:]
+	psfxw      = psfxw0[cut:]
+	psfyw      = psfyw0[cut:]
+	return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+
 def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
                      c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
     
@@ -158,8 +179,8 @@ def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
-def make_lambdafunc(lparams, dparam=[], obj):
-    '''
+'''def make_lambdafunc(lparams, dparam=[], obj):
+    
     Params:
     -------
     lparams   : list
@@ -176,9 +197,14 @@ def make_lambdafunc(lparams, dparam=[], obj):
     Return:
     func .   : function
         lamdba function with parameters fixed to the value oin obj.
-    '''
+    
     # get list of params you wish to fit
     nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
+    # assign value to fixed variables
+    varstr  = ''
+    for label in dparams:
+        varstr = label + ' = obj.' + label
+        exec(varstr)
     # generate the line to execute
     mystr = 'func  = lambda '
     for i in range(len(nparams)):
@@ -190,7 +216,7 @@ def make_lambdafunc(lparams, dparam=[], obj):
     mystr = mystr[:-2]
     mystr = mystr+')'
     exec(mystr)
-    return func
+    return func'''
 
 def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
     #t0_err, rp_err, a_err, inc_err = prior_errs
