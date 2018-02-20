@@ -190,6 +190,9 @@ def expand_dparams(dparams, mode):
 
     return dparams
 
+def get_lparams(function):
+    return inspect.getargspec(function).args
+
 def get_p0(lparams, dparams, obj):
     nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
     p0 = np.empty(len(nparams))
@@ -251,80 +254,116 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
 
     return np.dot(detec[np.newaxis,:], pos).reshape(-1)
 
-def signal_poly(input_data, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def signal_poly(time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21):
-    (time, xdata, ydata, mid_x, mid_y, mode) = input_data
     astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-    detec = detec_model_poly(input_data[1:], c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
+    detec = detec_model_poly((xdata, ydata, mid_x, mid_y, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
-def make_lambdafunc(lparams, namefunc, newname, dparams=[], nameobj='', debug=False):
+def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     '''
-    Generates command line to create a lambda function where a subset of parameters (dparams)
-    are kept fixed. The command line will then have to be executed exec(mystr).
+    Create a lambda function called dynamic_funk that will fixed the parameters listed in
+    dparams with the values in obj.
 
     Params:
     -------
-    lparams   : list
-        list of input all input parameters of the signal function.
-    namefunc  : str
+    function     : str
         name of the original function.
-    newname   : str
-        name assigned to the lambda function.
-    dparams   : list (optional)
+    dparams      : list (optional)
         list of all input parameters the user does not wish to fit. 
         Default is none.
-    nameobj    : str (optional)
-        name of object containing all initial and fixed parameter values.
+    obj          : str (optional)
+        bject containing all initial and fixed parameter values.
         Default is none.
-    debug      : bool (optional)
+    debug        : bool (optional)
         If true, will print mystr so the user can read the command because executing it.
     
     Return:
     -------
-    mystr      : 
-        string that will have to be executed.
+    dynamic_funk : function
+        lambda function with fixed parameters.
+
+    Note:
+    -----
+    The module where the original function is needs to be loaded here.
     '''
+    module   = function.__module__
+    namefunc = function.__name__
     # get list of params you wish to fit
+    lparams  = np.asarray(inspect.getargspec(function).args)
     index    = np.in1d(lparams, dparams)
     nparams  = lparams[np.where(index==False)[0]]
     # assign value to fixed variables
     varstr  = ''
     for label in lparams:
         if label in dparams:
-            varstr += nameobj + '.'
-        varstr += label + ', '
+            tmp = 'obj.' + label
+            varstr += str(eval(tmp)) + ', '
+        else:
+            varstr += label + ', '
     #remove extra ', '
     varstr = varstr[:-2]
     
     # generate the line to execute
-    mystr = newname + ' = lambda '
+    mystr = 'global dynamic_funk; dynamic_funk = lambda '
     for i in range(len(nparams)):
         mystr = mystr + nparams[i] +', '
     #remove extra ', '
     mystr = mystr[:-2]
-    mystr = mystr +': '+namefunc+'(' + varstr + ')'
+    #mystr = mystr +': '+namefunc+'(' + varstr + ')'
+    if module == 'helpers':
+        mystr = mystr +': '+namefunc+'(' + varstr + ')'
+    else: 
+        mystr = mystr +': '+module+'.'+namefunc+'(' + varstr + ')'
+    # executing the line
+    exec(mystr)
     if debug:
         print(mystr)
-    return mystr
+    return dynamic_funk
 
-def lnprior(priors, prior_errs, time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2):
-    #t0_err, rp_err, a_err, inc_err = prior_errs
-    #t0_prior, rp_prior, a_prior, inc_prior = priors
-    check = astro_models.check_phase(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-    #lgpri_t0 = -0.5*(((t0 - t0_prior)/t0_err)**2.0)
-    #lgpri_rp = 0 # -0.5*(((rp - rp_prior)/(rp_err))**2.0)
-    #lgpri_a = -0.5*(((a - a_prior)/a_err)**2.0)
-    #lgpri_i = -0.5*(((inc - inc_prior)/inc_err)**2.0)
-    # uniform prior for the rest
+def lnlike(p0, function, flux, time, xdata, ydata, mid_x, mid_y, mode):
+    '''
+    Notes:
+    ------
+    Assuming that we are always fitting for the photometric scatter (sigF). 
+    '''
+    # define model
+    model = function(time, xdata, ydata, mid_x, mid_y, mode, *p0[:-1])
+    inv_sigma2 = 1.0/(p0[-1]**2)
+    return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
+
+#def lnprior(p0, p0_labels):
+
+
+def lnprob(p0, function, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, mode, lnpriorcustom='none'):
+    '''
+    Calculating log probability of the signal function with input parameters p0 and 
+    input_data to describe flux.
+
+    Params:
+    -------
+
+    '''
+    lp = lnpriorfunc(*p0)
+
+    if (lnpriorcustom!='none'):
+        lp += lnpriorcustom(p0)
+    if not np.isfinite(lp):
+        return -np.inf
+    return lp + lnlike(p0, function, flux, time, xdata, ydata, mid_x, mid_y, mode)
+
+def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
+            c16, c17, c18, c19, c20, c21, sigF):
+    # checking that the parameters are physically plausible
+    check = astro_models.check_phase(A, B, C, D)
     if ((0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and 
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False)):
-        return 0.0 #+ lgpri_t0 + lgpri_rp + lgpri_a + lgpri_i
+        return 0.0
     else:
         return -np.inf
-
+'''
 def lnlike(flux, time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
                 c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21, sigF):
@@ -340,7 +379,7 @@ def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, lnpri
     loglike = lnlikeFN(flux, time, xdata, ydata, mid_x, mid_y, mode, *p0)
     if not np.isfinite(loglike):
         return -np.inf
-    return lp + loglike
+    return lp + loglike'''
 
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     '''

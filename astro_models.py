@@ -72,15 +72,15 @@ def area(time, t_sec, per, rp, inc_raw, r2):
 
 def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
     if 'eccent' in mode:
-        phi = anom + w + np.pi/2
+        phi  = anom + w + np.pi/2
     else:
-        t = time - t_sec
-        w = 2*np.pi/per
-        phi = (w*t)
+        t    = time - t_sec
+        freq = 2*np.pi/per
+        phi  = (freq*t)
     if 'v2' in mode:
-        phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi))) + C*(np.cos(2*phi)-1) + (D*np.sin(2*phi))
+        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
     else:
-        phase = 1 + (A*(np.cos(phi)-1) + (B*np.sin(phi)))
+        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
     return phase
 
 def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, mode):
@@ -108,32 +108,10 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     f_total = transit + fplanet
     return f_total
 
-def check_phase(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode):    
-    ecc = np.sqrt(ecosw**2 + esinw**2)
-    w   = np.arctan2(esinw, ecosw)
-    
-    params = batman.TransitParams()                      #object to store transit parameters
-    params.t0 = t0                                       #time of inferior conjunction
-    params.per = per                                     #orbital period
-    params.rp = rp                                       #planet radius (in units of stellar radii)
-    params.a = a                                         #semi-major axis (in units of stellar radii)
-    params.inc = inc                                     #orbital inclination (in degrees)
-    params.ecc = ecc                                     #eccentricity
-    params.w = w                                         #longitude of periastron (in degrees)
-    params.limb_dark = "uniform"                         #limb darkening model
-    params.u = []                                        #limb darkening coefficients
-    params.fp = fp                                       #planet/star brightnes
-    
-    m = batman.TransitModel(params, time)                #initializes model
-    t_sec = m.get_t_secondary(params)
-    params.t_secondary = t_sec
-    m = batman.TransitModel(params, time, transittype="secondary")  #initializes model
-    anom = m.get_true_anomaly()
-    flux = m.light_curve(params)
-    
-    phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
-    if 'ellipsoid' in mode:
-        sArea = area(time, t_sec, per, rp, inc_raw, r2)
-    else:
-        sArea = 1
-    return np.any((sArea*phase*(flux-1)) < 0)
+def check_phase(A, B, C, D):    
+    phi   = np.linspace(-np.pi,np.pi, 1000)
+    if (C!=0 and D!=0):
+        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
+    else: 
+        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
+    return np.any(phase < 0)
