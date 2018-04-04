@@ -193,12 +193,13 @@ def expand_dparams(dparams, mode):
 def get_lparams(function):
     return inspect.getargspec(function).args
 
-def get_p0(lparams, dparams, obj):
+def get_p0(lparams, fancyNames, dparams, obj):
     nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
+    fancyLabels = [fancyNames[i] for i in range(len(lparams)) if not any(sb in lparams[i] for sb in dparams)]
     p0 = np.empty(len(nparams))
     for i in range(len(nparams)):
          p0[i] = eval('obj.'+ nparams[i])
-    return p0, nparams
+    return p0, nparams, fancyLabels
 
 def load_past_params(path):
 	'''
@@ -298,9 +299,11 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     # assign value to fixed variables
     varstr  = ''
     for label in lparams:
-        if label in dparams:
+        if label in dparams and label != 'r2':
             tmp = 'obj.' + label
             varstr += str(eval(tmp)) + ', '
+        elif label in dparams:
+            varstr += 'rp' + ', '
         else:
             varstr += label + ', '
     #remove extra ', '
@@ -323,21 +326,21 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
-def lnlike(p0, function, flux, time, xdata, ydata, mid_x, mid_y, mode):
+def lnlike(p0, signalfunc, flux, time, xdata, ydata, mid_x, mid_y, mode):
     '''
     Notes:
     ------
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
     # define model
-    model = function(time, xdata, ydata, mid_x, mid_y, mode, *p0[:-1])
+    model = signalfunc(time, xdata, ydata, mid_x, mid_y, mode, *p0[:-1])
     inv_sigma2 = 1.0/(p0[-1]**2)
     return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
 
 #def lnprior(p0, p0_labels):
 
 
-def lnprob(p0, function, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, mode, lnpriorcustom='none'):
+def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, mode, lnpriorcustom='none'):
     '''
     Calculating log probability of the signal function with input parameters p0 and 
     input_data to describe flux.
@@ -352,7 +355,7 @@ def lnprob(p0, function, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, mo
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(p0, function, flux, time, xdata, ydata, mid_x, mid_y, mode)
+    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, mid_x, mid_y, mode)
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
             c16, c17, c18, c19, c20, c21, sigF):
