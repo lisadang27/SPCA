@@ -87,10 +87,7 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
     phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
     eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
     if 'ellipsoid' in mode:
-        sArea = area(time, t_sec, per, rp, inc, r2)
     else:
-        sArea = 1
-    return sArea*phase*(eclip - 1)
 
 def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode):
     
