@@ -114,41 +114,41 @@ def get_full_data(foldername, filename):
     return flux, flux_err, time, xdata, ydata
 
 def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, nFrames=64, cut=0, ignore=[]):
-	# chronological order
-	index = np.argsort(TIME)
-	FLUX  = FLUX[index]
-	TIME  = TIME[index]
-	XDATA = XDATA[index]
-	YDATA = YDATA[index]
+    # chronological order
+    index = np.argsort(TIME)
+    FLUX  = FLUX[index]
+    TIME  = TIME[index]
+    XDATA = XDATA[index]
+    YDATA = YDATA[index]
 
-	# crop the first AOR 
-	FLUX  = FLUX[int(cut*nFrames):]
-	TIME  = TIME[int(cut*nFrames):]
-	XDATA = XDATA[int(cut*nFrames):]
-	YDATA = YDATA[int(cut*nFrames):]
+    # crop the first AOR (if asked)
+    FLUX  = FLUX[int(cut*nFrames):]
+    TIME  = TIME[int(cut*nFrames):]
+    XDATA = XDATA[int(cut*nFrames):]
+    YDATA = YDATA[int(cut*nFrames):]
 
-	# Sigma clip per data cube (also masks invalids)
-	FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
-	XDATA_clip = sigma_clip(FLUX, sigma=6, iters=1)
-	YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
+    # Sigma clip per data cube (also masks invalids)
+    FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
+    XDATA_clip = sigma_clip(FLUX, sigma=6, iters=1)
+    YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
 
-	# Clip bad frames
-	ind = []
-	for i in ignore:
-		ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
-	mask_id = np.zeros(len(FLUX))
-	mask_id[ind.astype(int)] = 1
-	mask_id = np.ma.make_mask(mask_id)
+    # Clip bad frames
+    ind = []
+    for i in ignore:
+        ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
+    mask_id = np.zeros(len(FLUX))
+    mask_id[ind.astype(int)] = 1
+    mask_id = np.ma.make_mask(mask_id)
 
-	# Ultimate Clipping
-	MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + mask_id
-	FLUX  = np.ma.masked_array(FLUX, mask=MASK)
-	XDATA = np.ma.masked_array(XDATA, mask=MASK)
-	YDATA = np.ma.masked_array(YDATA, mask=MASK)
+    # Ultimate Clipping
+    MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + mask_id
+    FLUX  = np.ma.masked_array(FLUX, mask=MASK)
+    XDATA = np.ma.masked_array(XDATA, mask=MASK)
+    YDATA = np.ma.masked_array(YDATA, mask=MASK)
 
-	# normalizing the flux
-	FLUX  = FLUX/np.ma.median(FLUX)
-	return FLUX, TIME, XDATA, YDATA
+    # normalizing the flux
+    FLUX  = FLUX/np.ma.median(FLUX)
+    return FLUX, TIME, XDATA, YDATA
 
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     # sorting chronologically
@@ -202,16 +202,16 @@ def get_p0(lparams, fancyNames, dparams, obj):
     return p0, nparams, fancyLabels
 
 def load_past_params(path):
-	'''
-	Params:
-	-------
-	path     : str
-		path to the file containing past mcmc result (must be a table saved as .npy)
+    '''
+    Params:
+    -------
+    path     : str
+        path to the file containing past mcmc result (must be a table saved as .npy)
 
 
-	'''
+    '''
 
-	return
+    return
 
 def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
                      c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
@@ -428,8 +428,8 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
 def chi2(data, fit, err):
     return np.sum(((data - fit)/err)**2)
 
-def loglikelihood(data, fit, err):
-    return -0.5*chi2(data, fit, err) - np.sum(np.log(err)) #sum acts as N
+def loglikelihood(data, fit, err):       
+    return -0.5*chi2(data, fit, err) - len(fit)*np.log(err)
 
 def BIC(logL, Npar, Ndat):
     return logL - (Npar/2)*np.log(Ndat)
