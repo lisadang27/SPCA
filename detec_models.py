@@ -1,9 +1,9 @@
+import numpy as np
+
 def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
                      c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
     
-    xdata, ydata, mid_x, mid_y, mode = input_dat
-    x = xdata - mid_x
-    y = ydata - mid_y
+    x, y, mode = input_dat
     
     if   'Poly2' in mode:
         pos = np.vstack((np.ones_like(x),

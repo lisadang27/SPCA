@@ -107,10 +107,9 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     f_total = transit + fplanet
     return f_total
 
-def check_phase(A, B, C, D):    
-    phi   = np.linspace(-np.pi,np.pi, 1000)
-    if (C!=0 or D!=0):
-        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
+def check_phase(A, B, C, D, mode, phis):
+    if 'v2' in mode:
+        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis)
     else: 
-        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
+        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis)
     return np.any(phase < 0)

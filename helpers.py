@@ -10,6 +10,7 @@ from astropy.stats import sigma_clip
 import inspect
 
 import astro_models
+import detec_models
 
 class signal_params(object):
     # class constructor
@@ -213,53 +214,12 @@ def load_past_params(path):
 
     return
 
-def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
-                     c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
-    
-    xdata, ydata, mid_x, mid_y, mode = input_dat
-    x = xdata - mid_x
-    y = ydata - mid_y
-    
-    if   'Poly2' in mode:
-        pos = np.vstack((np.ones_like(x),
-                        x   ,      y,
-                        x**2, x   *y,      y**2))
-        detec = np.array([c1, c2, c3, c4, c5, c6])
-    elif 'Poly3' in mode:
-        pos = np.vstack((np.ones_like(x),
-                        x   ,      y,
-                        x**2, x   *y,      y**2,
-                        x**3, x**2*y,    x*y**2,      y**3))
-        detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                          c7,  c8,  c9,  c10,])
-    elif 'Poly4' in mode:
-        pos = np.vstack((np.ones_like(x),
-                        x   ,      y,
-                        x**2, x   *y,      y**2,
-                        x**3, x**2*y,    x*y**2,      y**3,
-                        x**4, x**3*y, x**2*y**2, x**1*y**3,   y**4))
-        detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                          c7,  c8,  c9,  c10,
-                          c11, c12, c13, c14, c15,])
-    elif 'Poly5' in mode:
-        pos = np.vstack((np.ones_like(x),
-                        x   ,      y,
-                        x**2, x   *y,      y**2,
-                        x**3, x**2*y,    x*y**2,      y**3,
-                        x**4, x**3*y, x**2*y**2, x**1*y**3,   y**4,
-                        x**5, x**4*y, x**3*y**2, x**2*y**3, x*y**4, y**5))
-        detec = np.array([c1,  c2,  c3,  c4,  c5,  c6,
-                          c7,  c8,  c9,  c10,
-                          c11, c12, c13, c14, c15,
-                          c16, c17, c18, c19, c20, c21])
 
-    return np.dot(detec[np.newaxis,:], pos).reshape(-1)
-
-def signal_poly(time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def signal_poly(time, xdata, ydata, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21):
     astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-    detec = detec_model_poly((xdata, ydata, mid_x, mid_y, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
+    detec = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
 
@@ -326,21 +286,21 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
-def lnlike(p0, signalfunc, flux, time, xdata, ydata, mid_x, mid_y, mode):
+def lnlike(p0, signalfunc, flux, time, xdata, ydata, mode):
     '''
     Notes:
     ------
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
     # define model
-    model = signalfunc(time, xdata, ydata, mid_x, mid_y, mode, *p0[:-1])
+    model = signalfunc(time, xdata, ydata, mode, *p0[:-1])
     inv_sigma2 = 1.0/(p0[-1]**2)
     return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
 
 #def lnprior(p0, p0_labels):
 
 
-def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, mode, lnpriorcustom='none'):
+def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mode, checkPhasePhis, lnpriorcustom='none'):
     '''
     Calculating log probability of the signal function with input parameters p0 and 
     input_data to describe flux.
@@ -349,19 +309,20 @@ def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mid_x, mid_y, 
     -------
 
     '''
-    lp = lnpriorfunc(*p0)
+    lp = lnpriorfunc(*p0, mode, checkPhasePhis)
 
     if (lnpriorcustom!='none'):
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, mid_x, mid_y, mode)
+    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, mode)
 
-def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21, sigF):
+def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+            c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
+            c16, c17, c18, c19, c20, c21, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
-    check = astro_models.check_phase(A, B, C, D)
-    if ((0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and 
+    check = astro_models.check_phase(A, B, C, D, mode, checkPhasePhis)
+    if ((0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False)):
         return 0.0
     else:
