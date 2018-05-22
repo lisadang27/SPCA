@@ -86,7 +86,10 @@ def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
 def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, mode):
     phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
     eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
+<<<<<<< HEAD
     if 'ellipsoid' in mode:
+=======
+>>>>>>> 41ab7b046d1b7ca01da85b38987da71cf95826ac
         return phase*(eclip - 1)*area(time, t_sec, per, rp, inc, r2)
     else:
         return phase*(eclip - 1)
@@ -107,10 +110,9 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     f_total = transit + fplanet
     return f_total
 
-def check_phase(A, B, C, D):    
-    phi   = np.linspace(-np.pi,np.pi, 1000)
-    if (C!=0 and D!=0):
-        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
+def check_phase(A, B, C, D, mode, phis):
+    if 'v2' in mode:
+        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis)
     else: 
-        phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
+        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis)
     return np.any(phase < 0)
