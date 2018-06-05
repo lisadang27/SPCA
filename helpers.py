@@ -188,6 +188,9 @@ def expand_dparams(dparams, mode):
                                       'c17','c18', 'c19', 'c20', 'c21'])
     elif 'Poly4' in mode:
         dparams = np.append(dparams, ['c16', 'c17','c18', 'c19', 'c20', 'c21'])
+        
+    if 'ecosw' in dparams and 'esinw' in dparams:
+        dparams = np.append(dparams, ['ecc', 'anom', 'w'])
 
     return dparams
 
@@ -195,8 +198,8 @@ def get_lparams(function):
     return inspect.getargspec(function).args
 
 def get_p0(lparams, fancyNames, dparams, obj):
-    nparams = [sa for sa in lparams if not any(sb in sa for sb in dparams)]
-    fancyLabels = [fancyNames[i] for i in range(len(lparams)) if not any(sb in lparams[i] for sb in dparams)]
+    nparams = np.array([sa for sa in lparams if not any(sb in sa for sb in dparams)])
+    fancyLabels = np.array([fancyNames[i] for i in range(len(lparams)) if not any(sb in lparams[i] for sb in dparams)])
     p0 = np.empty(len(nparams))
     for i in range(len(nparams)):
          p0[i] = eval('obj.'+ nparams[i])
@@ -262,7 +265,7 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         if label in dparams and label != 'r2':
             tmp = 'obj.' + label
             varstr += str(eval(tmp)) + ', '
-        elif label in dparams:
+        elif label in dparams and label == 'r2':
             varstr += 'rp' + ', '
         else:
             varstr += label + ', '
@@ -429,3 +432,8 @@ def triangle_colors(data1, data2, data3, data4, label, path):
     return
 
 
+def binnedNoise(x, y, nbin):
+    bins = np.linspace(np.min(x), np.max(x), nbin)
+    digitized = np.digitize(x, bins)
+    y_means = np.array([np.nanmean(y[digitized == i]) for i in range(1, nbin)])
+    return np.nanstd(y_means)
