@@ -1,8 +1,9 @@
 Root Path: /home/taylor/Documents/Research/spitzer/
 Add Stack: True
-Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/correction_stack_for_BCDs_that_used_SPITZER_I2_50096896_0000_2_C10732723_sdark.fits
-Ignore Frames: 0,1
-Planet: WASP-12b
+Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/
+#Ignore Frames: 0,1
+Ignore Frames: 
+Planet: WASP-12b_old
 Channel: ch2
 Subarray: True
 AOR Snip: r4
@@ -10,4 +11,4 @@ Mask Stars: 06h30m33.369s, +29d40m25.33s
 Photometry Method: Aperture
 Radius: 4.0
 Shape: Circular
-Edge: Hard
+Edge: Exact

@@ -47,17 +47,56 @@ def get_fnames(directory, AOR_snip, ch):
     Returns
     -------
 
-    :return: fname - (list) - List of paths to all bcd.fits files.
+    :return: fname, lens - (list, list) - List of paths to all bcd.fits files, 
+                                          number of files for each AOR (needed
+                                          for adding correction stacks).
     '''
     lst      = os.listdir(directory)
     AOR_list = [k for k in lst if AOR_snip in k] 
-    #AOR_list = np.delete(AOR_list, [0, 4])                # used to ignore calibration data sets
     fnames   = []
+    lens = []
     for i in range(len(AOR_list)):
         path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'	
-        fnames.extend([filename for filename in glob.glob(os.path.join(path, '*bcd.fits'))])
-    fnames.sort()
-    return fnames
+        files = glob.glob(os.path.join(path, '*bcd.fits'))
+        fnames.extend(files)
+        lens.append(len(files))
+    #fnames.sort()
+    return fnames, lens
+
+
+def get_stacks(calDir, dataDir, AOR_snip, ch):
+    '''
+    Find paths to all the fits files.
+
+    Parameters
+    ----------
+
+
+    Returns
+    -------
+
+    :return: 
+    '''
+    stacks = np.array(os.listdir(calDir))
+    locs = np.array([stacks[i].find('SPITZER_I') for i in range(len(stacks))])
+    good = np.where(locs!=-1)[0] #filter out all files that don't fit the correct naming convention for correction stacks
+    offset = 11 #legth of the string "SPITZER_I#_"
+    keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
+
+    data_list = os.listdir(dataDir)
+    AOR_list = [a for a in data_list if AOR_snip in a]
+    calFiles = []
+    for i in range(len(AOR_list)):
+        path = dataDir + '/' + AOR_list[i] + '/' + ch +'/cal/'
+        if not os.path.isdir(path):
+            print('Error: Folder \''+path+'\' does not exist, so automatic correction stack selection cannot be performed')
+            return []
+        fname = glob.glob(path+'*sdark.fits')[0]
+        loc = fname.find('SPITZER_I')+offset
+        key = fname[loc:].split('_')[0]
+        calFiles.append(os.path.join(calDir, stacks[list(good)][np.where(keys == key)[0][0]]))
+    return calFiles
+
 
 def get_time(hdu_list, time, ignoreFrames):
     '''
@@ -85,7 +124,8 @@ def get_time(hdu_list, time, ignoreFrames):
     sec2day = 1.0/(3600.0*24.0)
     step    = hdu_list[0].header['FRAMTIME']*sec2day
     t       = np.linspace(hdu_list[0].header['BMJD_OBS'] + step/2, hdu_list[0].header['BMJD_OBS'] + (h-1)*step, h)
-    t = np.delete(t, ignoreFrames, axis=0)
+    if ignoreFrames != []:
+        t = np.delete(t, ignoreFrames, axis=0)
     time.extend(t)
     return time
 
@@ -534,7 +574,9 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         method = 'center'
 
     # get list of filenames and nb of files
-    fnames = get_fnames(datapath, AOR_snip, channel)
+    fnames, lens = get_fnames(datapath, AOR_snip, channel)
+    if addStack:
+        stacks = get_stacks(stackPath, datapath, AOR_snip, channel)
     
     bin_size = bin_size - len(ignoreFrames)
 
@@ -572,6 +614,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     
     # data reduction & aperture photometry part
     if (subarray == True):
+        j=0 #counter to keep track of which correction stack we're using
         for i in range(len(fnames)):
             # open fits file
             hdu_list = fits.open(fnames[i])
@@ -580,7 +623,9 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
             time = get_time(hdu_list, time, ignoreFrames)
             #add background correcting stack if requested
             if addStack:
-                stackHDU = fits.open(stackPath)
+                while i > np.sum(lens[:j+1]):
+                    j+=1 #if we've moved onto a new AOR, increment j
+                stackHDU = fits.open(stacks[j])
                 image_data0 += stackHDU[0].data
             #ignore any consistently bad frames
             if ignoreFrames != []:

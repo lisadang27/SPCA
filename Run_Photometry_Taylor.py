@@ -55,13 +55,16 @@ else:
     with open(fname) as file:
         lines = file.readlines()
         lines = [line.strip() for line in lines] #remove endlines
-        headers = np.array([line.split(': ')[0].lower() for line in lines]) #get headers
-        settings = [line.split(': ')[-1] for line in lines] #get inputs
+        headers = np.array([line.split(':')[0].lower().strip() for line in lines]) #get headers
+        settings = [line.split(':')[-1].strip() for line in lines] #get inputs
         rootpath = settings[np.where(headers=='root path')[0][0]]
         addStack = settings[np.where(headers=='add stack')[0][0]]
         stackPath = settings[np.where(headers=='stack path')[0][0]]
         ignoreFrames = settings[np.where(headers=='ignore frames')[0][0]]
-        ignoreFrames = np.array(ignoreFrames.split(","), dtype=int)
+        if ignoreFrames != '':
+            ignoreFrames = np.array(ignoreFrames.split(","), dtype=int)
+        else:
+            ignoreFrames = []
         planet = settings[np.where(headers=='planet')[0][0]]
         channel = settings[np.where(headers=='channel')[0][0]]
         subarray = bool(settings[np.where(headers=='subarray')[0][0]])
