@@ -1,13 +1,16 @@
 Root Path: /home/taylor/Documents/Research/spitzer/
 Add Stack: True
-Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/correction_stack_for_BCDs_that_used_SPITZER_I1_50096896_0000_2_C10732701_sdark.fits
-Ignore Frames: 0,1
+#Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/correction_stack_for_BCDs_that_used_SPITZER_I1_50096896_0000_2_C10732701_sdark.fits
+Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/
+#Ignore Frames: 0,1
+#Ignore Frames: 0,1,2,3,37,40
+Ignore Frames: 0,1,2,3,4
 Planet: WASP-12b
 Channel: ch1
 Subarray: True
 AOR Snip: r4
 Mask Stars: 06h30m33.369s, +29d40m25.33s
 Photometry Method: Aperture
-Radius: 5.0
+Radius: 4.5
 Shape: Circular
 Edge: Hard
