@@ -24,6 +24,7 @@ def transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2):
     params = batman.TransitParams()                      #object to store transit parameters
     params.t0 = t0                                       #time of inferior conjunction
     params.per = per                                     #orbital period
+    params.rp = rp                                       #planet radius (in units of stellar radii)
     params.a = a                                         #semi-major axis (in units of stellar radii)
     params.inc = inc                                     #orbital inclination (in degrees)
     params.ecc = ecc                                     #eccentricity
@@ -32,7 +33,8 @@ def transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2):
     params.u = [u1, u2]                                  #limb darkening coefficients
     
     flux = np.array([])
-    rp_eff = np.sqrt(area(time, t_sec, per, rp, inc_raw, r2, r2off)*rp**2)
+    m = batman.TransitModel(params, time)
+    rp_eff = np.sqrt(area(time, m.get_t_secondary(params), per, rp, inc, r2, r2off)*rp**2)
     for i in range(len(time)):
         params.rp = rp_eff[i]                            #planet radius (in units of stellar radii)
         m = batman.TransitModel(params, time)
@@ -74,7 +76,7 @@ def eclipse_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2, fp, t_
     params.t_secondary = t_sec
     
     flux = np.array([])
-    rp_eff = np.sqrt(area(time, t_sec, per, rp, inc_raw, r2, r2off)*rp**2)
+    rp_eff = np.sqrt(area(time, t_sec, per, rp, inc, r2, r2off)*rp**2)
     for i in range(len(time)):
         params.rp = rp_eff[i]                            #planet radius (in units of stellar radii)
         m = batman.TransitModel(params, time, transittype="secondary")
