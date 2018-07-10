@@ -28,7 +28,8 @@ import warnings
 def create_folder(fname):
 	solved = 'no'
 	while(solved == 'no'):
-		path = 	os.path.dirname(os.path.abspath(__file__)) + '/' + fname
+		#path = 	os.path.dirname(os.path.abspath(__file__)) + '/' + fname
+		path = fname
 		if not os.path.exists(path):
 			os.makedirs(path)
 			solved = 'yes'
@@ -403,7 +404,7 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
 		elif (shape == 'Rectangular'):
 			aperture = RectangularAperture(position[i], w=w_r, h=h_r, theta=theta)
 		data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
-		phot_table = aperture_photometry(image_data[i,:,:],aperture, error=data_error, pixelwise_error=False, method=method)
+		phot_table = aperture_photometry(image_data[i,:,:],aperture, error=data_error, method=method)
 		tmp_sum.extend(phot_table['aperture_sum']*factor)
 		tmp_err.extend(phot_table['aperture_sum_err']*factor)
 	# removing outliers
