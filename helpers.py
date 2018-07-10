@@ -16,7 +16,7 @@ class signal_params(object):
     # class constructor
     def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08,
                  a=7, inc=84.2, ecosw=0.1, esinw=0.1, q1=0.001, q2=0.001,
-                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, sigF=0.008, mode=''):
+                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, r2off=0.0, sigF=0.008, mode=''):
         self.name  = name
         self.t0    = t0
         self.per   = per
@@ -33,6 +33,7 @@ class signal_params(object):
         self.C     = C
         self.D     = D
         self.r2    = r2
+        self.r2off = r2off
         self.c1    = 1.0
         self.c2    = 0.0
         self.c3    = 0.0
@@ -174,7 +175,7 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
 
 def expand_dparams(dparams, mode):
     if 'ellipse' not in mode:
-        dparams = np.append(dparams, 'r2')
+        dparams = np.append(dparams, ['r2', 'r2off'])
 
     if 'v2' not in mode:
         dparams = np.append(dparams, ['C', 'D'])
@@ -218,10 +219,10 @@ def load_past_params(path):
     return
 
 
-def signal_poly(time, xdata, ydata, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def signal_poly(time, xdata, ydata, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21):
-    astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
+    astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode)
     detec = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21)
     return astr*detec
@@ -320,7 +321,7 @@ def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mode, checkPha
         return -np.inf
     return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, mode)
 
-def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
             c16, c17, c18, c19, c20, c21, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
@@ -331,11 +332,11 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
     else:
         return -np.inf
 '''
-def lnlike(flux, time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def lnlike(flux, time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21, sigF):
     model = signal_poly((time, xdata, ydata, mid_x, mid_y, mode), t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
-                        C, D, r2, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17,
+                        C, D, r2, r2off, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17,
                         c18, c19, c20, c21)
     return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)
     
