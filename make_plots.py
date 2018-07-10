@@ -53,24 +53,29 @@ def plot_detec_syst(time, data, init):
     plt.xlabel('Time (BMJD)')
     plt.ylabel('Relative Flux')	
     
-    axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
+    return
+
+"""    fig, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 12))
+
+    #axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
     axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
     axes[0].set_ylabel("Relative Flux $F$")
-    axes[0].set_xlim((np.min(time0), np.max(time0)))
+    #axes[0].set_xlim((np.min(time0), np.max(time0)))
+    axes[0].set_xlim((np.min(time), np.max(time)))
 
-    axes[1].plot(time0, xdata0,  'r.', markersize=1, alpha = 0.7)
+    #axes[1].plot(time0, xdata0,  'r.', markersize=1, alpha = 0.7)
     axes[1].plot(time, xdata,  'k.', markersize=2, alpha = 1.0)
     axes[1].set_ylabel("x-centroid $x_0$")
 
-    axes[2].plot(time0, ydata0,  'r.', markersize=1, alpha = 0.7)
+    #axes[2].plot(time0, ydata0,  'r.', markersize=1, alpha = 0.7)
     axes[2].plot(time, ydata, 'k.', markersize=2, alpha = 1.0)
     axes[2].set_ylabel("y-centroid $y_0$")
 
-    axes[3].plot(time0, psfxw0,  'r.', markersize=1, alpha = 0.7)
+    #axes[3].plot(time0, psfxw0,  'r.', markersize=1, alpha = 0.7)
     axes[3].plot(time, psfxw, 'k.', markersize=2, alpha = 1.0)
     axes[3].set_ylabel("x PSF-width $\sigma _x$")
 
-    axes[4].plot(time0, psfyw0,  'r.', markersize=1, alpha = 0.7)
+    #axes[4].plot(time0, psfyw0,  'r.', markersize=1, alpha = 0.7)
     axes[4].plot(time, psfyw,  'k.', markersize=2, alpha = 1.0)
     axes[4].set_ylabel("y PSF-width $\sigma _y$")
     axes[4].set_xlabel('Time (BMJD)')
@@ -83,7 +88,7 @@ def plot_detec_syst(time, data, init):
     pathplot = savepath + '01_Raw_data.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
     return
-
+"""
 
 def plot_init_guess(time, data, init, astro, detec, savepath):
     '''
