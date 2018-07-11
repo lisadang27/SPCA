@@ -38,7 +38,7 @@ def transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2):
     for i in range(len(time)):
         params.rp = rp_eff[i]                            #planet radius (in units of stellar radii)
         m = batman.TransitModel(params, np.array([time[i]]))
-        flux = np.append(flux, m.light_curve(params)[i])
+        flux = np.append(flux, m.light_curve(params))
     
     t_secondary = m.get_t_secondary(params)
     anom       = m.get_true_anomaly()
@@ -80,7 +80,7 @@ def eclipse_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2, fp, t_
     for i in range(len(time)):
         params.rp = rp_eff[i]                            #planet radius (in units of stellar radii)
         m = batman.TransitModel(params, np.array([time[i]]), transittype="secondary")
-        flux = np.append(flux, m.light_curve(params)[i])
+        flux = np.append(flux, m.light_curve(params))
     
     return flux
 
