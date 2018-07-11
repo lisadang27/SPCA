@@ -147,12 +147,12 @@ def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
 
 def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off, mode):
     phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
-    #eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
+    eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
     if 'ellipse' in mode:
-        eclip = eclipse_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2, fp, t_sec)
+        # eclip = eclipse_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2, fp, t_sec)
         return phase*(eclip - 1)*area(time, t_sec, per, rp, inc, r2, r2off)
     else:
-        eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
+        # eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
         return phase*(eclip - 1)
 
 def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode):
@@ -161,12 +161,12 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     w   = np.arctan2(esinw, ecosw)
     u1  = 2*np.sqrt(q1)*q2
     u2  = np.sqrt(q1)*(1-2*q2)
-    #transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
+    transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     # create transit first and use orbital paramater to get time of superior conjunction
-    if 'ellipse' in mode:
-        transit, t_sec, anom = transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2)
-    else:
-        transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
+    # if 'ellipse' in mode:
+    #     transit, t_sec, anom = transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2)
+    # else:
+    #     transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     
     #ugly way of doing this as might pick up detector parameters, but thats alright - faster this way and still safe
     fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off, mode)
