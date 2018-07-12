@@ -233,24 +233,16 @@ def load_past_params(path):
     return
 
 
-<<<<<<< HEAD
-def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+
+def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
                 c16, c17, c18, c19, c20, c21, d1, d2, d3):
-    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
+    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode)
     detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, 
                                           c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
     psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
     return astr*detec*psfsys
-=======
-def signal_poly(time, xdata, ydata, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21):
-    astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode)
-    detec = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21)
-    return astr*detec
->>>>>>> 3f65740a466375a7d15bb1e27cb37a2e2cefca72
+
 
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     '''
