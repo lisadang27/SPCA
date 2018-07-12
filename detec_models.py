@@ -39,3 +39,10 @@ def detec_model_poly(input_dat, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0,
                           c16, c17, c18, c19, c20, c21])
 
     return np.dot(detec[np.newaxis,:], pos).reshape(-1)
+
+def detec_model_PSFW(input_dat, d1=1, d2=0, d3=0):
+    px, py = input_dat
+    pw     = np.vstack((np.ones_like(px), 
+                       px, py))
+    syst   = np.array([d1, d2, d3])
+    return np.dot(syst[np.newaxis,:], pw).reshape(-1)

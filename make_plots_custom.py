@@ -3,7 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
-                    time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath=''):
+                    time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath, peritime):
     '''
     Makes a multi-panel plot from photometry outputs.
     params:
@@ -68,6 +68,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     axes[4].set_xlabel('Time (BMJD)')
 
     for i in range(5):
+        axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
         for j in range(len(breaks)):
             axes[i].axvline(x=breaks[j], color ='k', alpha=0.3, linestyle = 'dashed')
 
@@ -77,7 +78,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     return
 
 
-def plot_init_guess(time, data, init, astro, detec, psfwi, savepath):
+def plot_init_guess(time, data, init, astro, detec, savepath):
     '''
     Makes a multi-panel plots for the initial light curve guesses.
     params:
@@ -105,10 +106,10 @@ def plot_init_guess(time, data, init, astro, detec, psfwi, savepath):
     axes[0].plot(time, data, '.', label='data')
     axes[0].plot(time, init, '.', label='guess')
     
-    axes[1].plot(time, data/(detec*psfwi), '.', label='Corrected')
+    axes[1].plot(time, data/detec, '.', label='Corrected')
     axes[1].plot(time, astro, '.', label='Astrophysical')
     
-    axes[2].plot(time, data/(detec*psfwi), '.', label='Corrected')
+    axes[2].plot(time, data/detec, '.', label='Corrected')
     axes[2].plot(time, astro, '.', label='Astrophysical')
     axes[2].set_ylim(0.998, 1.005)
     
@@ -129,3 +130,33 @@ def plot_init_guess(time, data, init, astro, detec, psfwi, savepath):
     pathplot = savepath + '02_Initial_Guess.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
     return
+
+def plot_psf_dependence(time, flux, detec_guess, astro_guess, psfxw, psfyw, breaks, savepath, peritime):
+    fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(10,8))
+
+    axes[0].plot(time, flux/detec_guess, '.', label='Corrected Data')
+    axes[0].plot(time, astro_guess,'.', label='Astrophysical Guess')
+    axes[0].legend(loc=3)
+    axes[0].set_ylabel('Flux')
+
+    axes[1].plot(time, flux/detec_guess-astro_guess,'.', label='Residuals')
+    axes[1].axhline(y=0, color='C1', linewidth=4)
+    axes[1].legend(loc=3)
+    axes[1].set_ylabel('Residuals')
+
+    axes[2].plot(time, psfxw, '.')
+    axes[2].set_ylabel('X-PSF Width')
+
+    axes[3].plot(time, psfyw, '.')
+    axes[3].set_xlim(np.min(time), np.max(time))
+    axes[3].set_ylabel('Y-PSF Width')
+    axes[3].set_xlabel('Time (BMJD)')
+
+    for i in range(4):
+        axes[i].axvline(x=peritime, color ='red', alpha=0.8, linestyle = 'dashed')
+        for j in range(len(breaks)):
+            axes[i].axvline(x=breaks[j], color ='k', alpha=0.3, linestyle = 'dashed')
+
+    fig.subplots_adjust(hspace=0)
+    pathplot = savepath + 'PSF_width_Noise_Correlation.pdf'
+    fig.savefig(pathplot)

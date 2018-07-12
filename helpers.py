@@ -54,6 +54,9 @@ class signal_params(object):
         self.c19   = 0.0
         self.c20   = 0.0
         self.c21   = 0.0
+        self.d1    = 1.0
+        self.d2    = 0.0
+        self.d3    = 0.0
         self.sigF  = sigF
         self.mode  = mode
 
@@ -109,29 +112,36 @@ def get_full_data(foldername, filename):
     flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
     flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
     time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
-    xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # hours
-    ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # hours
-    
-    return flux, flux_err, time, xdata, ydata
+    xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
+    ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
+    psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
+    psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+    return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
-def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, nFrames=64, cut=0, ignore=[]):
+def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=[]):
     # chronological order
     index = np.argsort(TIME)
     FLUX  = FLUX[index]
     TIME  = TIME[index]
     XDATA = XDATA[index]
     YDATA = YDATA[index]
+    PSFXW = PSFXW[index]
+    PSFYW = PSFYW[index]
 
     # crop the first AOR (if asked)
     FLUX  = FLUX[int(cut*nFrames):]
     TIME  = TIME[int(cut*nFrames):]
     XDATA = XDATA[int(cut*nFrames):]
     YDATA = YDATA[int(cut*nFrames):]
+    PSFXW = PSFXW[int(cut*nFrames):]
+    PSFYW = PSFYW[int(cut*nFrames):]
 
     # Sigma clip per data cube (also masks invalids)
     FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
-    XDATA_clip = sigma_clip(FLUX, sigma=6, iters=1)
+    XDATA_clip = sigma_clip(XDATA, sigma=6, iters=1)
     YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
+    PSFXW_clip = sigma_clip(PSFXW, sigma=6, iters=1)
+    PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, iters=1)
 
     # Clip bad frames
     ind = []
@@ -142,14 +152,16 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, nFrames=64, cut=0, ignore=[])
     mask_id = np.ma.make_mask(mask_id)
 
     # Ultimate Clipping
-    MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + mask_id
+    MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
     FLUX  = np.ma.masked_array(FLUX, mask=MASK)
     XDATA = np.ma.masked_array(XDATA, mask=MASK)
     YDATA = np.ma.masked_array(YDATA, mask=MASK)
+    PSFXW = np.ma.masked_array(PSFXW, mask=MASK)
+    PSFYW = np.ma.masked_array(PSFYW, mask=MASK)
 
     # normalizing the flux
     FLUX  = FLUX/np.ma.median(FLUX)
-    return FLUX, TIME, XDATA, YDATA
+    return FLUX, TIME, XDATA, YDATA, PSFXW, PSFYW
 
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     # sorting chronologically
@@ -191,7 +203,9 @@ def expand_dparams(dparams, mode):
         
     if 'ecosw' in dparams and 'esinw' in dparams:
         dparams = np.append(dparams, ['ecc', 'anom', 'w'])
-
+        
+    if 'psfw' not in mode:
+        dparams = np.append(dparams, ['d1', 'd2', 'd3'])
     return dparams
 
 def get_lparams(function):
@@ -218,13 +232,14 @@ def load_past_params(path):
     return
 
 
-def signal_poly(time, xdata, ydata, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
+def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21):
-    astr  = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
-    detec = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21)
-    return astr*detec
+                c16, c17, c18, c19, c20, c21, d1, d2, d3):
+    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode)
+    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, 
+                                          c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
+    psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
+    return astr*detec*psfsys
 
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     '''
@@ -289,21 +304,21 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
-def lnlike(p0, signalfunc, flux, time, xdata, ydata, mode):
+def lnlike(p0, signalfunc, flux, time, xdata, ydata, psfxw, psfyw, mode):
     '''
     Notes:
     ------
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
     # define model
-    model = signalfunc(time, xdata, ydata, mode, *p0[:-1])
+    model = signalfunc(time, xdata, ydata, psfxw, psfyw, mode, *p0[:-1])
     inv_sigma2 = 1.0/(p0[-1]**2)
     return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
 
 #def lnprior(p0, p0_labels):
 
 
-def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mode, checkPhasePhis, lnpriorcustom='none'):
+def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, psfxw, psfyw, mode, checkPhasePhis, lnpriorcustom='none'):
     '''
     Calculating log probability of the signal function with input parameters p0 and 
     input_data to describe flux.
@@ -318,14 +333,14 @@ def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, mode, checkPha
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, mode)
+    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, psfxw, psfyw, mode)
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21, sigF, mode, checkPhasePhis):
+            c16, c17, c18, c19, c20, c21, d1, d2, d3, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
     check = astro_models.check_phase(A, B, C, D, mode, checkPhasePhis)
-    if ((0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and
+    if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False)):
         return 0.0
     else:

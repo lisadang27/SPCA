@@ -17,7 +17,7 @@ def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
     m = batman.TransitModel(params, time)                #initializes model
     flux = m.light_curve(params)
     t_secondary = m.get_t_secondary(params)
-    anom       = m.get_true_anomaly()
+    anom       = m.get_true_anomaly()                    # anom is in radian!
     return flux, t_secondary, anom
 
 def eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec):
@@ -72,7 +72,7 @@ def area(time, t_sec, per, rp, inc_raw, r2):
 
 def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
     if 'eccent' in mode:
-        phi  = anom + w + np.pi/2
+        phi  = anom + np.deg2rad(w) + np.pi/2      # phis = orbital phase (everything in rad!)
     else:
         t    = time - t_sec
         freq = 2*np.pi/per
@@ -94,7 +94,7 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
 def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, mode):
     
     ecc = np.sqrt(ecosw**2 + esinw**2)
-    w   = np.arctan2(esinw, ecosw)
+    w   = np.rad2deg(np.arctan2(esinw, ecosw))    # needs to be in degrees for batman!
     u1  = 2*np.sqrt(q1)*q2
     u2  = np.sqrt(q1)*(1-2*q2)
     # create transit first and use orbital paramater to get time of superior conjunction
