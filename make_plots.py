@@ -142,10 +142,3 @@ def plot_init_guess(time, data, init, astro, detec, psfwi, savepath):
     pathplot = savepath + '02_Initial_Guess.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
     return
-
-
-
-    fig.subplots_adjust(hspace=0)
-    plotname = savepath + 'MCMC_'+mode+'_2.pdf'
-    fig.savefig(plotname, bbox_inches='tight')
-    return
