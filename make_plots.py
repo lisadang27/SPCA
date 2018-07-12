@@ -44,7 +44,19 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     
     fig, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 12))
     #fig.suptitle("XO-3b Observation")
+
+def plot_detec_syst(time, data, init):
+    plt.figure(figsize=(10,3))
+    plt.plot(time, data, '+', label='data')
+    plt.plot(time, init, '+', label='guess')
+    plt.title('Initial Guess')
+    plt.xlabel('Time (BMJD)')
+    plt.ylabel('Relative Flux')	
     
+    return
+
+"""    fig, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 12))
+
     #axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
     axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
     axes[0].set_ylabel("Relative Flux $F$")
@@ -76,16 +88,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     pathplot = savepath + '01_Raw_data.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
     return
-
-def plot_detec_syst(time, data, init):
-    plt.figure(figsize=(10,3))
-    plt.plot(time, data, '+', label='data')
-    plt.plot(time, init, '+', label='guess')
-    plt.title('Initial Guess')
-    plt.xlabel('Time (BMJD)')
-    plt.ylabel('Relative Flux')	
-    
-    return
+"""
 
 def plot_init_guess(time, data, init, astro, detec, psfwi, savepath):
     '''
