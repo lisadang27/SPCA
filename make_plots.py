@@ -171,7 +171,7 @@ def plot_bestfit(x, flux, lcurve, detec, psfwi, mode, breaks, savepath):
     for i in range(len(axes)):
         for j in range(len(breaks)):
             axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
-    fig.align_ylabels()
+    #fig.align_ylabels()
     
     fig.subplots_adjust(hspace=0)
     plotname = savepath + 'MCMC_'+mode+'_2.pdf'
