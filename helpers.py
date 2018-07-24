@@ -55,7 +55,7 @@ class signal_params(object):
         self.c19   = 0.0
         self.c20   = 0.0
         self.c21   = 0.0
-        self.d1    = 1.0
+        self.d1    = 0.0
         self.d2    = 0.0
         self.d3    = 0.0
         self.sigF  = sigF
@@ -234,12 +234,9 @@ def load_past_params(path):
 
 
 
-def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21, d1, d2, d3):
+def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, d1, d2, d3):
     astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode)
-    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, 
-                                          c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
+    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
     psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
     return astr*detec*psfsys
 
