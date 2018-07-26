@@ -408,7 +408,7 @@ def chi2(data, fit, err):
     return np.sum(((data - fit)/err)**2)
 
 def loglikelihood(data, fit, err):       
-    return -0.5*chi2(data, fit, err) - len(fit)*np.log(err)
+    return -0.5*chi2(data, fit, err) - len(fit)*np.log(err) - len(fit)*np.log(np.sqrt(2*np.pi))
 
 def BIC(logL, Npar, Ndat):
     return logL - (Npar/2)*np.log(Ndat)

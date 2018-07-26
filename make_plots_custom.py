@@ -160,3 +160,41 @@ def plot_psf_dependence(time, flux, detec_guess, astro_guess, psfxw, psfyw, brea
     fig.subplots_adjust(hspace=0)
     pathplot = savepath + 'PSF_width_Noise_Correlation.pdf'
     fig.savefig(pathplot)
+    return
+
+def plot_bestfit(x, flux, lcurve, detec, psfwi, mode, breaks, savepath, peritime):
+    fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
+    
+    axes[0].set_xlim(np.min(x), np.max(x))
+    axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[0].plot(x, lcurve*detec*psfwi, '.', color = 'r', markersize = 2.5, alpha = 0.4)
+    #axes[0].set_ylim(0.975, 1.0125)
+    axes[0].set_ylabel('Raw Flux')
+
+    axes[1].plot(x, flux/(detec*psfwi), '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[1].plot(x, lcurve, color = 'r', linewidth=2)
+    axes[1].set_ylabel('Calibrated Flux')
+    #axes[1].set_ylim(0.9825, 1.0125)
+    
+    axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
+    axes[2].plot(x, flux/(detec*psfwi), '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[2].plot(x, lcurve, color = 'r', linewidth=2)
+    axes[2].set_ylabel('Calibrated Flux')
+    axes[2].set_ylim(0.9975, 1.0035)
+
+    axes[3].plot(x, flux/(detec*psfwi) - lcurve, 'k.', markersize = 4, alpha = 0.15)
+    axes[3].axhline(y=0, color='r', linewidth = 2)
+    axes[3].set_ylabel('Residuals')
+    axes[3].set_xlabel('Orbital Phase')
+    axes[3].set_ylim(-0.007, 0.007)
+
+    for i in range(len(axes)):
+        axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
+        for j in range(len(breaks)):
+            axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
+    #fig.align_ylabels()
+    
+    fig.subplots_adjust(hspace=0)
+    plotname = savepath + 'MCMC_'+mode+'_2.pdf'
+    fig.savefig(plotname, bbox_inches='tight')
+    return
