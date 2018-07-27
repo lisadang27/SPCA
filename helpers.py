@@ -58,6 +58,8 @@ class signal_params(object):
         self.d1    = 0.0
         self.d2    = 0.0
         self.d3    = 0.0
+        self.s1    = 0.0
+        self.s2    = 0.0
         self.sigF  = sigF
         self.mode  = mode
 

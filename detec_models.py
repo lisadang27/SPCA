@@ -45,3 +45,7 @@ def detec_model_PSFW(input_dat, d1=0, d2=0, d3=0):
     pw     = np.vstack((np.ones_like(px), px, py))
     syst   = np.array([d1, d2, d3])
     return np.dot(syst[np.newaxis,:], pw).reshape(-1)
+
+def hside(time, s1, s2):
+    x = time - s2
+    return s1*np.heaviside(x, 0.5)
