@@ -209,6 +209,9 @@ def expand_dparams(dparams, mode):
         
     if 'psfw' not in mode:
         dparams = np.append(dparams, ['d1', 'd2', 'd3'])
+        
+    if 'hside' not in mode:
+        dparams = np.append(dparams, ['s1', 's2'])
     return dparams
 
 def get_lparams(function):
@@ -231,16 +234,30 @@ def load_past_params(path):
 
 
     '''
-
     return
 
 
 
-def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, d1, d2, d3):
-    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode)
-    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
-    psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
-    return astr*detec*psfsys
+def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
+                d1, d2, d3, s1, s2):
+    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
+                                           A, B, C, D, r2, r2off, mode)
+    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
+                                           c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
+    
+    if (('psfw' in mode) and ('hside' in mode)):
+        psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
+        hstep  = detec_models.hside(time, s1, s2)
+        return astr*detec*psfsys*hstep
+    
+    elif (('psfw' in mode) and ('hside' not in mode)):
+        psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
+        return astr*detec*psfsys
+    
+    elif (('psfw' not in mode) and ('hside' in mode)):
+        hstep  = detec_models.hside(time, s1, s2)
+        return astr*detec*hstep
 
 
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
@@ -339,7 +356,7 @@ def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, psfxw, psfyw, 
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21, d1, d2, d3, sigF, mode, checkPhasePhis):
+            c16, c17, c18, c19, c20, c21, d1, d2, d3, s1, s2, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
     check = astro_models.check_phase(A, B, C, D, mode, checkPhasePhis)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and

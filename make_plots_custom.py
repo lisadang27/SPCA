@@ -162,27 +162,27 @@ def plot_psf_dependence(time, flux, detec_guess, astro_guess, psfxw, psfyw, brea
     fig.savefig(pathplot)
     return
 
-def plot_bestfit(x, flux, lcurve, detec, psfwi, mode, breaks, savepath, peritime):
+def plot_bestfit(x, flux, lcurve, detec, psfwi, hside, mode, breaks, savepath, peritime):
     fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
     
     axes[0].set_xlim(np.min(x), np.max(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
-    axes[0].plot(x, lcurve*detec*psfwi, '.', color = 'r', markersize = 2.5, alpha = 0.4)
+    axes[0].plot(x, lcurve*detec*psfwi*hside, '.', color = 'r', markersize = 2.5, alpha = 0.4)
     #axes[0].set_ylim(0.975, 1.0125)
     axes[0].set_ylabel('Raw Flux')
 
-    axes[1].plot(x, flux/(detec*psfwi), '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[1].plot(x, flux/(detec*psfwi*hside), '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[1].plot(x, lcurve, color = 'r', linewidth=2)
     axes[1].set_ylabel('Calibrated Flux')
     #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
-    axes[2].plot(x, flux/(detec*psfwi), '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[2].plot(x, flux/(detec*psfwi*hside), '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[2].plot(x, lcurve, color = 'r', linewidth=2)
     axes[2].set_ylabel('Calibrated Flux')
     axes[2].set_ylim(0.9975, 1.0035)
 
-    axes[3].plot(x, flux/(detec*psfwi) - lcurve, 'k.', markersize = 4, alpha = 0.15)
+    axes[3].plot(x, flux/(detec*psfwi*hside) - lcurve, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     axes[3].set_ylabel('Residuals')
     axes[3].set_xlabel('Orbital Phase')
