@@ -48,4 +48,4 @@ def detec_model_PSFW(input_dat, d1=0, d2=0, d3=0):
 
 def hside(time, s1, s2):
     x = time - s2
-    return s1*np.heaviside(x, 0.5)
+    return s1*np.heaviside(x, 0.0) + 1
