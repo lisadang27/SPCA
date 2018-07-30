@@ -142,7 +142,7 @@ def plot_init_guess(time, data, init, astro, detec, psfwi, hside, savepath):
     fig.savefig(pathplot, bbox_inches='tight')
     return
 
-def plot_bestfit(x, flux, lcurve, detec, psfwi, hside, mode, breaks, savepath, peritime=''):
+def plot_bestfit(x, flux, lcurve, detec, psfwi, hside, mode, breaks, savepath, peritime=-np.inf):
     fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
     
     axes[0].set_xlim(np.min(x), np.max(x))
@@ -160,13 +160,14 @@ def plot_bestfit(x, flux, lcurve, detec, psfwi, hside, mode, breaks, savepath, p
     axes[2].plot(x, flux/(detec*psfwi*hside), '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[2].plot(x, lcurve, color = 'r', linewidth=2)
     axes[2].set_ylabel('Calibrated Flux')
-    axes[2].set_ylim(0.9975, 1.0035)
+    #axes[2].set_ylim(0.9975, 1.0035)
+    axes[2].set_ylim(ymin=0.9975)
 
     axes[3].plot(x, flux/(detec*psfwi*hside) - lcurve, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     axes[3].set_ylabel('Residuals')
     axes[3].set_xlabel('Orbital Phase')
-    axes[3].set_ylim(-0.007, 0.007)
+    #axes[3].set_ylim(-0.007, 0.007)
 
     for i in range(len(axes)):
         axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
