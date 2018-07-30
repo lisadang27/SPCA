@@ -55,7 +55,7 @@ class signal_params(object):
         self.c19   = 0.0
         self.c20   = 0.0
         self.c21   = 0.0
-        self.d1    = 0.0
+        self.d1    = 1.0
         self.d2    = 0.0
         self.d3    = 0.0
         self.s1    = 0.0
