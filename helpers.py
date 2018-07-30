@@ -258,6 +258,9 @@ def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, eco
     elif (('psfw' not in mode) and ('hside' in mode)):
         hstep  = detec_models.hside(time, s1, s2)
         return astr*detec*hstep
+    
+    else:
+        return astr*detec
 
 
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
