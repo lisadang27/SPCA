@@ -132,30 +132,30 @@ def area_old(time, t_sec, per, rp, inc_raw, r2):
     f = arr[:,0,2]
     return np.pi/np.sqrt(3*b*f**2/a + 3*c*d**2/a + -6*d*e*f/a + b*c - e**2)/(np.pi*rp**2)
 
-def phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode):
-    if 'eccent' in mode:
+def phase_variation(time, mode, t_sec, per, anom, w, A, B, C, D):
+    if 'eccent' in mode.lower():
         phi  = anom + np.deg2rad(w) + np.pi/2      # phis = orbital phase (everything in rad!)
     else:
         t    = time - t_sec
         freq = 2*np.pi/per
         phi  = (freq*t)
-    if 'v2' in mode:
+    if 'v2' in mode.lower():
         phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
     else:
         phase = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
     return phase
 
-def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off, mode):
-    phase = phase_variation(time, t_sec, per, anom, w, A, B, C, D, mode)
+def fplanet_model(time, mode, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off):
+    phase = phase_variation(time, mode, t_sec, per, anom, w, A, B, C, D)
     eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
-    if 'ellipse' in mode:
+    if 'ellipse' in mode.lower():
         # eclip = eclipse_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2, fp, t_sec)
         return phase*(eclip - 1)*area(time, t_sec, per, rp, inc, r2, r2off)
     else:
         # eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec)
         return phase*(eclip - 1)
 
-def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, mode):
+def ideal_lightcurve(time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off):
     
     ecc = np.sqrt(ecosw**2 + esinw**2)
     w   = np.rad2deg(np.arctan2(esinw, ecosw))    # needs to be in degrees for batman!
@@ -163,20 +163,20 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     u2  = np.sqrt(q1)*(1-2*q2)
     transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     # create transit first and use orbital paramater to get time of superior conjunction
-    # if 'ellipse' in mode:
+    # if 'ellipse' in mode.lower():
     #     transit, t_sec, anom = transit_model_ellipse(time, t0, per, rp, r2, r2off, a, inc, ecc, w, u1, u2)
     # else:
     #     transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
     
     #ugly way of doing this as might pick up detector parameters, but thats alright - faster this way and still safe
-    fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off, mode)
+    fplanet = fplanet_model(time, mode, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off)
     
     # add both light curves
     f_total = transit + fplanet
     return f_total
 
 def check_phase(A, B, C, D, mode, phis):
-    if 'v2' in mode:
+    if 'v2' in mode.lower():
         phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis)
     else: 
         phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis)
