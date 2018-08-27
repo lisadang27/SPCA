@@ -27,6 +27,7 @@ import csv
 import time as tim
 import os, sys
 import warnings
+from collections import Iterable
 
 def get_fnames(directory, AOR_snip, ch):
     '''
@@ -411,16 +412,26 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
 
     '''
     l, h, w  = image_data.shape
-    position = [cx, cy]
     tmp_sum  = []
     tmp_err  = []
-    if   (shape == 'Circular'):
-        aperture = CircularAperture(position, r=r)
-    elif (shape == 'Elliptical'):
-        aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
-    elif (shape == 'Rectangular'):
-        aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
+    movingCentroid = (isinstance(cx, Iterable) or isinstance(cy, Iterable))
+    if not movingCentroid:
+        position = [cx, cy]
+        if   (shape == 'Circular'):
+            aperture = CircularAperture(position, r=r)
+        elif (shape == 'Elliptical'):
+            aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
+        elif (shape == 'Rectangular'):
+            aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
     for i in range(l):
+        if movingCentroid:
+            position = [cx[i], cy[i]]
+            if   (shape == 'Circular'):
+                aperture = CircularAperture(position, r=r)
+            elif (shape == 'Elliptical'):
+                aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
+            elif (shape == 'Rectangular'):
+                aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
         data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
         phot_table = aperture_photometry(image_data[i,:,:], aperture, error=data_error, method=method)#, pixelwise_error=False)
         tmp_sum.extend(phot_table['aperture_sum']*factor)
@@ -464,7 +475,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     bin_size = 64, save_bin = '/ch2_datacube_binned_AORs579.dat', plot = True, 
     plot_name= 'Lightcurve.pdf', oversamp = False, saveoversamp = True, reuse_oversamp = False,
     planet = 'CoRoT-2b', r = 2.5, shape = 'Circular', edge='hard', addStack = False,
-    stackPath = '', ignoreFrames = [], maskStars = [], **kwargs):
+    stackPath = '', ignoreFrames = [], maskStars = [], moveCentroid=False, **kwargs):
 
     '''
     Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
@@ -549,6 +560,12 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         An array-like object where each element is an array-like object
         with the RA and DEC coordinates of a nearby star which should be
         masked out when computing background subtraction.
+        
+    moveCentroid: bool (optional)
+        True if you want the centroid to be centered on the flux-weighted
+        mean centroids (will default to 15,15 when a NaN is returned),
+        otherwise aperture will be centered on 15,15 (or 30,30 for 2x
+        oversampled images)
 
     **kwargs : dictionary
         Argument passed onto other functions.
@@ -563,9 +580,9 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     warnings.filterwarnings('ignore')
     tic = tim.clock()
     
-    if edge.lower()=='hard':
+    if edge.lower()=='hard' or edge.lower()=='center' or edge.lower()=='centre':
         method = 'center'
-    elif edge.lower()=='soft':
+    elif edge.lower()=='soft' or edge.lower()=='subpixel':
         method = 'subpixel'
     elif edge.lower()=='exact':
         method = 'exact'
@@ -681,16 +698,38 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                 # convert electron count to Mjy/str
                 ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
                 # aperture photometry
-                flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err, cx=2*15, cy=2*15,
-                                              r=2*r, a=2*5, b=2*5, w_r=2*5, h_r=2*5, shape=shape, method=method, **kwargs)
+                if moveCentroid:
+                    xo_new = np.array(xo[image_data3.shape[0]*i:])
+                    yo_new = np.array(yo[image_data3.shape[0]*i:])
+                    xo_new[np.where(np.isnan(xo_new))[0]] = 15*2
+                    yo_new[np.where(np.isnan(yo_new))[0]] = 15*2
+                    xo_new = list(xo_new)
+                    yo_new = list(yo_new)
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                                                  cx=xo, cy=yo, r=2*r, a=2*5, b=2*5, w_r=2*5, h_r=2*5,
+                                                  shape=shape, method=method, **kwargs)
+                else:
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                                                  cx=2*15, cy=2*15, r=2*r, a=2*5, b=2*5, w_r=2*5, h_r=2*5,
+                                                  shape=shape, method=method, **kwargs)
             else :
                 # get centroids & PSF width
                 xo, yo, xw, yw = centroid_FWM(image_data3, xo, yo, xw, yw)
                 # convert electron count to Mjy/str
                 ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
                 # aperture photometry
-                flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err, r=r, shape=shape, 
-                                              method=method, **kwargs)
+                if moveCentroid:
+                    xo_new = np.array(xo[image_data3.shape[0]*i:])
+                    yo_new = np.array(yo[image_data3.shape[0]*i:])
+                    xo_new[np.where(np.isnan(xo_new))[0]] = 15
+                    yo_new[np.where(np.isnan(yo_new))[0]] = 15
+                    xo_new = list(xo_new)
+                    yo_new = list(yo_new)
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                                                  cx=xo_new, cy=yo_new, r=r, shape=shape, method=method, **kwargs)
+                else:
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                                                  r=r, shape=shape, method=method, **kwargs)
             if ((i+1)%100 == 0 or i+1==len(fnames) or i==0):
                 print('Status:', i+1, 'out of', len(fnames))
 

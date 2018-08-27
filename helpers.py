@@ -11,6 +11,7 @@ import inspect
 
 import astro_models
 import detec_models
+import bliss
 
 class signal_params(object):
     # class constructor
@@ -119,7 +120,13 @@ def get_full_data(foldername, filename):
     ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
     psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
     psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
-    return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+    
+    #remove bad values so that BLISS mapping will work
+    mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
+                                                  np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
+                                   np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
+    
+    return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
 def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=[]):
     # chronological order
@@ -156,11 +163,19 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
 
     # Ultimate Clipping
     MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
-    FLUX  = np.ma.masked_array(FLUX, mask=MASK)
-    XDATA = np.ma.masked_array(XDATA, mask=MASK)
-    YDATA = np.ma.masked_array(YDATA, mask=MASK)
-    PSFXW = np.ma.masked_array(PSFXW, mask=MASK)
-    PSFYW = np.ma.masked_array(PSFYW, mask=MASK)
+    #FLUX  = np.ma.masked_array(FLUX, mask=MASK)
+    #XDATA = np.ma.masked_array(XDATA, mask=MASK)
+    #YDATA = np.ma.masked_array(YDATA, mask=MASK)
+    #PSFXW = np.ma.masked_array(PSFXW, mask=MASK)
+    #PSFYW = np.ma.masked_array(PSFYW, mask=MASK)
+    
+    #remove bad values so that BLISS mapping will work
+    FLUX  = FLUX[np.logical_not(MASK)]
+    TIME  = TIME[np.logical_not(MASK)]
+    XDATA = XDATA[np.logical_not(MASK)]
+    YDATA = YDATA[np.logical_not(MASK)]
+    PSFXW = PSFXW[np.logical_not(MASK)]
+    PSFYW = PSFYW[np.logical_not(MASK)]
 
     # normalizing the flux
     FLUX  = FLUX/np.ma.median(FLUX)
@@ -188,29 +203,31 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def expand_dparams(dparams, mode):
-    if 'ellipse' not in mode:
+    if 'ellipse' not in mode.lower():
         dparams = np.append(dparams, ['r2', 'r2off'])
 
-    if 'v2' not in mode:
+    if 'v2' not in mode.lower():
         dparams = np.append(dparams, ['C', 'D'])
 
-    if 'Poly2' in mode:
+    if 'poly' not in mode.lower():
+        dparams = np.append(dparams, ['c'+str(int(i)) for i in range(22)])  
+    elif 'poly2' in mode.lower():
         dparams = np.append(dparams, ['c7','c8', 'c9', 'c10', 'c11', 
                                       'c12', 'c13', 'c14', 'c15', 'c16', 
                                       'c17','c18', 'c19', 'c20', 'c21'])
-    elif 'Poly3' in mode:
+    elif 'poly3' in mode.lower():
         dparams = np.append(dparams, ['c11', 'c12', 'c13', 'c14', 'c15', 'c16', 
                                       'c17','c18', 'c19', 'c20', 'c21'])
-    elif 'Poly4' in mode:
+    elif 'poly4' in mode.lower():
         dparams = np.append(dparams, ['c16', 'c17','c18', 'c19', 'c20', 'c21'])
         
     if 'ecosw' in dparams and 'esinw' in dparams:
         dparams = np.append(dparams, ['ecc', 'anom', 'w'])
         
-    if 'psfw' not in mode:
+    if 'psfw' not in mode.lower():
         dparams = np.append(dparams, ['d1', 'd2', 'd3'])
         
-    if 'hside' not in mode:
+    if 'hside' not in mode.lower():
         dparams = np.append(dparams, ['s1', 's2'])
     return dparams
 
@@ -235,32 +252,6 @@ def load_past_params(path):
 
     '''
     return
-
-
-
-def signal_poly(time, xdata, ydata, psfwx, psfwy, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
-                d1, d2, d3, s1, s2):
-    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
-                                           A, B, C, D, r2, r2off, mode)
-    detec  = detec_models.detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
-                                           c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
-    
-    if (('psfw' in mode) and ('hside' in mode)):
-        psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
-        hstep  = detec_models.hside(time, s1, s2)
-        return astr*detec*psfsys*hstep
-    
-    elif (('psfw' in mode) and ('hside' not in mode)):
-        psfsys = detec_models.detec_model_PSFW((psfwx, psfwy), d1, d2, d3)
-        return astr*detec*psfsys
-    
-    elif (('psfw' not in mode) and ('hside' in mode)):
-        hstep  = detec_models.hside(time, s1, s2)
-        return astr*detec*hstep
-    
-    else:
-        return astr*detec
 
 
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
@@ -326,21 +317,21 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
-def lnlike(p0, signalfunc, flux, time, xdata, ydata, psfxw, psfyw, mode):
+def lnlike(p0, signalfunc, signal_input):
     '''
     Notes:
     ------
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
+    flux = signal_input[0]
+    
     # define model
-    model = signalfunc(time, xdata, ydata, psfxw, psfyw, mode, *p0[:-1])
+    model = signalfunc(signal_input, *p0)
+    
     inv_sigma2 = 1.0/(p0[-1]**2)
     return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
 
-#def lnprior(p0, p0_labels):
-
-
-def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, psfxw, psfyw, mode, checkPhasePhis, lnpriorcustom='none'):
+def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom='none'):
     '''
     Calculating log probability of the signal function with input parameters p0 and 
     input_data to describe flux.
@@ -349,13 +340,13 @@ def lnprob(p0, signalfunc, lnpriorfunc, flux, time, xdata, ydata, psfxw, psfyw, 
     -------
 
     '''
-    lp = lnpriorfunc(*p0, mode, checkPhasePhis)
+    lp = lnpriorfunc(*p0, signal_input[-1], checkPhasePhis)
 
     if (lnpriorcustom!='none'):
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
-    return lp + lnlike(p0, signalfunc, flux, time, xdata, ydata, psfxw, psfyw, mode)
+    return lp + lnlike(p0, signalfunc, signal_input)
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
@@ -363,27 +354,10 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
     # checking that the parameters are physically plausible
     check = astro_models.check_phase(A, B, C, D, mode, checkPhasePhis)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and
-        (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False)):
+        (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False) and (sigF > 0)):
         return 0.0
     else:
         return -np.inf
-'''
-def lnlike(flux, time, xdata, ydata, mid_x, mid_y, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                c1, c2, c3, c4, c5, c6, c7, c8, c9, c10, c11, c12, c13, c14, c15,
-                c16, c17, c18, c19, c20, c21, sigF):
-    model = signal_poly((time, xdata, ydata, mid_x, mid_y, mode), t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
-                        C, D, r2, r2off, c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17,
-                        c18, c19, c20, c21)
-    return -0.5*np.sum((flux-model)**2)/(sigF**2) - len(flux)*np.log(sigF)
-    
-def lnprob(p0, time, flux, xdata, ydata, mid_x, mid_y, priors, errs, mode, lnpriorFn, lnlikeFn):
-    lp = lnpriorFN(priors, prior_errs, time, mode, *p0)
-    if not np.isfinite(lp):
-        return -np.inf
-    loglike = lnlikeFN(flux, time, xdata, ydata, mid_x, mid_y, mode, *p0)
-    if not np.isfinite(loglike):
-        return -np.inf
-    return lp + loglike'''
 
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     '''
@@ -423,7 +397,8 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
             plt.xticks(rotation=25)
     if fname != None:
         plt.savefig(fname, bbox_inches='tight')
-    plt.show()
+    else:
+        plt.show()
     return    
 
 def chi2(data, fit, err):
@@ -432,8 +407,11 @@ def chi2(data, fit, err):
 def loglikelihood(data, fit, err):       
     return -0.5*chi2(data, fit, err) - len(fit)*np.log(err) - len(fit)*np.log(np.sqrt(2*np.pi))
 
-def BIC(logL, Npar, Ndat):
+def evidence(logL, Npar, Ndat):
     return logL - (Npar/2)*np.log(Ndat)
+
+def BIC(logL, Npar, Ndat):
+    return -2*(logL - (Npar/2)*np.log(Ndat))
 
 def triangle_colors(data1, data2, data3, data4, label, path):
     fig = plt.figure(figsize = (8,8))

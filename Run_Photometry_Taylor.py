@@ -43,6 +43,7 @@ if (len(sys.argv) < 2):
         radius = float(input("Aperture Radius: "))
         shape = input("Aperture Shape: ")
         edge = input("Aperture Edge: ")
+        moveCentroid = input("Center Aperture on FWM Centroid? (True/False): ")
 else:
     #test if given settings file exists
     fname = sys.argv[1]
@@ -58,10 +59,10 @@ else:
         headers = np.array([line.split(':')[0].lower().strip() for line in lines]) #get headers
         settings = [line.split(':')[-1].strip() for line in lines] #get inputs
         rootpath = settings[np.where(headers=='root path')[0][0]]
-        addStack = settings[np.where(headers=='add stack')[0][0]]
+        addStack = bool(settings[np.where(headers=='add stack')[0][0]])
         stackPath = settings[np.where(headers=='stack path')[0][0]]
         ignoreFrames = settings[np.where(headers=='ignore frames')[0][0]]
-        if ignoreFrames != '':
+        if ignoreFrames is not None and ignoreFrames != '':
             ignoreFrames = np.array(ignoreFrames.split(","), dtype=int)
         else:
             ignoreFrames = []
@@ -78,6 +79,9 @@ else:
             radius = float(settings[np.where(headers=='radius')[0][0]])
             shape = settings[np.where(headers=='shape')[0][0]]
             edge = settings[np.where(headers=='edge')[0][0]]
+            moveCentroid = bool(settings[np.where(headers=='move centroid')[0][0]])
+            if moveCentroid is None:
+                moveCentroid = False
 
 if channel=='ch1':
     folder='3um'
@@ -85,6 +89,8 @@ else:
     folder='4um'
 if photometry=='Aperture':
     folder += edge+shape+"_".join(str(radius).split('.'))
+    if moveCentroid:
+        folder += '_movingCentroid'
 datapath   = rootpath+planet+'/data/'+channel
 savepath   = rootpath+planet+'/analysis/'+channel+'/'+folder
 plot_name = 'lightcurve_'+planet+'.pdf'
@@ -101,7 +107,8 @@ if   (photometry == 'Aperture'):
     APhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                                save_full=save_full, save_bin=save_bin, planet=planet,
                                r=radius, shape=shape, edge=edge, plot_name=plot_name,
-                               addStack=addStack, stackPath=stackPath, ignoreFrames=ignoreFrames)
+                               addStack=addStack, stackPath=stackPath, ignoreFrames=ignoreFrames,
+                               moveCentroid=moveCentroid)
 elif (photometry == 'PSFfit'):
     PSFPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray)
 elif (photometry == 'Companion'):

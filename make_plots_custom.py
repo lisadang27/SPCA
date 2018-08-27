@@ -78,22 +78,20 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     return
 
 
-def plot_init_guess(time, data, init, astro, detec, savepath):
+def plot_init_guess(time, data, astro, detec_full, savepath):
     '''
     Makes a multi-panel plots for the initial light curve guesses.
     params:
     -------
-        time  : 1D array 
+        time       : 1D array 
             array of time stamps
-        data  : 1D array
+        data       : 1D array
             array of flux values for each time stamps
-        init  : 1D array
-            initial modelled the fluxes for each time stamps
-        astro : 1D array
+        astro      : 1D array
             initial modelled astrophysical flux variation for each time stamps
-        detec : 1D array
+        detec_full : 1D array
             initial modelled flux variation due to the detector for each time stamps
-        savepath : str
+        savepath   : str
             path to directory where the plot will be saved
     returns:
     --------
@@ -104,16 +102,16 @@ def plot_init_guess(time, data, init, astro, detec, savepath):
     #fig.suptitle('Initial Guess')
     
     axes[0].plot(time, data, '.', label='data')
-    axes[0].plot(time, init, '.', label='guess')
+    axes[0].plot(time, astro*detec_full, '.', label='guess')
     
-    axes[1].plot(time, data/detec, '.', label='Corrected')
+    axes[1].plot(time, data/detec_full, '.', label='Corrected')
     axes[1].plot(time, astro, '.', label='Astrophysical')
     
-    axes[2].plot(time, data/detec, '.', label='Corrected')
+    axes[2].plot(time, data/detec_full, '.', label='Corrected')
     axes[2].plot(time, astro, '.', label='Astrophysical')
     axes[2].set_ylim(0.998, 1.005)
     
-    axes[3].plot(time, data-init, '.', label='residuals')
+    axes[3].plot(time, data/detec_full-astro, '.', label='residuals')
     axes[3].axhline(y=0, linewidth=2, color='black')
     
     axes[0].set_ylabel('Relative Flux')
@@ -162,27 +160,27 @@ def plot_psf_dependence(time, flux, detec_guess, astro_guess, psfxw, psfyw, brea
     fig.savefig(pathplot)
     return
 
-def plot_bestfit(x, flux, lcurve, detec, psfwi, hside, mode, breaks, savepath, peritime):
+def plot_bestfit(x, flux, astro, detec_full, mode, breaks, savepath, peritime):
     fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
     
     axes[0].set_xlim(np.min(x), np.max(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
-    axes[0].plot(x, lcurve*detec*psfwi*hside, '.', color = 'r', markersize = 2.5, alpha = 0.4)
+    axes[0].plot(x, astro*detec_full, '.', color = 'r', markersize = 2.5, alpha = 0.4)
     #axes[0].set_ylim(0.975, 1.0125)
     axes[0].set_ylabel('Raw Flux')
 
-    axes[1].plot(x, flux/(detec*psfwi*hside), '.', color = 'k', markersize = 4, alpha = 0.15)
-    axes[1].plot(x, lcurve, color = 'r', linewidth=2)
+    axes[1].plot(x, flux/detec_full, '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[1].plot(x, astro, color = 'r', linewidth=2)
     axes[1].set_ylabel('Calibrated Flux')
     #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
-    axes[2].plot(x, flux/(detec*psfwi*hside), '.', color = 'k', markersize = 4, alpha = 0.15)
-    axes[2].plot(x, lcurve, color = 'r', linewidth=2)
+    axes[2].plot(x, flux/detec_full, '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[2].plot(x, astro, color = 'r', linewidth=2)
     axes[2].set_ylabel('Calibrated Flux')
     axes[2].set_ylim(0.9975, 1.0035)
 
-    axes[3].plot(x, flux/(detec*psfwi*hside) - lcurve, 'k.', markersize = 4, alpha = 0.15)
+    axes[3].plot(x, flux/detec_full - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     axes[3].set_ylabel('Residuals')
     axes[3].set_xlabel('Orbital Phase')
