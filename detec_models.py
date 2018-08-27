@@ -52,6 +52,9 @@ def hside(time, s1, s2):
     x = time - s2
     return s1*np.heaviside(x, 0.0) + 1
 
+def tslope(time, m1):
+    return 1+(time-time[0])*m1
+
 def detec_model_bliss(signal_input, astroModel): 
     '''
     Input:
@@ -65,7 +68,7 @@ def detec_model_bliss(signal_input, astroModel):
         NNI     = NNI points
     '''
     
-    (flux, time, nBin, nData, knotNdata, low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y,
+    (flux, time, psfxw, psfyw, nBin, nData, knotNdata, low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y,
      LL_dist, LR_dist, UL_dist, UR_dist, delta_xo, delta_yo, knot_nrst_x, knot_nrst_y,
      knot_nrst_lin, BLS, NNI, knots_x_mesh, knots_y_mesh, tmask_good_knotNdata, mode) = signal_input
     
@@ -95,20 +98,21 @@ def detec_model_bliss(signal_input, astroModel):
 #THIS IS THE MAIN SIGNAL FUNCTION WHICH BRANCHES OUT TO THE CORRECT SIGNAL FUNCTION
 def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
-                d1, d2, d3, s1, s2, sigF):
+                d1, d2, d3, s1, s2, m1, sigF):
 
     mode = signal_input[-1]
     if 'poly' in mode.lower():
         return signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                            c1,  c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17,
-                           c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, sigF)
+                           c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1, sigF)
     else:
-        return signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, sigF)
+        return signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+                            d1, d2, d3, s1, s2, m1, sigF)
 ######################################################################################
 
 def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
-                d1, d2, d3, s1, s2, sigF):
+                d1, d2, d3, s1, s2, m1, sigF):
     
     #flux, time, xdata, ydata, psfwx, psfwy, mode = signal_input
     #psfw variables won't be there if you're not fitting against psf width
@@ -128,22 +132,44 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
         hstep  = hside(time, s1, s2)
     else:
         hstep = 1
+        
+    if 'tslope' in mode.lower():
+        tcurve = tslope(time, m1)
+    else:
+        tcurve = 1
     
     astr   = astro_models.ideal_lightcurve(time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
                                            A, B, C, D, r2, r2off)
     detec  = detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
                                            c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
     
-    return astr*detec*psfsys*hstep
+    return astr*detec*psfsys*hstep*tcurve
 
-def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, sigF):
+def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, 
+                 d1, d2, d3, s1, s2, m1, sigF):
     
     time = signal_input[1]
     mode = signal_input[-1]
+    
+    if 'psfw' in mode.lower():
+        psfwidths = signal_input[2:4]
+        psfsys = detec_model_PSFW(psfwidths, d1, d2, d3)
+    else:
+        psfsys = 1
+    
+    if 'hside' in mode.lower():
+        hstep  = hside(time, s1, s2)
+    else:
+        hstep = 1
+    
+    if 'tslope' in mode.lower():
+        tcurve = tslope(time, m1)
+    else:
+        tcurve = 1
     
     astroModel = astro_models.ideal_lightcurve(time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2,
                                                fp, A, B, C, D, r2, r2off)
     
     detecModel = detec_model_bliss(signal_input, astroModel)
     
-    return astroModel*detecModel
+    return astroModel*detecModel*psfsys*hstep*tcurve
