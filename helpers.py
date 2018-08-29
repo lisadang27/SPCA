@@ -452,6 +452,14 @@ def triangle_colors(data1, data2, data3, data4, label, path):
     fig.savefig(path, bbox_inches='tight')
     return
 
+def binValues(values, binAxisValues, nbin, assumeWhiteNoise):
+    bins = np.linspace(np.min(binAxisValues), np.max(binAxisValues), nbin)
+    digitized = np.digitize(binAxisValues, bins)
+    binned = np.array([np.nanmedian(values[digitized == i]) for i in range(1, nbin)])
+    binnedErr = np.mean(np.array([np.nanstd(values[digitized == i]) for i in range(1, nbin)]))
+    if assumeWhiteNoise:
+        binnedErr /= np.sqrt(len(x)/nbin)
+    return binned, binnedErr
 
 def binnedNoise(x, y, nbin):
     bins = np.linspace(np.min(x), np.max(x), nbin)
