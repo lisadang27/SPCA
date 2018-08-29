@@ -183,7 +183,7 @@ def plot_bestfit(x, flux, astro, detec_full, mode, breaks, savepath, peritime):
     axes[3].plot(x, flux/detec_full - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     axes[3].set_ylabel('Residuals')
-    axes[3].set_xlabel('Orbital Phase')
+    axes[3].set_xlabel('Time from periapse (days)')
     axes[3].set_ylim(-0.007, 0.007)
 
     for i in range(len(axes)):
