@@ -356,7 +356,7 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
             c16, c17, c18, c19, c20, c21, d1, d2, d3, s1, s2, m1, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
-    check = astro_models.check_phase(A, B, C, D, mode, checkPhasePhis)
+    check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and #(inc < 90) and
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False) and (sigF > 0)
         and (m1 > -1)):

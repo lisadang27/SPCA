@@ -138,7 +138,7 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
     else:
         tcurve = 1
     
-    astr   = astro_models.ideal_lightcurve(time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
+    astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
                                            A, B, C, D, r2, r2off)
     detec  = detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
                                            c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
@@ -167,7 +167,7 @@ def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A,
     else:
         tcurve = 1
     
-    astroModel = astro_models.ideal_lightcurve(time, mode, t0, per, rp, a, inc, ecosw, esinw, q1, q2,
+    astroModel = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2,
                                                fp, A, B, C, D, r2, r2off)
     
     detecModel = detec_model_bliss(signal_input, astroModel)
