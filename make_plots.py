@@ -6,6 +6,11 @@ import matplotlib.cm
 import bliss
 import helpers
 
+import os,sys
+lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
+sys.path.append(lib_path)
+from timeavg import binrms
+
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                     time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath='', peritime=''):
     '''
@@ -224,8 +229,8 @@ def plot_init_guess(time, data, astro, detec_full, savepath, mode):
     fig.savefig(pathplot, bbox_inches='tight')
     return
 
-def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath, nbin=None, peritime=-np.inf):
-    #nbin = 50
+def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None):
+    
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
         #raw_flux_binned, flux_binned_err = helpers.binValues(flux, x, nbin)
@@ -261,7 +266,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath, nbin=None, perit
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     if nbin is not None:
-        axes[2].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
+        axes[3].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[3].set_ylabel('Residuals')
     axes[3].set_xlabel('Orbital Phase')
@@ -274,6 +279,58 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath, nbin=None, perit
     #fig.align_ylabels()
     
     fig.subplots_adjust(hspace=0)
-    plotname = savepath + 'MCMC_'+mode+'_2.pdf'
-    fig.savefig(plotname, bbox_inches='tight')
+    
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_2.pdf'
+        fig.savefig(plotname, bbox_inches='tight')
+    if showplot:
+        plt.show()
+    
+    return
+
+def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, savetxt=False):
+    maxbins = int(np.rint(residuals.size/minbins))
+    rms, rmslo, rmshi, stderr, binsz = binrms(residuals, maxbins)
+    plt.clf()
+    ax = plt.gca()
+    ax.set_yscale('log')
+    ax.set_xscale('log')
+    plt.errorbar(binsz, rms, yerr=[rmslo, rmshi], fmt="k-", ecolor='0.5', capsize=0, label="Data RMS")
+    ax.plot(binsz, stderr, c='red', label="Gaussian std.")
+    ylim = ax.get_ylim()
+    plt.plot([ingrDuration,ingrDuration],ylim, color='black', ls='--', alpha=0.6)
+    plt.plot([occDuration,occDuration],ylim, color='black', ls='-.', alpha=0.6)
+    ax.set_ylim(ylim)
+    plt.xlabel(r'N$_{\rm binned}$', fontsize='x-large')
+    plt.ylabel('RMS', fontsize='x-large')
+    plt.legend(loc='best', fontsize='large')
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
+        plt.savefig(plotname, bbox_inches='tight')
+    if showplot:
+        plt.show()
+    
+    #Eclipse Duration
+    sreal = rms[np.where(binsz<=ingrDuration)[0][-1]]*1e6
+    s0 = stderr[np.where(binsz<=ingrDuration)[0][-1]]*1e6
+    outStr = 'Over Ingress ('+str(round(ingrDuration*intTime*24*60, 1))+' min):\n'
+    outStr += 'Expected Noise (ppm)\t'+'Observed Noise (ppm)\n'
+    outStr += str(s0)+'\t'+str(sreal)+'\n'
+    outStr += 'Observed/Expected\n'
+    outStr += str(sreal/s0)+'\n\n'
+    #Transit Duration
+    sreal = rms[np.where(binsz<=occDuration)[0][-1]]*1e6
+    s0 = stderr[np.where(binsz<=occDuration)[0][-1]]*1e6
+    outStr += 'Over Transit/Eclipse ('+str(round(occDuration*intTime*24*60, 1))+' min):\n'
+    outStr += 'Expected Noise (ppm)\t'+'Observed Noise (ppm)\n'
+    outStr += str(s0)+'\t'+str(sreal)+'\n'
+    outStr += 'Observed/Expected\n'
+    outStr += str(sreal/s0)
+
+    print(outStr)
+    if savetxt:
+        fname = savepath + 'MCMC_'+mode+'_RedNoise.txt'
+        with open(fname,'w') as file:
+            file.write(outStr)
+    
     return

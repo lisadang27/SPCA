@@ -329,12 +329,11 @@ def lnlike(p0, signalfunc, signal_input):
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
     flux = signal_input[0]
+    inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
     
     # define model
     model = signalfunc(signal_input, *p0)
-    
-    inv_sigma2 = 1.0/(p0[-1]**2)
-    return -0.5*(np.sum((flux-model)**2*inv_sigma2) - len(flux)*np.log(inv_sigma2))
+    return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
 
 def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom='none'):
     '''
@@ -452,13 +451,13 @@ def triangle_colors(data1, data2, data3, data4, label, path):
     fig.savefig(path, bbox_inches='tight')
     return
 
-def binValues(values, binAxisValues, nbin, assumeWhiteNoise):
+def binValues(values, binAxisValues, nbin, assumeWhiteNoise=False):
     bins = np.linspace(np.min(binAxisValues), np.max(binAxisValues), nbin)
     digitized = np.digitize(binAxisValues, bins)
     binned = np.array([np.nanmedian(values[digitized == i]) for i in range(1, nbin)])
     binnedErr = np.mean(np.array([np.nanstd(values[digitized == i]) for i in range(1, nbin)]))
     if assumeWhiteNoise:
-        binnedErr /= np.sqrt(len(x)/nbin)
+        binnedErr /= np.sqrt(len(values)/nbin)
     return binned, binnedErr
 
 def binnedNoise(x, y, nbin):
@@ -466,3 +465,35 @@ def binnedNoise(x, y, nbin):
     digitized = np.digitize(x, bins)
     y_means = np.array([np.nanmean(y[digitized == i]) for i in range(1, nbin)])
     return np.nanstd(y_means)
+
+def getIngressDuration(p0_mcmc, p0_labels, p0_obj, intTime):
+    if 'rp' in p0_labels:
+        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+    else:
+        rpMCMC = p0_obj.rp
+    if 'a' in p0_labels:
+        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+    else:
+        aMCMC = p0_obj.a
+    if 'per' in p0_labels:
+        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+    else:
+        perMCMC = p0_obj.per
+
+    return (2*rpMCMC/(2*np.pi*aMCMC/perMCMC))/intTime #Eclipse/transit ingress time
+
+def getOccultationDuration(p0_mcmc, p0_labels, p0_obj, intTime):
+    if 'rp' in p0_labels:
+        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+    else:
+        rpMCMC = p0_obj.rp
+    if 'a' in p0_labels:
+        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+    else:
+        aMCMC = p0_obj.a
+    if 'per' in p0_labels:
+        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+    else:
+        perMCMC = p0_obj.per
+
+    return (2/(2*np.pi*aMCMC/perMCMC))/intTime #Transit/eclipse duration
