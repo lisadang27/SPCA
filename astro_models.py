@@ -360,12 +360,17 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
     :return: fplanet - (ndarray) - Observed flux coming from planet over time.
     '''
     
-    phase = phase_variation(time, t_sec, per, anom, ecc, w, A, B, C, D)
-    eclip = eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec)
+    fplanet = phase_variation(time, t_sec, per, anom, ecc, w, A, B, C, D)
     
-    fplanet = phase*(eclip - 1)
-    if r2 != rp and r2 != None:
-        fplanet *= area(time, t_sec, per, rp, inc, r2, r2off)
+    if r2!=rp and r2!=None:
+        #if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
+        #rp will just be the minimum physical radius
+        rEcl = rp*area(t_sec, t_sec, per, rp, inc, r2, r2off)
+    else:
+        rEcl = rp
+    
+    eclip = eclipse(time, t0, per, rEcl, a, inc, ecc, w, fp, t_sec)
+    fplanet *= (eclip - 1)
     
     return fplanet
 
@@ -447,7 +452,14 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     u1  = 2*np.sqrt(q1)*q2
     u2  = np.sqrt(q1)*(1-2*q2)
     
-    transit, t_sec, anom = transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2)
+    if r2!=rp and r2!=None:
+        #if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
+        #rp will just be the minimum physical radius
+        rTrans = rp*area(t0, t0, per, rp, inc, r2, r2off)
+    else:
+        rTrans = rp
+    
+    transit, t_sec, anom = transit_model(time, t0, per, rTrans, a, inc, ecc, w, u1, u2)
     fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off)
     
     return transit + fplanet
