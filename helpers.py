@@ -206,6 +206,8 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
 def expand_dparams(dparams, mode):
     if 'ellipse' not in mode.lower():
         dparams = np.append(dparams, ['r2', 'r2off'])
+    elif 'offset' not in mode.lower():
+        dparams = np.append(dparams, ['r2off'])
 
     if 'v2' not in mode.lower():
         dparams = np.append(dparams, ['C', 'D'])
