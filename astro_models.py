@@ -366,6 +366,7 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
         #if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
         #rp will just be the minimum physical radius
         rEcl = rp*area(t_sec, t_sec, per, rp, inc, r2, r2off)
+        fplanet *= area(time, t_sec, per, rp, inc, r2, r2off)
     else:
         rEcl = rp
     
