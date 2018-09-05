@@ -2,20 +2,20 @@ Root Path: /home/taylor/Documents/Research/spitzer/
 Add Stack: True
 Stack Path: /home/taylor/Documents/Research/spitzer/Calibration/
 #Ignore Frames: 0,1,2,3,37,40
-Ignore Frames: 0,1
-Planet: WASP-12b
-AOR Snip: r4801
+#Ignore Frames: 0,1
+#Planet: WASP-12b
+#AOR Snip: r4801
 
 #Ignore Frames: 0,1,2,3,4
-#Ignore Frames: 0,1,2
-#Planet: WASP-12b_old
-#AOR Snip: r4126
+Ignore Frames: 0,1,2
+Planet: WASP-12b_old
+AOR Snip: r4126
 
 Channel: ch1
 Subarray: True
 Mask Stars: 06h30m33.369s, +29d40m25.33s
 Photometry Method: Aperture
-Radius: 4.5
+Radius: 4.3
 Shape: Circular
-Edge: Hard
-Move Centroid: True
+Edge: Exact
+Move Centroid: False

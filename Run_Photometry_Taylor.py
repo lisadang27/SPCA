@@ -79,9 +79,11 @@ else:
             radius = float(settings[np.where(headers=='radius')[0][0]])
             shape = settings[np.where(headers=='shape')[0][0]]
             edge = settings[np.where(headers=='edge')[0][0]]
-            moveCentroid = bool(settings[np.where(headers=='move centroid')[0][0]])
-            if moveCentroid is None:
+            moveCentroid = settings[np.where(headers=='move centroid')[0][0]]
+            if moveCentroid is None or moveCentroid.lower() == 'false':
                 moveCentroid = False
+            elif moveCentroid.lower() == 'true':
+                moveCentroid = True
 
 if channel=='ch1':
     folder='3um'
