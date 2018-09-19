@@ -229,7 +229,7 @@ def plot_init_guess(time, data, astro, detec_full, savepath, mode):
     fig.savefig(pathplot, bbox_inches='tight')
     return
 
-def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None):
+def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -237,20 +237,21 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         calibrated_binned, calibrated_binned_err = helpers.binValues(flux/detec, x, nbin, assumeWhiteNoise=True)
         residuals_binned, residuals_binned_err = helpers.binValues(flux/detec-astro, x, nbin, assumeWhiteNoise=True)
     
-    fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
+    fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 14))
     
     axes[0].set_xlim(np.min(x), np.max(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[0].plot(x, astro*detec, '.', color = 'r', markersize = 2.5, alpha = 0.4)
     #axes[0].set_ylim(0.975, 1.0125)
-    axes[0].set_ylabel('Raw Flux')
+    axes[0].set_ylabel('Raw Flux', fontsize=fontsize)
 
     axes[1].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[1].plot(x, astro, color = 'r', linewidth=2)
     if nbin is not None:
         axes[1].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[1].set_ylabel('Calibrated Flux')
+    axes[1].set_ylabel('Calibrated Flux', fontsize=fontsize)
+    # axes[1].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
     #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
@@ -259,20 +260,23 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     if nbin is not None:
         axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[2].set_ylabel('Calibrated Flux')
+    axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
     #axes[2].set_ylim(0.9975, 1.0035)
-    axes[2].set_ylim(ymin=0.9975)
+    # axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
+    axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
     if nbin is not None:
         axes[3].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[3].set_ylabel('Residuals')
-    axes[3].set_xlabel('Orbital Phase')
-    #axes[3].set_ylim(-0.007, 0.007)
+    axes[3].set_ylabel('Residuals', fontsize=fontsize)
+    axes[3].set_xlabel('Orbital Phase', fontsize=fontsize)
+    # axes[3].set_ylim(-4*np.std(flux/detec - astro), 4*np.std(flux/detec - astro))
 
     for i in range(len(axes)):
+        axes[i].xaxis.set_tick_params(labelsize=fontsize)
+        axes[i].yaxis.set_tick_params(labelsize=fontsize)
         axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
         for j in range(len(breaks)):
             axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
@@ -288,7 +292,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     
     return
 
-def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, savetxt=False):
+def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False):
     maxbins = int(np.rint(residuals.size/minbins))
     rms, rmslo, rmshi, stderr, binsz = binrms(residuals, maxbins)
     plt.clf()
@@ -327,7 +331,8 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     outStr += 'Observed/Expected\n'
     outStr += str(sreal/s0)
 
-    print(outStr)
+    if showtxt:
+        print(outStr)
     if savetxt:
         fname = savepath + 'MCMC_'+mode+'_RedNoise.txt'
         with open(fname,'w') as file:
