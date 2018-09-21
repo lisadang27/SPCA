@@ -115,7 +115,7 @@ class signal_params(object):
         self.sigF  = sigF
         self.mode  = mode
 
-def get_data(path):
+def get_data_PLD(path):
     '''
     Retrieve binned data
     
@@ -186,7 +186,7 @@ def get_full_data_PLD(foldername, filename):
     
     return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
-def get_data_PLD(path):
+def get_data(path):
     '''
     Retrieve binned data
     
