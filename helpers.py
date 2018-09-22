@@ -64,6 +64,8 @@ class signal_params(object):
         self.m1    = 0.0
         self.sigF  = sigF
         self.mode  = mode
+        self.Tstar = None
+        self.TstarUncert = None
 
 def get_data(path):
     '''
