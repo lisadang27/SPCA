@@ -35,39 +35,89 @@ class signal_params(object):
         self.D     = D
         self.r2    = r2
         self.r2off = r2off
-        self.c1    = 1.0
-        self.c2    = 0.0
-        self.c3    = 0.0
-        self.c4    = 0.0
-        self.c5    = 0.0
-        self.c6    = 0.0
-        self.c7    = 0.0
-        self.c8    = 0.0
-        self.c9    = 0.0
-        self.c10   = 0.0
-        self.c11   = 0.0
-        self.c12   = 0.0
-        self.c15   = 0.0
-        self.c13   = 0.0
-        self.c14   = 0.0
-        self.c16   = 0.0
-        self.c17   = 0.0
-        self.c18   = 0.0
-        self.c19   = 0.0
-        self.c20   = 0.0
-        self.c21   = 0.0
-        self.d1    = 1.0
-        self.d2    = 0.0
-        self.d3    = 0.0
-        self.s1    = 0.0
-        self.s2    = 0.0
-        self.m1    = 0.0
+        self.c1    = 1.0     # Poly coeff 
+        self.c2    = 0.0     # Poly coeff 
+        self.c3    = 0.0     # Poly coeff 
+        self.c4    = 0.0     # Poly coeff 
+        self.c5    = 0.0     # Poly coeff 
+        self.c6    = 0.0     # Poly coeff 
+        self.c7    = 0.0     # Poly coeff 
+        self.c8    = 0.0     # Poly coeff 
+        self.c9    = 0.0     # Poly coeff 
+        self.c10   = 0.0     # Poly coeff 
+        self.c11   = 0.0     # Poly coeff 
+        self.c12   = 0.0     # Poly coeff 
+        self.c15   = 0.0     # Poly coeff 
+        self.c13   = 0.0     # Poly coeff 
+        self.c14   = 0.0     # Poly coeff 
+        self.c16   = 0.0     # Poly coeff 
+        self.c17   = 0.0     # Poly coeff 
+        self.c18   = 0.0     # Poly coeff 
+        self.c19   = 0.0     # Poly coeff 
+        self.c20   = 0.0     # Poly coeff 
+        self.c21   = 0.0     # Poly coeff 
+        self.d1    = 1.0     # PSF width coeff 
+        self.d2    = 0.0     # PSF width coeff 
+        self.d3    = 0.0     # PSF width coeff 
+        self.s1    = 0.0     # step function coeff 
+        self.s2    = 0.0     # step function coeff
+        self.m1    = 0.0     # tslope coeff 
+        self.p1_1  = 0.0     # PLD coefficient
+        self.p2_1  = 0.0     # PLD coefficient
+        self.p3_1  = 0.0     # PLD coefficient
+        self.p4_1  = 0.0     # PLD coefficient
+        self.p5_1  = 0.0     # PLD coefficient
+        self.p6_1  = 0.0     # PLD coefficient
+        self.p7_1  = 0.0     # PLD coefficient
+        self.p8_1  = 0.0     # PLD coefficient
+        self.p9_1  = 0.0     # PLD coefficient
+        self.p10_1 = 0.0     # PLD coefficient
+        self.p11_1 = 0.0     # PLD coefficient
+        self.p12_1 = 0.0     # PLD coefficient
+        self.p13_1 = 0.0     # PLD coefficient
+        self.p14_1 = 0.0     # PLD coefficient
+        self.p15_1 = 0.0     # PLD coefficient
+        self.p16_1 = 0.0     # PLD coefficient
+        self.p17_1 = 0.0     # PLD coefficient
+        self.p18_1 = 0.0     # PLD coefficient
+        self.p19_1 = 0.0     # PLD coefficient
+        self.p20_1 = 0.0     # PLD coefficient
+        self.p21_1 = 0.0     # PLD coefficient
+        self.p22_1 = 0.0     # PLD coefficient
+        self.p23_1 = 0.0     # PLD coefficient
+        self.p24_1 = 0.0     # PLD coefficient
+        self.p25_1 = 0.0     # PLD coefficient        
+        self.p1_2  = 0.0     # PLD coefficient
+        self.p2_2  = 0.0     # PLD coefficient
+        self.p3_2  = 0.0     # PLD coefficient
+        self.p4_2  = 0.0     # PLD coefficient
+        self.p5_2  = 0.0     # PLD coefficient
+        self.p6_2  = 0.0     # PLD coefficient
+        self.p7_2  = 0.0     # PLD coefficient
+        self.p8_2  = 0.0     # PLD coefficient
+        self.p9_2  = 0.0     # PLD coefficient
+        self.p10_2 = 0.0     # PLD coefficient
+        self.p11_2 = 0.0     # PLD coefficient
+        self.p12_2 = 0.0     # PLD coefficient
+        self.p13_2 = 0.0     # PLD coefficient
+        self.p14_2 = 0.0     # PLD coefficient
+        self.p15_2 = 0.0     # PLD coefficient
+        self.p16_2 = 0.0     # PLD coefficient
+        self.p17_2 = 0.0     # PLD coefficient
+        self.p18_2 = 0.0     # PLD coefficient
+        self.p19_2 = 0.0     # PLD coefficient
+        self.p20_2 = 0.0     # PLD coefficient
+        self.p21_2 = 0.0     # PLD coefficient
+        self.p22_2 = 0.0     # PLD coefficient
+        self.p23_2 = 0.0     # PLD coefficient
+        self.p24_2 = 0.0     # PLD coefficient
+        self.p25_2 = 0.0     # PLD coefficient
         self.sigF  = sigF
         self.mode  = mode
         self.Tstar = None
         self.TstarUncert = None
 
-def get_data(path):
+def get_data(path, mode):
     '''
     Retrieve binned data
     
@@ -99,21 +149,32 @@ def get_data(path):
     Y-width of the target's PSF for each frame     
     '''
     
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            flux     = np.loadtxt(path, usecols=(0,1,2,3,4,5,6,7,8), skiprows=1)             # mJr/str
+            flux_err = np.loadtxt(path, usecols=(9,10,11,12,13,14,15,16,17), skiprows=1)     # mJr/str
+            time     = np.loadtxt(path, usecols=[18], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[20], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[22], skiprows=1)     # pixel
+            psfxwdat = np.loadtxt(path, usecols=[24], skiprows=1)     # pixel
+            psfywdat = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
+        
+    else:
     #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
-    xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
-    ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
-    psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
-    psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
-    
-    factor = 1/(np.median(flux))
-    flux = factor*flux
-    flux_err = factor*flux
+        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
+        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
+        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
+        xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
+        ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
+        psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
+        psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
+
+        factor = 1/(np.median(flux))
+        flux = factor*flux
+        flux_err = factor*flux
     return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
 
-def get_full_data(foldername, filename):
+def get_full_data(foldername, filename, mode):
     path = foldername + filename
     #Loading Data
     flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
