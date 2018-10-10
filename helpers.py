@@ -151,14 +151,23 @@ def get_data(path, mode):
     
     if 'pld' in mode.lower():
         if '3x3' in mode.lower():
-            flux     = np.loadtxt(path, usecols=(0,1,2,3,4,5,6,7,8), skiprows=1)             # mJr/str
-            flux_err = np.loadtxt(path, usecols=(9,10,11,12,13,14,15,16,17), skiprows=1)     # mJr/str
+            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
+            flux_err = np.loadtxt(path, usecols=np.arange(9,18), skiprows=1)     # MJy/str
             time     = np.loadtxt(path, usecols=[18], skiprows=1)     # BMJD
             xdata    = np.loadtxt(path, usecols=[20], skiprows=1)     # pixel
             ydata    = np.loadtxt(path, usecols=[22], skiprows=1)     # pixel
             psfxwdat = np.loadtxt(path, usecols=[24], skiprows=1)     # pixel
             psfywdat = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
-        
+        elif '5x5' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
+            flux_err = np.loadtxt(path, usecols=np.arange(25,50), skiprows=1)    # mJr/str
+            time     = np.loadtxt(path, usecols=[50], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[52], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[54], skiprows=1)     # pixel
+            psfxwdat = np.loadtxt(path, usecols=[56], skiprows=1)     # pixel
+            psfywdat = np.loadtxt(path, usecols=[58], skiprows=1)     # pixel
+        else:
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
     else:
     #Loading Data
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
@@ -174,23 +183,43 @@ def get_data(path, mode):
         flux_err = factor*flux
     return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
 
-def get_full_data(foldername, filename, mode):
-    path = foldername + filename
-    #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
-    xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
-    ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
-    psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
-    psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+def get_full_data(path, mode):
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
+            time     = np.loadtxt(path, usecols=[9], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[10], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[11], skiprows=1)     # pixel
+            psfxw    = np.loadtxt(path, usecols=[12], skiprows=1)     # pixel
+            psfyw    = np.loadtxt(path, usecols=[13], skiprows=1)     # pixel
+            
+        elif '5x5' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
+            time     = np.loadtxt(path, usecols=[25], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[27], skiprows=1)     # pixel
+            psfxw    = np.loadtxt(path, usecols=[28], skiprows=1)     # pixel
+            psfyw    = np.loadtxt(path, usecols=[29], skiprows=1)     # pixel
+        else:
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+        return flux, time, xdata, ydata, psfxw, psfyw
     
-    #remove bad values so that BLISS mapping will work
-    mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
-                                                  np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
-                                   np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
+    else:
+        #Loading Data
+        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
+        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
+        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
+        xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
+        ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
     
-    return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
+        #remove bad values so that BLISS mapping will work
+        mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
+                                                      np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
+                                       np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
+
+        return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
 def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=[]):
     # chronological order
@@ -298,6 +327,14 @@ def expand_dparams(dparams, mode):
         
     if 'tslope' not in mode.lower():
         dparams = np.append(dparams, ['m1'])
+        
+    if 'pld' not in mode.lower():
+        dparams = np.append(dparams, ['p1_1', 'p2_1', 'p3_1', 'p4_1', 'p5_1', 'p6_1', 'p7_1', 'p8_1', 'p9_1', 'p10_1', 
+                     'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 'p16_1', 'p17_1', 'p18_1', 
+                     'p19_1', 'p20_1', 'p21_1', 'p22_1', 'p23_1', 'p24_1', 'p25_1', 'p1_2', 
+                     'p2_2', 'p3_2', 'p4_2', 'p5_2', 'p6_2', 'p7_2', 'p8_2', 'p9_2', 'p10_2', 
+                     'p11_2', 'p12_2', 'p13_2', 'p14_2', 'p15_2', 'p16_2', 'p17_2', 'p18_2', 
+                     'p19_2', 'p20_2', 'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'])
     
     return dparams
 

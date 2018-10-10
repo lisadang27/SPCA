@@ -414,15 +414,26 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
     ape_sum_err.extend(tmp_err)
     return ape_sum, ape_sum_err
 
-def get_pixel_values(image_data0, P, nbx = 3, nby = 3):
-    image_data = np.ma.masked_invalid(image_data0)
-    h, w, l = image_data.shape
-    P_tmp = np.empty(shape=(h, nbx*nby))
-    for i in range(h):
-        xmax, ymax = 15, 15
-        P_tmp[i,:]   = np.array([image_data[i,xmax-1,ymax-1], image_data[i,xmax-1,  ymax], image_data[i,xmax-1,ymax+1],
-                                 image_data[i,xmax  ,ymax-1], image_data[i,xmax  ,  ymax], image_data[i,  xmax,ymax+1],
-                                 image_data[i,xmax+1,ymax-1], image_data[i,xmax+1,  ymax], image_data[i,xmax+1,ymax+1]])
+def get_pixel_values(image_data0, P, box = 3):
+    img = np.ma.masked_invalid(image_data0)
+    h, w, l = img.shape
+    P_tmp = np.empty(shape=(h, box**2))
+    x0, y0 = 15, 15
+    if box == 3:
+        for i in range(h):
+            P_tmp[i,:]   = np.array([img[i,x0-1,y0-1], img[i,x0-1,  y0], img[i,x0-1,y0+1],
+                                     img[i,x0  ,y0-1], img[i,x0  ,  y0], img[i,x0  ,y0+1],
+                                     img[i,x0+1,y0-1], img[i,x0+1,  y0], img[i,x0+1,y0+1]])
+    elif box == 5:
+        for i in range(h):
+            P_tmp[i,:]   = np.array([img[i,x0-2,y0-2], img[i,x0-2,y0-1], img[i,x0-2,  y0], img[i,x0-2,y0+1], img[i,x0-2,y0+2],
+                                     img[i,x0-1,y0-2], img[i,x0-1,y0-1], img[i,x0-1,  y0], img[i,x0-1,y0+1], img[i,x0-1,y0+2],
+                                     img[i,x0  ,y0-2], img[i,x0  ,y0-1], img[i,x0  ,  y0], img[i,x0  ,y0+1], img[i,x0  ,y0+2],
+                                     img[i,x0+1,y0-2], img[i,x0+1,y0-1], img[i,x0+1,  y0], img[i,x0+1,y0+1], img[i,x0+1,y0+2],
+                                     img[i,x0+2,y0-2], img[i,x0+2,y0-1], img[i,x0+2,  y0], img[i,x0+2,y0+1], img[i,x0+2,y0+2]])
+    else:
+        raise RuntimeError('Sorry, not supported only box = 3,5 possible!')
+        
     P = np.append(P, P_tmp, axis = 0)
     return P
 

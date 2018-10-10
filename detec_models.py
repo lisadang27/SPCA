@@ -166,7 +166,7 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
         return signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                            c1,  c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17,
                            c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1, sigF)
-    elif 'bliss' in .mode.lower():
+    elif 'bliss' in mode.lower():
         return signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                             d1, d2, d3, s1, s2, m1, sigF)
     elif 'pld' in mode.lower():
