@@ -1,6 +1,7 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
+import helpers
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                     time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath, peritime):

@@ -247,7 +247,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, iters=1)
 
     # Clip bad frames
-    ind = []
+    ind = np.array([])
     for i in ignore:
         ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
     mask_id = np.zeros(len(FLUX))
