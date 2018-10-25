@@ -160,39 +160,65 @@ def plot_psf_dependence(time, flux, detec_guess, astro_guess, psfxw, psfyw, brea
     fig.savefig(pathplot)
     return
 
-def plot_bestfit(x, flux, astro, detec_full, mode, breaks, savepath, peritime):
-    fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 10))
+def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
+    
+    if nbin is not None:
+        x_binned, _ = helpers.binValues(x, x, nbin)
+        #raw_flux_binned, flux_binned_err = helpers.binValues(flux, x, nbin)
+        calibrated_binned, calibrated_binned_err = helpers.binValues(flux/detec, x, nbin, assumeWhiteNoise=True)
+        residuals_binned, residuals_binned_err = helpers.binValues(flux/detec-astro, x, nbin, assumeWhiteNoise=True)
+    
+    fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 14))
     
     axes[0].set_xlim(np.min(x), np.max(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
-    axes[0].plot(x, astro*detec_full, '.', color = 'r', markersize = 2.5, alpha = 0.4)
+    axes[0].plot(x, astro*detec, '.', color = 'r', markersize = 2.5, alpha = 0.4)
     #axes[0].set_ylim(0.975, 1.0125)
-    axes[0].set_ylabel('Raw Flux')
+    axes[0].set_ylabel('Raw Flux', fontsize=fontsize)
 
-    axes[1].plot(x, flux/detec_full, '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[1].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[1].plot(x, astro, color = 'r', linewidth=2)
-    axes[1].set_ylabel('Calibrated Flux')
+    if nbin is not None:
+        axes[1].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
+                         color = 'blue', markersize = 10, alpha = 1)
+    axes[1].set_ylabel('Calibrated Flux', fontsize=fontsize)
+    # axes[1].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
     #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
-    axes[2].plot(x, flux/detec_full, '.', color = 'k', markersize = 4, alpha = 0.15)
+    axes[2].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[2].plot(x, astro, color = 'r', linewidth=2)
-    axes[2].set_ylabel('Calibrated Flux')
-    axes[2].set_ylim(0.9975, 1.0035)
+    if nbin is not None:
+        axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
+                         color = 'blue', markersize = 10, alpha = 1)
+    axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
+    #axes[2].set_ylim(0.9975, 1.0035)
+    # axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
+    axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro))
 
-    axes[3].plot(x, flux/detec_full - astro, 'k.', markersize = 4, alpha = 0.15)
+    axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
-    axes[3].set_ylabel('Residuals')
-    axes[3].set_xlabel('Time from periapse (days)')
-    axes[3].set_ylim(-0.007, 0.007)
+    if nbin is not None:
+        axes[3].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
+                         color = 'blue', markersize = 10, alpha = 1)
+    axes[3].set_ylabel('Residuals', fontsize=fontsize)
+    axes[3].set_xlabel('Time from Periapse (days)', fontsize=fontsize)
+    # axes[3].set_ylim(-4*np.std(flux/detec - astro), 4*np.std(flux/detec - astro))
 
     for i in range(len(axes)):
+        axes[i].xaxis.set_tick_params(labelsize=fontsize)
+        axes[i].yaxis.set_tick_params(labelsize=fontsize)
         axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
         for j in range(len(breaks)):
             axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
     #fig.align_ylabels()
     
     fig.subplots_adjust(hspace=0)
-    plotname = savepath + 'MCMC_'+mode+'_2.pdf'
-    fig.savefig(plotname, bbox_inches='tight')
+    
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_2.pdf'
+        fig.savefig(plotname, bbox_inches='tight')
+    if showplot:
+        plt.show()
+    
     return
