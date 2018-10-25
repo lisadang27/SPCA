@@ -252,7 +252,7 @@ def precompute(flux, time, xdata, ydata, psfxw, psfyw, mode, astroGuess, nBin=10
     tmask_good_knotNdata = (knotNdata != 0.1)  
     tot_goodK     = len(knotNdata[tmask_good_knotNdata])
 
-    print('N/K = %.2f' % (nData/tot_goodK))
+    # print('N/K = %.2f' % (nData/tot_goodK))
     
     if plot:
         make_plots.plot_knots(xdata, ydata, flux, astroGuess, knot_nrst_lin,

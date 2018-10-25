@@ -239,7 +239,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     
     fig, axes = plt.subplots(ncols = 1, nrows = 4, sharex = True, figsize=(8, 14))
     
-    axes[0].set_xlim(np.min(x), np.max(x))
+    axes[0].set_xlim(np.nanmin(x), np.nanmax(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[0].plot(x, astro*detec, '.', color = 'r', markersize = 2.5, alpha = 0.4)
     #axes[0].set_ylim(0.975, 1.0125)
@@ -251,7 +251,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         axes[1].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[1].set_ylabel('Calibrated Flux', fontsize=fontsize)
-    # axes[1].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
+    # axes[1].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.nanmax(astro)+4*np.nanstd(flux/detec - astro))
     #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
@@ -262,8 +262,8 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
                          color = 'blue', markersize = 10, alpha = 1)
     axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
     #axes[2].set_ylim(0.9975, 1.0035)
-    # axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro), ymax=np.max(astro)+4*np.std(flux/detec - astro))
-    axes[2].set_ylim(ymin=1-3*np.std(flux/detec - astro))
+    # axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.nanmax(astro)+4*np.nanstd(flux/detec - astro))
+    axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
@@ -272,7 +272,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
                          color = 'blue', markersize = 10, alpha = 1)
     axes[3].set_ylabel('Residuals', fontsize=fontsize)
     axes[3].set_xlabel('Orbital Phase', fontsize=fontsize)
-    # axes[3].set_ylim(-4*np.std(flux/detec - astro), 4*np.std(flux/detec - astro))
+    # axes[3].set_ylim(-4*np.nanstd(flux/detec - astro), 4*np.nanstd(flux/detec - astro))
 
     for i in range(len(axes)):
         axes[i].xaxis.set_tick_params(labelsize=fontsize)
@@ -280,7 +280,8 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
         for j in range(len(breaks)):
             axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
-    #fig.align_ylabels()
+    
+    fig.align_ylabels()
     
     fig.subplots_adjust(hspace=0)
     
@@ -292,29 +293,33 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     
     return
 
-def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False):
+def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
     maxbins = int(np.rint(residuals.size/minbins))
     rms, rmslo, rmshi, stderr, binsz = binrms(residuals, maxbins)
     plt.clf()
     ax = plt.gca()
     ax.set_yscale('log')
     ax.set_xscale('log')
-    plt.errorbar(binsz, rms, yerr=[rmslo, rmshi], fmt="k-", ecolor='0.5', capsize=0, label="Data RMS")
+    ax.errorbar(binsz, rms, yerr=[rmslo, rmshi], fmt="k-", ecolor='0.5', capsize=0, label="Data RMS")
     ax.plot(binsz, stderr, c='red', label="Gaussian std.")
     ylim = ax.get_ylim()
-    plt.plot([ingrDuration,ingrDuration],ylim, color='black', ls='--', alpha=0.6)
-    plt.plot([occDuration,occDuration],ylim, color='black', ls='-.', alpha=0.6)
+    ax.plot([ingrDuration,ingrDuration],ylim, color='black', ls='--', alpha=0.6)
+    ax.plot([occDuration,occDuration],ylim, color='black', ls='-.', alpha=0.6)
     ax.set_ylim(ylim)
-    plt.xlabel(r'N$_{\rm binned}$', fontsize='x-large')
-    plt.ylabel('RMS', fontsize='x-large')
-    plt.legend(loc='best', fontsize='large')
+    
+    ax.xaxis.set_tick_params(labelsize=fontsize)
+    ax.yaxis.set_tick_params(labelsize=fontsize)
+    
+    plt.xlabel(r'N$_{\rm binned}$', fontsize=fontsize)
+    plt.ylabel('RMS', fontsize=fontsize)
+    plt.legend(loc='best', fontsize=fontsize)
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
         plt.savefig(plotname, bbox_inches='tight')
     if showplot:
         plt.show()
     
-    #Eclipse Duration
+    #Ingress Duration
     sreal = rms[np.where(binsz<=ingrDuration)[0][-1]]*1e6
     s0 = stderr[np.where(binsz<=ingrDuration)[0][-1]]*1e6
     outStr = 'Over Ingress ('+str(round(ingrDuration*intTime*24*60, 1))+' min):\n'
@@ -322,7 +327,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     outStr += str(s0)+'\t'+str(sreal)+'\n'
     outStr += 'Observed/Expected\n'
     outStr += str(sreal/s0)+'\n\n'
-    #Transit Duration
+    #Occultation Duration
     sreal = rms[np.where(binsz<=occDuration)[0][-1]]*1e6
     s0 = stderr[np.where(binsz<=occDuration)[0][-1]]*1e6
     outStr += 'Over Transit/Eclipse ('+str(round(occDuration*intTime*24*60, 1))+' min):\n'
