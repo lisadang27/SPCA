@@ -122,25 +122,25 @@ def detec_model_PLD(input_data, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1,p
     
     Pgroup, mode = input_data # Pgroup are pixel "lightcurves" 
     
-    if '3x3' in mode:
+    if '3x3' in mode.lower():
         P1, P2, P3, P4, P5, P6, P7, P8, P9 = np.split(Pgroup, 9, axis=0)
-        if 'PLD1' in mode.lower():
+        if 'pld1' in mode.lower():
             detec = np.asarray(p1_1*P1+ p2_1*P2+ p3_1*P3+ p4_1*P4+ p5_1*P5+ p6_1*P6+ p7_1*P7+ p8_1*P8+ p9_1*P9)
-        elif 'PLD2' in mode.lower():
+        elif 'pld2' in mode.lower():
             detec = np.asarray(p1_1*P1   + p2_1*P2   + p3_1*P3   + p4_1*P4   + p5_1*P5   + p6_1*P6   + p7_1*P7   + 
                                p8_1*P8   + p9_1*P9+ 
                                p1_2*P1**2+ p2_2*P2**2+ p3_2*P3**2+ p4_2*P4**2+ p5_2*P5**2+ p6_2*P6**2+ p7_2*P7**2+ 
                                p8_2*P8**2+ p9_2*P9**2)
             
-    elif '5x5' in mode:
+    elif '5x5' in mode.lower():
         P1, P2, P3, P4, P5, P6, P7, P8, P9 , P10, P11, P12, P13, P14, P15, \
         P16, P17, P18, P19, P20, P21, P22, P23, P24, P25 = np.split(Pgroup, 25, axis=0)
-        if 'PLD1' in mode.lower():
+        if 'pld1' in mode.lower():
             detec = np.asarray(p1*P1+ p2_1*P2+ p3_1*P3+ p4_1*P4+ p5_1*P5+ p6_1*P6+ p7_1*P7+ p8_1*P8+ p9_1*P9+ 
                                p10_1*P10+ p11_1*P11+ p12_1*P12+ p13_1*P13+ p14_1*P14+ p15_1*P15+ p16_1*P16+ 
                                p17_1*P17+ p18_1*P18+ p19_1*P19+ p20_1*P20+ p21_1*P21+ p22_1*P22+ p23_1*P23+ 
                                p24_1*P24+ p25_1*P25)
-        elif 'PLD2' in mode.lower():
+        elif 'pld2' in mode.lower():
             detec = np.asarray(p1_1*P1     + p2_1*P2     + p3_1*P3     + p4_1*P4     + p5_1*P5     + p6_1*P6     + p7_1*P7     +
                                p8_1*P8     + p9_1*P9     + p10_1*P10   + p11_1*P11   + p12_1*P12   + p13_1*P13   + p14_1*P14   +
                                p15_1*P15   + p16_1*P16   + p17_1*P17   + p18_1*P18   + p19_1*P19   + p20_1*P20   + p21_1*P21   +
@@ -149,7 +149,7 @@ def detec_model_PLD(input_data, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1,p
                                p11_2*P11**2+ p12_2*P12**2+ p13_2*P13**2+ p14_2*P14**2+ p15_2*P15**2+ p16_2*P16**2+ p17_2*P17**2+
                                p18_2*P18**2+ p19_2*P19**2+ p20_2*P20**2+ p21_2*P21**2+ p22_2*P22**2+ p23_2*P23**2+ p24_2*P24**2+
                                p25_2*P25**2)
-    return detec
+    return detec.ravel()
 
 ######################################################################################
 #THIS IS THE MAIN SIGNAL FUNCTION WHICH BRANCHES OUT TO THE CORRECT SIGNAL FUNCTION
@@ -171,11 +171,11 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
                             d1, d2, d3, s1, s2, m1, sigF)
     elif 'pld' in mode.lower():
         return signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                          p1_1 ,p2_1 ,p3_1 ,p4_1 ,p5_1 ,p6_1 ,p7_1 ,p8_1 ,p9_1,p10_1,p11_1,p12_1,p13_1,p14_1,p15_1,
-                          p16_1,p17_1,p18_1,p19_1,p20_1,p21_1,p22_1,p23_1,p24_1,p25_1,
-                          p1_2 ,p2_2 ,p3_2 ,p4_2 ,p5_2 ,p6_2 ,p7_2 ,p8_2 ,p9_2,p10_2,p11_2,p12_2,p13_2,p14_2,p15_2,
-                          p16_2,p17_2,p18_2,p19_2,p20_2,p21_2,p22_2,p23_2,p24_2,p25_2,
-                          d1, d2, d3, s1, s2, m1, sigF)
+               p1_1 ,p2_1 ,p3_1 ,p4_1 ,p5_1 ,p6_1 ,p7_1 ,p8_1 ,p9_1,p10_1,p11_1,p12_1,p13_1,p14_1,p15_1,
+               p16_1,p17_1,p18_1,p19_1,p20_1,p21_1,p22_1,p23_1,p24_1,p25_1,
+               p1_2 ,p2_2 ,p3_2 ,p4_2 ,p5_2 ,p6_2 ,p7_2 ,p8_2 ,p9_2,p10_2,p11_2,p12_2,p13_2,p14_2,p15_2,
+               p16_2,p17_2,p18_2,p19_2,p20_2,p21_2,p22_2,p23_2,p24_2,p25_2,
+               d1, d2, d3, s1, s2, m1, sigF)
 ######################################################################################
 
 def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,

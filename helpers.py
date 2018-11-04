@@ -62,15 +62,15 @@ class signal_params(object):
         self.s1    = 0.0     # step function coeff 
         self.s2    = 0.0     # step function coeff
         self.m1    = 0.0     # tslope coeff 
-        self.p1_1  = 0.0     # PLD coefficient
-        self.p2_1  = 0.0     # PLD coefficient
-        self.p3_1  = 0.0     # PLD coefficient
-        self.p4_1  = 0.0     # PLD coefficient
-        self.p5_1  = 0.0     # PLD coefficient
-        self.p6_1  = 0.0     # PLD coefficient
-        self.p7_1  = 0.0     # PLD coefficient
-        self.p8_1  = 0.0     # PLD coefficient
-        self.p9_1  = 0.0     # PLD coefficient
+        self.p1_1  = 1.0     # PLD coefficient
+        self.p2_1  = 1.0     # PLD coefficient
+        self.p3_1  = 1.0     # PLD coefficient
+        self.p4_1  = 1.0     # PLD coefficient
+        self.p5_1  = 1.0     # PLD coefficient
+        self.p6_1  = 1.0     # PLD coefficient
+        self.p7_1  = 1.0     # PLD coefficient
+        self.p8_1  = 1.0     # PLD coefficient
+        self.p9_1  = 1.0     # PLD coefficient
         self.p10_1 = 0.0     # PLD coefficient
         self.p11_1 = 0.0     # PLD coefficient
         self.p12_1 = 0.0     # PLD coefficient
@@ -329,13 +329,30 @@ def expand_dparams(dparams, mode):
         dparams = np.append(dparams, ['m1'])
         
     if 'pld' not in mode.lower():
-        dparams = np.append(dparams, ['p1_1', 'p2_1', 'p3_1', 'p4_1', 'p5_1', 'p6_1', 'p7_1', 'p8_1', 'p9_1', 'p10_1', 
-                     'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 'p16_1', 'p17_1', 'p18_1', 
-                     'p19_1', 'p20_1', 'p21_1', 'p22_1', 'p23_1', 'p24_1', 'p25_1', 'p1_2', 
-                     'p2_2', 'p3_2', 'p4_2', 'p5_2', 'p6_2', 'p7_2', 'p8_2', 'p9_2', 'p10_2', 
-                     'p11_2', 'p12_2', 'p13_2', 'p14_2', 'p15_2', 'p16_2', 'p17_2', 'p18_2', 
-                     'p19_2', 'p20_2', 'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'])
-    
+        dparams = np.append(dparams, ['p1_1', 'p2_1', 'p3_1', 'p4_1', 'p5_1', 'p6_1', 'p7_1', 'p8_1', 
+                                      'p9_1', 'p10_1', 'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 
+                                      'p16_1', 'p17_1', 'p18_1', 'p19_1', 'p20_1', 'p21_1', 'p22_1', 
+                                      'p23_1', 'p24_1', 'p25_1', 'p1_2', 'p2_2', 'p3_2', 'p4_2', 'p5_2', 
+                                      'p6_2', 'p7_2', 'p8_2', 'p9_2', 'p10_2', 'p11_2', 'p12_2', 'p13_2',
+                                      'p14_2', 'p15_2', 'p16_2', 'p17_2', 'p18_2','p19_2', 'p20_2', 
+                                      'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'])
+    elif 'pld' in mode.lower():
+        if 'pld1' in mode.lower():
+            dparams = np.append(dparams, ['p1_2', 'p2_2', 'p3_2', 'p4_2', 'p5_2', 'p6_2', 'p7_2', 'p8_2', 
+                                          'p9_2', 'p10_2', 'p11_2', 'p12_2', 'p13_2', 'p14_2', 'p15_2', 
+                                          'p16_2', 'p17_2', 'p18_2','p19_2', 'p20_2', 'p21_2', 'p22_2', 
+                                          'p23_2', 'p24_2', 'p25_2'])
+            if '3x3' in mode.lower():
+                dparams = np.append(dparams, ['p10_1', 'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 
+                                              'p16_1', 'p17_1', 'p18_1', 'p19_1', 'p20_1', 'p21_1',
+                                              'p22_1', 'p23_1', 'p24_1', 'p25_1'])
+        elif 'pld2' in mode.lower():
+            if '3x3' in mode.lower():
+                dparams = np.append(dparams, ['p10_1', 'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 
+                                      'p16_1', 'p17_1', 'p18_1', 'p19_1', 'p20_1', 'p21_1', 'p22_1', 
+                                      'p23_1', 'p24_1', 'p25_1', 'p10_2', 'p11_2', 'p12_2', 'p13_2',
+                                      'p14_2', 'p15_2', 'p16_2', 'p17_2', 'p18_2','p19_2', 'p20_2', 
+                                      'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'])
     return dparams
 
 def get_lparams(function):
@@ -456,7 +473,11 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21, d1, d2, d3, s1, s2, m1, sigF, mode, checkPhasePhis):
+            c16, c17, c18, c19, c20, c21, p1_1 ,p2_1 ,p3_1 ,p4_1 ,p5_1 ,p6_1 ,p7_1 ,p8_1 ,
+            p9_1,p10_1,p11_1,p12_1,p13_1,p14_1,p15_1,p16_1,p17_1,p18_1,p19_1,p20_1,p21_1,
+            p22_1,p23_1,p24_1,p25_1,p1_2 ,p2_2 ,p3_2 ,p4_2 ,p5_2 ,p6_2 ,p7_2 ,p8_2 ,p9_2,
+            p10_2,p11_2,p12_2,p13_2,p14_2,p15_2,p16_2,p17_2,p18_2,p19_2,p20_2,p21_2,p22_2,
+            p23_2,p24_2,p25_2,d1, d2, d3, s1, s2, m1, sigF, mode, checkPhasePhis):
     # checking that the parameters are physically plausible
     check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and
