@@ -389,7 +389,8 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
     # central position of aperture
     # position = np.c_[cx, cy] # remove when uncommenting below
     if (type(cx) is list):
-        position = np.c_[cx, cy]
+        #Fill "bad" values. These are masked anyway, so the value we fill it with is arbitrary.
+        position = np.c_[np.ma.fix_invalid(cx,fill_value=15), np.ma.fix_invalid(cy,fill_value=15)].tolist()
     else:
         position = np.c_[(cx*np.ones(l)), (cy*np.ones(l))]
     tmp_sum = []
