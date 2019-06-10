@@ -6,6 +6,8 @@ import matplotlib.ticker
 from matplotlib import rc
 from matplotlib.ticker import MaxNLocator
 
+from scipy import optimize
+
 import time
 import os, sys
 
@@ -293,6 +295,9 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
     xo.extend(cx/scale)
     yo.extend(cy/scale)
+    print(cx,cy)
+    print(len(cx),len(cy))
+    print()
     # get PSF widths
     X, Y    = np.repeat(X[np.newaxis,:,:], h, axis=0), np.repeat(Y[np.newaxis,:,:], h, axis=0)
     cx, cy  = np.reshape(cx, (h, 1, 1)), np.reshape(cy, (h, 1, 1))
@@ -304,6 +309,64 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     wx.extend(widx/scale)
     wy.extend(widy/scale)
     return xo, yo, wx, wy
+#Get the center by fitting a 2D gaussian
+def gaussian(height, center_x, center_y, width_x, width_y):
+    """Returns a gaussian function with the given parameters"""
+    width_x = float(width_x)
+    width_y = float(width_y)
+    return lambda x,y: height*np.exp(
+                -(((center_x-x)/width_x)**2+((center_y-y)/width_y)**2)/2)
+
+def moments(data):
+    """Returns (height, x, y, width_x, width_y)
+    the gaussian parameters of a 2D distribution by calculating its
+    moments """
+    total = np.sum(data)
+    X, Y = np.indices(data.shape)
+    x = np.sum((X*data))/total
+    y = np.sum((Y*data).sum())/total
+    col = data[:, y.astype(int)]
+    width_x = np.sqrt(np.sum(np.abs((np.arange(col.size)-y)**2*col))/np.sum(col))
+    row = data[x.astype(int), :]
+    width_y = np.sqrt(np.abs(np.sum((np.arange(row.size)-x)**2*row))/np.sum(row))
+    height = np.max(data)
+    return height, x, y, width_x, width_y
+
+def fitgaussian(data):
+    """Returns (height, x, y, width_x, width_y)
+    the gaussian parameters of a 2D distribution found by a fit"""
+    params = moments(data)
+    errorfunction = lambda p: np.ravel(gaussian(*p)(*np.indices(data.shape)) -
+                                 data)
+    p, success = optimize.leastsq(errorfunction, params)
+    return p
+def centroid_2DGaussian(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, bounds = (13, 18, 13, 18)):
+    #Using cookbook from https://scipy-cookbook.readthedocs.io/items/FittingData.html
+    lbx, ubx, lby, uby = bounds
+    lbx, ubx, lby, uby = lbx*scale, ubx*scale, lby*scale, uby*scale
+    cx = []
+    cy = []
+    widx = []
+    widy = []
+   
+    for i in range(image_data.shape[0]):
+        starbox = image_data[i, lbx:ubx, lby:uby]
+        xmean, ymean, xwidth, ywidth = fitgaussian(starbox)[[1,2,3,4]]
+        cx.extend([xmean+ lbx])
+        cy.extend([ymean+lby])
+        widx.extend([xwidth])
+        widy.extend([ywidth])
+    cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
+    cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
+    xo.extend(cx/scale)
+    yo.extend(cy/scale)
+    widx    = sigma_clip(widx, sigma=4, iters=2, cenfunc=np.ma.median)
+    widy    = sigma_clip(widy, sigma=4, iters=2, cenfunc=np.ma.median)
+    wx.extend(widx/scale)
+    wy.extend(widy/scale)
+    return xo, yo, wx, wy
+    
+    
 
 def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
     cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5, 
