@@ -62,6 +62,9 @@ class signal_params(object):
         self.s1    = 0.0
         self.s2    = 0.0
         self.m1    = 0.0
+        self.gpAmp = 1e-2
+        self.gpLx  = -4.0
+        self.gpLy  = -4.0
         self.sigF  = sigF
         self.mode  = mode
         self.Tstar = None
@@ -135,6 +138,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     # chronological order
     index = np.argsort(TIME)
     FLUX  = FLUX[index]
+    FERR  = FERR[index]
     TIME  = TIME[index]
     XDATA = XDATA[index]
     YDATA = YDATA[index]
@@ -143,6 +147,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
 
     # crop the first AOR (if asked)
     FLUX  = FLUX[int(cut*nFrames):]
+    FERR  = FERR[int(cut*nFrames):]
     TIME  = TIME[int(cut*nFrames):]
     XDATA = XDATA[int(cut*nFrames):]
     YDATA = YDATA[int(cut*nFrames):]
@@ -151,6 +156,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
 
     # Sigma clip per data cube (also masks invalids)
     FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
+    FERR_clip  = sigma_clip(FERR, sigma=6, iters=1)
     XDATA_clip = sigma_clip(XDATA, sigma=6, iters=1)
     YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
     PSFXW_clip = sigma_clip(PSFXW, sigma=6, iters=1)
@@ -174,6 +180,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     
     #remove bad values so that BLISS mapping will work
     FLUX  = FLUX[np.logical_not(MASK)]
+    FERR  = FERR[np.logical_not(MASK)]
     TIME  = TIME[np.logical_not(MASK)]
     XDATA = XDATA[np.logical_not(MASK)]
     YDATA = YDATA[np.logical_not(MASK)]
@@ -181,8 +188,9 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     PSFYW = PSFYW[np.logical_not(MASK)]
 
     # normalizing the flux
+    FERR  = FERR/np.ma.median(FLUX)
     FLUX  = FLUX/np.ma.median(FLUX)
-    return FLUX, TIME, XDATA, YDATA, PSFXW, PSFYW
+    return FLUX, TIME, XDATA, YDATA, PSFXW, PSFYW, FERR
 
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     # sorting chronologically
@@ -206,37 +214,42 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def expand_dparams(dparams, mode):
-    if 'ellipse' not in mode.lower():
+    modeLower = mode.lower()
+    
+    if 'ellipse' not in modeLower:
         dparams = np.append(dparams, ['r2', 'r2off'])
-    elif 'offset' not in mode.lower():
+    elif 'offset' not in modeLower:
         dparams = np.append(dparams, ['r2off'])
 
-    if 'v2' not in mode.lower():
+    if 'v2' not in modeLower:
         dparams = np.append(dparams, ['C', 'D'])
 
-    if 'poly' not in mode.lower():
+    if 'poly' not in modeLower:
         dparams = np.append(dparams, ['c'+str(int(i)) for i in range(22)])  
-    elif 'poly2' in mode.lower():
+    elif 'poly2' in modeLower:
         dparams = np.append(dparams, ['c7','c8', 'c9', 'c10', 'c11', 
                                       'c12', 'c13', 'c14', 'c15', 'c16', 
                                       'c17','c18', 'c19', 'c20', 'c21'])
-    elif 'poly3' in mode.lower():
+    elif 'poly3' in modeLower:
         dparams = np.append(dparams, ['c11', 'c12', 'c13', 'c14', 'c15', 'c16', 
                                       'c17','c18', 'c19', 'c20', 'c21'])
-    elif 'poly4' in mode.lower():
+    elif 'poly4' in modeLower:
         dparams = np.append(dparams, ['c16', 'c17','c18', 'c19', 'c20', 'c21'])
         
     if 'ecosw' in dparams and 'esinw' in dparams:
         dparams = np.append(dparams, ['ecc', 'anom', 'w'])
         
-    if 'psfw' not in mode.lower():
+    if 'psfw' not in modeLower:
         dparams = np.append(dparams, ['d1', 'd2', 'd3'])
         
-    if 'hside' not in mode.lower():
+    if 'hside' not in modeLower:
         dparams = np.append(dparams, ['s1', 's2'])
         
-    if 'tslope' not in mode.lower():
+    if 'tslope' not in modeLower:
         dparams = np.append(dparams, ['m1'])
+        
+    if 'gp' not in modeLower:
+        dparams = np.append(dparams, ['gpAmp', 'gpLx', 'gpLy'])
     
     return dparams
 
@@ -309,10 +322,26 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     #remove extra ', '
     varstr = varstr[:-2]
     
+    parmDefaults = inspect.getargspec(function).defaults
+    if parmDefaults is not None:
+        parmDefaults = np.array(parmDefaults, dtype=str)
+        nOptionalParms = len(parmDefaults)
+        if np.all(index[-nOptionalParms:]):
+            # if all optional parameters are in dparams, remove them from this list
+            nOptionalParms = 0
+        elif np.any(index[-nOptionalParms:]):
+            parmDefaults = parmDefaults[np.logical_not(index[-nOptionalParms:])]
+            nOptionalParms = len(parmDefaults)    
+    else:
+        nOptionalParms = 0
+    
     # generate the line to execute
     mystr = 'global dynamic_funk; dynamic_funk = lambda '
-    for i in range(len(nparams)):
+    for i in range(len(nparams)-nOptionalParms):
         mystr = mystr + nparams[i] +', '
+    # add in any optional parameters
+    for i in range(nOptionalParms):
+        mystr = mystr + nparams[len(nparams)-nOptionalParms+i] + '=' + parmDefaults[i] + ', '
     #remove extra ', '
     mystr = mystr[:-2]
     #mystr = mystr +': '+namefunc+'(' + varstr + ')'
@@ -326,18 +355,44 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
+# def lnlike(p0, signalfunc, signal_input):
+#     '''
+#     Notes:
+#     ------
+#     Assuming that we are always fitting for the photometric scatter (sigF). 
+#     '''
+#     flux = signal_input[0]
+#     inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
+    
+#     # define model
+#     model = signalfunc(signal_input, *p0)
+#     return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
+
 def lnlike(p0, signalfunc, signal_input):
     '''
     Notes:
     ------
     Assuming that we are always fitting for the photometric scatter (sigF). 
     '''
-    flux = signal_input[0]
-    inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
     
-    # define model
-    model = signalfunc(signal_input, *p0)
-    return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
+    flux = signal_input[0]
+    mode = signal_input[-1]
+    
+    if 'gp' in mode.lower():
+        model, gp = signalfunc(signal_input, *p0, predictGp=False, returnGp=True)
+        
+        resid = flux/model-1
+#         resid -= np.mean(resid)
+        
+        # return -0.5*(np.dot(resid,gp.apply_inverse(resid)) + gp.solver.log_determinant)
+        return gp.log_likelihood(resid)
+    else:
+        inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
+        
+        # define model
+        model = signalfunc(signal_input, *p0)
+        return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
+    
 
 def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom='none'):
     '''
@@ -358,7 +413,10 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21, d1, d2, d3, s1, s2, m1, sigF, mode, checkPhasePhis):
+            c16, c17, c18, c19, c20, c21,
+            d1, d2, d3, s1, s2, m1,
+            gpAmp, gpLx, gpLy, sigF,
+            mode, checkPhasePhis):
     # checking that the parameters are physically plausible
     check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and
