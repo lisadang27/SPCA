@@ -3,3 +3,5 @@ __pycache__
 *.swp
 MCcubed
 *.pyc
+.DS_Store
+WASP12b_special
