@@ -730,8 +730,8 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                 else:
                     flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
                                                   r=r, shape=shape, method=method, **kwargs)
-            if ((i+1)%100 == 0 or i+1==len(fnames) or i==0):
-                print('Status:', i+1, 'out of', len(fnames))
+#             if ((i+1)%100 == 0 or i+1==len(fnames) or i==0):
+#                 print('Status:', i+1, 'out of', len(fnames))
 
     elif (subarray == False):
         print('Sorry this part is undercontruction!')
@@ -764,7 +764,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
             binned_bg_err = binned_bg_err[binned_flux_mask==binned_flux]
             binned_bg_err_std = binned_bg_err_std[binned_flux_mask==binned_flux]
             binned_flux_std = binned_flux_std[binned_flux_mask==binned_flux]
-            print('Clipped', len(binned_flux)-np.sum(binned_flux_mask==binned_flux), 'binned points (>10 sigma outliers)')
+#             print('Clipped', len(binned_flux)-np.sum(binned_flux_mask==binned_flux), 'binned points (>10 sigma outliers)')
             binned_flux = binned_flux[binned_flux_mask==binned_flux]
 
     if (plot == True):
@@ -808,5 +808,5 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         np.savetxt(pathBINN, BINN_data, header = BINN_head)
 
     toc = tim.clock()
-    print('Number of discarded frames:', tossed)
-    print('Time:', toc-tic, 'seconds')
+#     print('Number of discarded frames:', tossed)
+#     print('Time:', toc-tic, 'seconds')
