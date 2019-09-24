@@ -381,7 +381,7 @@ def lnlike(p0, signalfunc, signal_input):
     if 'gp' in mode.lower():
         model, gp = signalfunc(signal_input, *p0, predictGp=False, returnGp=True)
         
-        return gp.log_likelihood(flux)
+        return gp.log_likelihood(flux-model)
     else:
         inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
         

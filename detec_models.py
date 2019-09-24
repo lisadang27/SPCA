@@ -109,6 +109,23 @@ def detec_model_bliss(signal_input, astroModel):
 
 def detec_model_GP(input_data, gpAmp, gpLx, gpLy, sigF):
     
+    flux, xdata, ydata, time, returnGp, astroModel = input_data
+    
+    gp = george.GP(np.exp(gpAmp)*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2, axes=[0, 1]))#, solver=george.HODLRSolver, tol=1e-8)
+    
+    gp.compute(np.array([xdata, ydata]).T, sigF)
+    
+    mu, _ = gp.predict(flux-astroModel, np.array([xdata, ydata]).T)
+    
+    mu = 1.+mu/astroModel
+    
+    if returnGp:
+        return mu, gp
+    else:
+        return mu
+    
+def detec_model_GP_old(input_data, gpAmp, gpLx, gpLy, sigF):
+    
     flux, xdata, ydata, time, returnGp, p0_astro, astrofunc = input_data
     
     mean_model = gpAstroModel(astrofunc, p0_astro)
@@ -203,6 +220,51 @@ def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A,
     return model
 
 def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+              d1, d2, d3, s1, s2, m1,
+              gpAmp, gpLx, gpLy, sigF,
+              predictGp=True, returnGp=False):
+    
+    #flux, time, xdata, ydata, psfwx, psfwy, mode = signal_input
+    
+    flux, time, xdata, ydata = signal_input[:4]
+    mode = signal_input[-1]
+    
+    model = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc,
+                                          ecosw, esinw, q1, q2, fp,
+                                          A, B, C, D, r2, r2off)
+    
+    if 'psfw' in mode.lower():
+        psfwidths = signal_input[4:6]
+        model *= detec_model_PSFW(psfwidths, d1, d2, d3)
+    
+    if 'hside' in mode.lower():
+        model *= hside(time, s1, s2)
+    
+    if 'tslope' in mode.lower():
+        model *= tslope(time, m1)
+    
+    if predictGp:
+        detec_input = (flux, xdata, ydata, time, returnGp, model)
+        returnVar = detec_model_GP(detec_input, gpAmp, gpLx, gpLy, sigF)
+        if returnGp:
+            detecModel, gp = returnVar
+        else:
+            detecModel = returnVar
+        
+        model *= detecModel
+    else:
+        if returnGp:
+            gp = george.GP(np.exp(gpAmp)*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2, axes=[0, 1]))#,
+#                            mean=mean_model)#, solver=george.HODLRSolver, tol=1e-8)
+    
+            gp.compute(np.array([xdata, ydata]).T, sigF)
+    
+    if returnGp:
+        return model, gp
+    else:
+        return model
+    
+def signal_GP_old(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
               d1, d2, d3, s1, s2, m1,
               gpAmp, gpLx, gpLy, sigF,
               predictGp=True, returnGp=False):
