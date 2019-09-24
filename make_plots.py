@@ -11,9 +11,9 @@ lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
 sys.path.append(lib_path)
 
 try:
-    from timeavg import binrms
+    from mc3.rednoise import binrms
 except ImportError:
-    print('Error: binrms from timeavg failed to import')
+    print('Error: binrms from mc3.rednoise failed to import')
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 

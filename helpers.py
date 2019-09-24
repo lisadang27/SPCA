@@ -62,9 +62,9 @@ class signal_params(object):
         self.s1    = 0.0
         self.s2    = 0.0
         self.m1    = 0.0
-        self.gpAmp = 1e-2
-        self.gpLx  = -4.0
-        self.gpLy  = -4.0
+        self.gpAmp = -0.5
+        self.gpLx  = -3
+        self.gpLy  = -3
         self.sigF  = sigF
         self.mode  = mode
         self.Tstar = None
@@ -381,11 +381,7 @@ def lnlike(p0, signalfunc, signal_input):
     if 'gp' in mode.lower():
         model, gp = signalfunc(signal_input, *p0, predictGp=False, returnGp=True)
         
-        resid = flux/model-1
-#         resid -= np.mean(resid)
-        
-        # return -0.5*(np.dot(resid,gp.apply_inverse(resid)) + gp.solver.log_determinant)
-        return gp.log_likelihood(resid)
+        return gp.log_likelihood(flux)
     else:
         inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
         

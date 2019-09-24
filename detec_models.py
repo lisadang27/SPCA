@@ -1,7 +1,19 @@
 import numpy as np
 import george
+from george.modeling import Model
 
 import astro_models
+
+class gpAstroModel(Model):
+    def __init__(self, astrofunc, p0_astro):
+        self.p0_astro = p0_astro
+        self.astrofunc = astrofunc
+    
+    def get_value(self, inputs):
+        xdata, ydata, time = inputs.T
+        return self.astrofunc(time, *self.p0_astro)
+
+
 
 def detec_model_poly(detec_inputs, c1, c2, c3, c4, c5, c6, c7=0, c8=0, c9=0, c10=0, c11=0, 
                      c12=0, c13=0, c14=0, c15=0, c16=0, c17=0, c18=0, c19=0, c20=0, c21=0):
@@ -96,21 +108,24 @@ def detec_model_bliss(signal_input, astroModel):
     return detec
 
 def detec_model_GP(input_data, gpAmp, gpLx, gpLy, sigF):
-    #flux/astroModel, xdata, ydata, returnGp = input_data
     
-    flux, xdata, ydata, returnGp = input_data
+    flux, xdata, ydata, time, returnGp, p0_astro, astrofunc = input_data
     
-    gp = george.GP(gpAmp**2*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2),
-                   white_noise=np.log(sigF), solver=george.HODLRSolver, tol=1e-12)
+    mean_model = gpAstroModel(astrofunc, p0_astro)
     
-    gp.compute(np.array([xdata, ydata]).T)
+    gp = george.GP(np.exp(gpAmp)*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=3, axes=[0, 1]),
+                   mean=mean_model)#, solver=george.HODLRSolver, tol=1e-8)
     
-    mu, _ = gp.predict(flux-1, np.array([xdata, ydata]).T)
+    gp.compute(np.array([xdata, ydata, time]).T, sigF)
+    
+    mu, _ = gp.predict(flux, np.array([xdata, ydata, time]).T)
+    
+    mu /= astrofunc(time, *p0_astro)
     
     if returnGp:
-        return mu+1, gp
+        return mu, gp
     else:
-        return mu+1
+        return mu
 
 ######################################################################################
 #THIS IS THE MAIN SIGNAL FUNCTION WHICH BRANCHES OUT TO THE CORRECT SIGNAL FUNCTION
@@ -147,28 +162,22 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
     ydata = signal_input[3]
     mode = signal_input[-1]
     
-    if 'psfw' in mode.lower():
-        psfwidths = signal_input[4:6]
-        psfsys = detec_model_PSFW(psfwidths, d1, d2, d3)
-    else:
-        psfsys = 1
-    
-    if 'hside' in mode.lower():
-        hstep  = hside(time, s1, s2)
-    else:
-        hstep = 1
-        
-    if 'tslope' in mode.lower():
-        tcurve = tslope(time, m1)
-    else:
-        tcurve = 1
-    
     astr   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
                                            A, B, C, D, r2, r2off)
-    detec  = detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
+    model = astr*detec_model_poly((xdata, ydata, mode), c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, 
                                            c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21)
     
-    return astr*detec*psfsys*hstep*tcurve
+    if 'psfw' in mode.lower():
+        psfwidths = signal_input[4:6]
+        model *= detec_model_PSFW(psfwidths, d1, d2, d3)
+    
+    if 'hside' in mode.lower():
+        model *= hside(time, s1, s2)
+        
+    if 'tslope' in mode.lower():
+        model *= tslope(time, m1)
+  
+    return model
 
 def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, 
                  d1, d2, d3, s1, s2, m1):
@@ -176,28 +185,22 @@ def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A,
     time = signal_input[1]
     mode = signal_input[-1]
     
-    if 'psfw' in mode.lower():
-        psfwidths = signal_input[4:6]
-        psfsys = detec_model_PSFW(psfwidths, d1, d2, d3)
-    else:
-        psfsys = 1
-    
-    if 'hside' in mode.lower():
-        hstep  = hside(time, s1, s2)
-    else:
-        hstep = 1
-    
-    if 'tslope' in mode.lower():
-        tcurve = tslope(time, m1)
-    else:
-        tcurve = 1
-    
     astroModel = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2,
                                                fp, A, B, C, D, r2, r2off)
     
-    detecModel = detec_model_bliss(signal_input, astroModel)
+    model = astroModel*detec_model_bliss(signal_input, astroModel)
     
-    return astroModel*detecModel*psfsys*hstep*tcurve
+    if 'psfw' in mode.lower():
+        psfwidths = signal_input[4:6]
+        model *= detec_model_PSFW(psfwidths, d1, d2, d3)
+    
+    if 'hside' in mode.lower():
+        model *= hside(time, s1, s2)
+    
+    if 'tslope' in mode.lower():
+        model *= tslope(time, m1)
+    
+    return model
 
 def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
               d1, d2, d3, s1, s2, m1,
@@ -209,43 +212,45 @@ def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
     flux, time, xdata, ydata = signal_input[:4]
     mode = signal_input[-1]
     
+    model = 1.
+    
     if 'psfw' in mode.lower():
         psfwidths = signal_input[4:6]
-        psfsys = detec_model_PSFW(psfwidths, d1, d2, d3)
-    else:
-        psfsys = 1
+        model *= detec_model_PSFW(psfwidths, d1, d2, d3)
     
     if 'hside' in mode.lower():
-        hstep  = hside(time, s1, s2)
-    else:
-        hstep = 1
+        model *= hside(time, s1, s2)
     
     if 'tslope' in mode.lower():
-        tcurve = tslope(time, m1)
-    else:
-        tcurve = 1
+        model *= tslope(time, m1)
+        
+    astrofunc = lambda time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off: \
+                    model*astro_models.ideal_lightcurve(time, t0, per, rp, a, inc,
+                                                        ecosw, esinw, q1, q2, fp,
+                                                        A, B, C, D, r2, r2off)
     
-    astroModel = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2,
-                                               fp, A, B, C, D, r2, r2off)
+    p0_astro = np.array([t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off])
     
     if predictGp:
-        detec_input = (flux/astroModel, xdata, ydata, returnGp)
+        detec_input = (flux, xdata, ydata, time, returnGp, p0_astro, astrofunc)
         returnVar = detec_model_GP(detec_input, gpAmp, gpLx, gpLy, sigF)
         if returnGp:
             detecModel, gp = returnVar
         else:
             detecModel = returnVar
+        
+        model = astrofunc(time, p0_astro)*detecModel
     else:
         if returnGp:
-            gp = george.GP(gpAmp**2*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2),
-                           white_noise=np.log(sigF), solver=george.HODLRSolver, tol=1e-12)
-    
-            gp.compute(np.array([xdata, ydata]).T)
+            mean_model = gpAstroModel(astrofunc, p0_astro)
             
-        detecModel = 1
+            gp = george.GP(np.exp(gpAmp)*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=3, axes=[0, 1]),
+                           mean=mean_model)#, solver=george.HODLRSolver, tol=1e-8)
+    
+            gp.compute(np.array([xdata, ydata, time]).T, sigF)
     
     if returnGp:
-        return astroModel*(detecModel*(psfsys*hstep*tcurve)), gp
+        return model, gp
     else:
-        return astroModel*detecModel*(psfsys*hstep*tcurve)
+        return model
     
