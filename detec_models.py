@@ -107,7 +107,7 @@ def detec_model_bliss(signal_input, astroModel):
     '''
     return detec
 
-def detec_model_GP(input_data, gpAmp, gpLx, gpLy, sigF):
+def detec_model_GP_simpler(input_data, gpAmp, gpLx, gpLy, sigF):
     
     flux, xdata, ydata, time, returnGp, astroModel = input_data
     
@@ -124,7 +124,7 @@ def detec_model_GP(input_data, gpAmp, gpLx, gpLy, sigF):
     else:
         return mu
     
-def detec_model_GP_old(input_data, gpAmp, gpLx, gpLy, sigF):
+def detec_model_GP(input_data, gpAmp, gpLx, gpLy, sigF):
     
     flux, xdata, ydata, time, returnGp, p0_astro, astrofunc = input_data
     
@@ -219,7 +219,7 @@ def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A,
     
     return model
 
-def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+def signal_GP_simpler(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
               d1, d2, d3, s1, s2, m1,
               gpAmp, gpLx, gpLy, sigF,
               predictGp=True, returnGp=False):
@@ -264,7 +264,7 @@ def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B,
     else:
         return model
     
-def signal_GP_old(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+def signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
               d1, d2, d3, s1, s2, m1,
               gpAmp, gpLx, gpLy, sigF,
               predictGp=True, returnGp=False):
