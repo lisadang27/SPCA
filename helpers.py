@@ -13,17 +13,24 @@ import astro_models
 import detec_models
 import bliss
 
+from numba import jit
+
+
 class signal_params(object):
     # class constructor
     def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08,
-                 a=7, inc=84.2, ecosw=0.1, esinw=0.1, q1=0.001, q2=0.001,
-                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, r2=0.08, r2off=0.0, sigF=0.008, mode=''):
-        self.name  = name
-        self.t0    = t0
-        self.per   = per
-        self.rp    = rp
-        self.a     = a
-        self.inc   = inc
+                 a=7., inc=84.2, ecosw=0.0, esinw=0.0, q1=0.01, q2=0.01,
+                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, sigF=0.002, mode=''):
+        self.name    = name
+        self.t0      = t0
+        self.t0_err  = 0.0
+        self.per     = per
+        self.per_err = 0.0
+        self.rp      = rp
+        self.a       = a
+        self.a_err   = 0.0
+        self.inc     = inc
+        self.inc_err = 0.0
         self.ecosw = ecosw
         self.esinw = esinw
         self.q1    = q1
@@ -33,8 +40,8 @@ class signal_params(object):
         self.B     = B
         self.C     = C
         self.D     = D
-        self.r2    = r2
-        self.r2off = r2off
+        self.r2    = rp
+        self.r2off = 0.0
         self.c1    = 1.0
         self.c2    = 0.0
         self.c3    = 0.0
@@ -62,13 +69,13 @@ class signal_params(object):
         self.s1    = 0.0
         self.s2    = 0.0
         self.m1    = 0.0
-        self.gpAmp = -0.5
-        self.gpLx  = -3
-        self.gpLy  = -3
+        self.gpAmp = -2.
+        self.gpLx  = -6.
+        self.gpLy  = -6.
         self.sigF  = sigF
         self.mode  = mode
         self.Tstar = None
-        self.TstarUncert = None
+        self.Tstar_err = None
 
 def get_data(path):
     '''
@@ -134,7 +141,7 @@ def get_full_data(foldername, filename):
     
     return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
-def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=[]):
+def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=np.array([])):
     # chronological order
     index = np.argsort(TIME)
     FLUX  = FLUX[index]
@@ -163,7 +170,7 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, iters=1)
 
     # Clip bad frames
-    ind = []
+    ind = np.array([])
     for i in ignore:
         ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
     mask_id = np.zeros(len(FLUX))
@@ -383,11 +390,11 @@ def lnlike(p0, signalfunc, signal_input):
         
         return gp.log_likelihood(flux-model)
     else:
-        inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
-        
+        # inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
         # define model
         model = signalfunc(signal_input, *p0)
-        return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
+        # return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
+        return loglikelihood(flux, model, p0[-1])
     
 
 def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom='none'):
@@ -446,12 +453,15 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     plt.figure(figsize = (15, 2*nrows))
     for ind in range(ndim):
         plt.subplot(nrows, ncols, ind+1)
-        mu_param = np.mean(samples[:,:,ind][:,beg:end:interv], axis = 0)
-        std_param = np.std(samples[:,:,ind][:,beg:end:interv], axis = 0)
+        sig1 = (0.6827)/2.*100
+        sig2 = (0.9545)/2.*100
+        sig3 = (0.9973)/2.*100
+        percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
+        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
         plt.plot(step, mu_param)
-        plt.fill_between(step, mu_param + 3*std_param, mu_param - 3*std_param, facecolor='k', alpha = 0.1)
-        plt.fill_between(step, mu_param + 2*std_param, mu_param - 2*std_param, facecolor='k', alpha = 0.1)
-        plt.fill_between(step, mu_param + 1*std_param, mu_param - 1*std_param, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos1sig, neg1sig, facecolor='k', alpha = 0.1)
         plt.title(labels[ind])
         plt.xlim(np.min(step), np.max(step))
         if ind < (ndim - ncols):
@@ -462,19 +472,29 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
         plt.savefig(fname, bbox_inches='tight')
     else:
         plt.show()
+    plt.close()
     return    
 
+@jit(nopython=True, parallel=False)
 def chi2(data, fit, err):
-    return np.sum(((data - fit)/err)**2)
+    #using inverse sigma since multiplying is faster than dividing
+    inv_err = err**-1
+    return np.sum(((data - fit)*inv_err)**2)
 
-def loglikelihood(data, fit, err):       
-    return -0.5*chi2(data, fit, err) - len(fit)*np.log(err) - len(fit)*np.log(np.sqrt(2*np.pi))
+@jit(nopython=True, parallel=False)
+def loglikelihood(data, fit, err):
+    #using inverse sigma since multiplying is faster than dividing
+    inv_err = err**-1
+    len_fit = len(fit)
+    return -0.5*np.sum(((data - fit)*inv_err)**2) + len_fit*np.log(inv_err) - len_fit*np.log(np.sqrt(2*np.pi))
 
+@jit(nopython=True, parallel=False)
 def evidence(logL, Npar, Ndat):
-    return logL - (Npar/2)*np.log(Ndat)
+    return logL - (Npar/2.)*np.log(Ndat)
 
+@jit(nopython=True, parallel=False)
 def BIC(logL, Npar, Ndat):
-    return -2*(logL - (Npar/2)*np.log(Ndat))
+    return -2.*(logL - (Npar/2.)*np.log(Ndat))
 
 def triangle_colors(data1, data2, data3, data4, label, path):
     fig = plt.figure(figsize = (8,8))

@@ -1,50 +1,27 @@
 import numpy as np
 import batman
+from numba import jit
 
 def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
-    '''
-    Get a model transit lightcurve.
+    """Get a model transit lightcurve.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecc (float): Orbital eccentricity.
+        w (float): Longitude of periastron (in degrees).
+        u1 (float): Limb darkening coefficient 1.
+        u2 (float): Limb darkening coefficient 2.
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
-
-    :type t0 : float
-    :param t0: Time of inferior conjunction
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius (in units of stellar radii)
-
-    :type a : float
-    :param a: Semi-major axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type ecc : float
-    :param ecc: Eccentricity
-
-    :type w : float
-    :param w: Longitude of periastron (in degrees)
-
-    :type u1 : float
-    :param u1: Limb darkening coefficient
-
-    :type u2 : float
-    :param u2: Limb darkening coefficient
-
-    Returns
-    -------
-
-    :return: flux, t_secondary, anom - (ndarray, float, ndarray) - Model transit lightcurve,
-                                                                   time of secondary eclipse,
-                                                                   and true anomaly
-    '''
+    Returns:
+        tuple: flux, t_secondary, anom (ndarray, float, ndarray).
+            Model transit lightcurve, time of secondary eclipse,
+    
+    """
     
     #make object to store transit parameters
     params = batman.TransitParams()
@@ -70,47 +47,24 @@ def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
 
 
 def eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec):
-    '''
-    Get a model secondary eclipse lightcurve.
+    """Get a model secondary eclipse lightcurve.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecc (float): Orbital eccentricity.
+        w (float): Longitude of periastron (in degrees).
+        fp (float): Planet-to-star flux ratio.
+        t_sec (float): Time of secondary eclipse.
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
-
-    :type t0 : float
-    :param t0: Time of inferior conjunction
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius (in units of stellar radii)
-
-    :type a : float
-    :param a: Semi-major axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type ecc : float
-    :param ecc: Eccentricity
-
-    :type w : float
-    :param w: Longitude of periastron (in degrees)
+    Returns:
+        ndarray: flux. The model eclipse light curve.
     
-    :type fp : float
-    :param fp: Planet-to-star flux ratio
-    
-    :type t_sec : float
-    :param t_sec: Time of secondary eclipse
-
-    Returns
-    -------
-
-    :return: flux - (ndarray) - Model eclipse light curve
-    '''
+    """
     
     #make object to store transit parameters
     params = batman.TransitParams()
@@ -135,35 +89,20 @@ def eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec):
 
 
 def area_noOffset(time, t_sec, per, rp, inc, r2):
-    '''
-    Model the variations in projected area of a bi-axial ellipsoid over time, assuming elongated axis is the sub-stellar axis.
+    """Model the variations in projected area of a bi-axial ellipsoid over time, assuming elongated axis is the sub-stellar axis.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t_sec (float): Time of secondary eclipse.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        r2 (float): Planet radius along sub-stellar axis (in units of stellar radii).
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
+    Returns:
+        ndarray: Modelled projected area of the ellipsoid over time.
     
-    :type t_sec : float
-    :param t_sec: Time of secondary eclipse
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius along dawn-dusk axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type r2 : float
-    :param r2: Planet radius along sub-stellar axis (in units of stellar radii)
-
-    Returns
-    -------
-
-    :return: areas - (ndarray) - Modelled projected area of the ellipsoid over time
-    '''
+    """
     
     t = time - t_sec
     orbFreq = 2*np.pi/per
@@ -178,38 +117,21 @@ def area_noOffset(time, t_sec, per, rp, inc, r2):
 
 
 def area(time, t_sec, per, rp, inc, r2, r2off):
-    '''
-    Model the variations in projected area of a bi-axial ellipsoid over time, without assuming elongated axis is the sub-stellar axis.
+    """Model the variations in projected area of a bi-axial ellipsoid over time, without assuming elongated axis is the sub-stellar axis.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t_sec (float): Time of secondary eclipse.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        r2 (float): Planet radius along sub-stellar axis (in units of stellar radii).
+        r2off (float): Angle to the elongated axis with respect to the sub-stellar axis (in degrees).
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
+    Returns:
+        ndarray: Modelled projected area of the ellipsoid over time.
     
-    :type t_sec : float
-    :param t_sec: Time of secondary eclipse
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius along dawn-dusk axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type r2 : float
-    :param r2: Planet radius along sub-stellar axis (in units of stellar radii)
-    
-    :type r2off : float
-    :param r2off: Angle to the elongated axis with respect to the sub-stellar axis (in degrees)
-
-    Returns
-    -------
-
-    :return: areas - (ndarray) - Modelled projected area of the ellipsoid over time
-    '''
+    """
     
     t = time - t_sec
     orbFreq = 2*np.pi/per
@@ -224,141 +146,76 @@ def area(time, t_sec, per, rp, inc, r2, r2off):
                          + rp**2*r2**2*np.cos(inc)**2)/(np.pi*rp**2)
 
 
-
 def phase_variation(time, t_sec, per, anom, ecc, w, A, B, C=0, D=0):
-    '''
-    Model first- or second-order sinusoidal phase variations.
+    """Model first- or second-order sinusoidal phase variations.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t_sec (float): Time of secondary eclipse.
+        per (float): Orbital period.
+        anom (ndarray): The true anomaly over time.
+        ecc (float): Orbital eccentricity.
+        w (float): Longitude of periastron (in degrees).
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float, optional): Amplitude of the second-order cosine term. Default=0.
+        D (float, optional): Amplitude of the second-order sine term. Default=0.
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
+    Returns:
+        ndarray: Modelled phase variations.
     
-    :type t_sec : float
-    :param t_sec: Time of secondary eclipse.
-
-    :type per : float
-    :param per: Orbital period.
-
-    :type anom : ndarray
-    :param anom: The true anomaly over time.
-    
-    :type ecc : float
-    :param ecc: Eccentricity
-
-    :type w : float
-    :param w: Longitude of periastron (in degrees).
-
-    :type A : float
-    :param A: Amplitude of the first-order cosine term.
-    
-    :type B : float
-    :param B: Amplitude of the first-order sine term.
-    
-    :type C : float, optional
-    :param C: Amplitude of the second-order cosine term. Default=0.
-    
-    :type D : float, optional
-    :param D: Amplitude of the second-order sine term. Default=0.
-
-    Returns
-    -------
-
-    :return: phaseVars - (ndarray) - Modelled phase variations
-    '''
+    """
     
     #calculate the orbital phase
-    if ecc == 0:
+    if ecc == 0.:
         #the planet is on a circular orbit
         t    = time - t_sec
-        freq = 2*np.pi/per
+        freq = 2.*np.pi/per
         phi  = (freq*t)
     else:
         #the planet is on an eccentric orbit
-        phi  = anom + np.deg2rad(w) + np.pi/2
+        phi  = anom + w*np.pi/180. + np.pi/2.
     
     #calculate the phase variations
-    if C==0 and D==0:
+    if C==0. and D==0.:
         #Skip multiplying by a bunch of zeros to speed up fitting
-        phaseVars = 1 + A*(np.cos(phi)-1) + B*np.sin(phi)
+        phaseVars = 1. + A*(np.cos(phi)-1.) + B*np.sin(phi)
     else:
-        phaseVars = 1 + A*(np.cos(phi)-1) + B*np.sin(phi) + C*(np.cos(2*phi)-1) + D*np.sin(2*phi)
+        phaseVars = 1. + A*(np.cos(phi)-1.) + B*np.sin(phi) + C*(np.cos(2.*phi)-1.) + D*np.sin(2.*phi)
     
     return phaseVars
 
 
 
 
-def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C=0, D=0, r2=None, r2off=None):
-    '''
-    Model observed flux coming from the planet over time.
+def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C=0., D=0., r2=None, r2off=None):
+    """Model observed flux coming from the planet over time.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        anom (ndarray): The true anomaly over time.
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecc (float): Orbital eccentricity.
+        w (float): Longitude of periastron (in degrees).
+        u1 (float): Limb darkening coefficient 1.
+        u2 (float): Limb darkening coefficient 2.
+        fp (float): Planet-to-star flux ratio.
+        t_sec (float): Time of secondary eclipse.
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float, optional): Amplitude of the second-order cosine term. Default=0.
+        D (float, optional): Amplitude of the second-order sine term. Default=0.
+        r2 (float, optional): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
+        r2off (float, optional): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
+    Returns:
+        ndarray: Observed flux coming from planet over time.
     
-    :type anom : ndarray
-    :param anom: The true anomaly over time.
-    
-    :type t0 : float
-    :param t0: Time of inferior conjunction
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius (in units of stellar radii)
-
-    :type a : float
-    :param a: Semi-major axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type ecc : float
-    :param ecc: Eccentricity
-
-    :type w : float
-    :param w: Longitude of periastron (in degrees)
-
-    :type u1 : float
-    :param u1: Limb darkening coefficient
-
-    :type u2 : float
-    :param u2: Limb darkening coefficient
-    
-    :type fp : float
-    :param fp: Planet-to-star flux ratio
-    
-    :type t_sec : float
-    :param t_sec: Time of secondary eclipse.
-    
-    :type A : float
-    :param A: Amplitude of the first-order cosine term.
-    
-    :type B : float
-    :param B: Amplitude of the first-order sine term.
-    
-    :type C : float, optional
-    :param C: Amplitude of the second-order cosine term. Default=0.
-    
-    :type D : float, optional
-    :param D: Amplitude of the second-order sine term. Default=0.
-    
-    :type r2 : float, optional
-    :param r2: Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
-    
-    :type r2off : float, optional
-    :param r2off: Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
-
-    Returns
-    -------
-
-    :return: fplanet - (ndarray) - Observed flux coming from planet over time.
-    '''
+    """
     
     fplanet = phase_variation(time, t_sec, per, anom, ecc, w, A, B, C, D)
     
@@ -376,70 +233,32 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
     return fplanet
 
 
-
 def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C=0, D=0, r2=None, r2off=None):
-    '''
-    Model observed flux coming from the star+planet system over time.
+    """Model observed flux coming from the star+planet system over time.
 
-    Parameters
-    ----------
+    Args:
+        time (ndarray): Array of times at which to calculate the model.
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecosw (float): Eccentricity multiplied by the cosine of the longitude of periastron (value between -1 and 1).
+        esinw (float): Eccentricity multiplied by the sine of the longitude of periastron (value between -1 and 1).
+        q1 (float): Limb darkening coefficient 1, parametrized to range between 0 and 1.
+        q2 (float): Limb darkening coefficient 2, parametrized to range between 0 and 1.
+        fp (float): Planet-to-star flux ratio.
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float, optional): Amplitude of the second-order cosine term. Default=0.
+        D (float, optional): Amplitude of the second-order sine term. Default=0.
+        r2 (float, optional): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
+        r2off (float, optional): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
 
-    :type time : ndarray
-    :param time: Array of times at which to calculate the model.
-        
-    :type t0 : float
-    :param t0: Time of inferior conjunction
-
-    :type per : float
-    :param per: Orbital period
-
-    :type rp : float
-    :param rp: Planet radius (in units of stellar radii)
-
-    :type a : float
-    :param a: Semi-major axis (in units of stellar radii)
-
-    :type inc : float
-    :param inc: Orbital inclination (in degrees)
-
-    :type ecosw : float
-    :param ecc: Eccentricity multiplied by the cosine of the longitude of periastron (value between -1 and 1)
-
-    :type esinw : float
-    :param w: Eccentricity multiplied by the sine of the longitude of periastron (value between -1 and 1)
-
-    :type q1 : float
-    :param q1: Limb darkening coefficient, parametrized to range between 0 and 1
-
-    :type q2 : float
-    :param q2: Limb darkening coefficient, parametrized to range between 0 and 1
+    Returns:
+        ndarray: Observed flux coming from star+planet system over time.
     
-    :type fp : float
-    :param fp: Planet-to-star flux ratio
-    
-    :type A : float
-    :param A: Amplitude of the first-order cosine term.
-    
-    :type B : float
-    :param B: Amplitude of the first-order sine term.
-    
-    :type C : float, optional
-    :param C: Amplitude of the second-order cosine term. Default=0.
-    
-    :type D : float, optional
-    :param D: Amplitude of the second-order sine term. Default=0.
-    
-    :type r2 : float, optional
-    :param r2: Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
-    
-    :type r2off : float, optional
-    :param r2off: Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
-
-    Returns
-    -------
-
-    :return: lightcurve - (ndarray) - Observed flux coming from star+planet system over time.
-    '''
+    """
     
     if ecosw==0 and esinw==0:
         ecc = 0
@@ -447,7 +266,7 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     else:
         ecc = np.sqrt(ecosw**2 + esinw**2)
         #longitude of periastron needs to be in degrees for batman!
-        w   = np.rad2deg(np.arctan2(esinw, ecosw))
+        w   = np.arctan2(esinw, ecosw)*180./np.pi
     
     #convert q1 and q2 limb darkening parameterization to u1 and u2 used by batman
     u1  = 2*np.sqrt(q1)*q2
@@ -467,39 +286,24 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
 
 
 
-
+@jit(nopython=True, parallel=False)
 def check_phase(phis, A, B, C=0, D=0):
-    '''
-    Check if the phasecurve ever dips below zero, implying non-physical negative flux coming from the planet.
+    """Check if the phasecurve ever dips below zero, implying non-physical negative flux coming from the planet.
 
-    Parameters
-    ----------
+    Args:
+        phis (ndarray): Array of phases in radians at which to calculate the model, e.g. phis=np.linspace(-np.pi,np.pi,1000).
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float, optional): Amplitude of the second-order cosine term. Default=0.
+        D (float, optional): Amplitude of the second-order sine term. Default=0.
 
-    :type phis : ndarray
-    :param phis: Array of phases at which to calculate the model, e.g. phis=np.linspace(-np.pi,np.pi,1000).
+    Returns:
+        bool: True if lightcurve implies non-physical negative flux coming from the planet, False otherwise.
     
-    :type A : float
-    :param A: Amplitude of the first-order cosine term.
-    
-    :type B : float
-    :param B: Amplitude of the first-order sine term.
-    
-    :type C : float, optional
-    :param C: Amplitude of the second-order cosine term. Default=0.
-    
-    :type D : float, optional
-    :param D: Amplitude of the second-order sine term. Default=0.
-    
-    Returns
-    -------
-
-    :return: lightcurveBad - (bool) - True if lightcurve implies non-physical negative flux coming from the planet.
-    '''
+    """
     
     if C==0 and D==0:
         #avoid wasting time by multiplying by a bunch of zeros
-        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis)
+        return np.any(1 + A*(np.cos(phis)-1) + B*np.sin(phis) < 0)
     else: 
-        phase = 1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis)
-    
-    return np.any(phase < 0)
+        return np.any(1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis) < 0)

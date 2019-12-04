@@ -11,13 +11,13 @@ lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
 sys.path.append(lib_path)
 
 try:
-    from mc3.rednoise import binrms
+    from mc3.stats import time_avg
 except ImportError:
-    print('Error: binrms from mc3.rednoise failed to import')
+    print('Error: time_avg from mc3.stats failed to import')
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
-                    time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath='', peritime=''):
+                    time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath=None, peritime=''):
     '''
     Makes a multi-panel plot from photometry outputs.
     params:
@@ -89,8 +89,14 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
             axes[i].axvline(x=breaks[j], color ='k', alpha=0.3, linestyle = 'dashed')
 
     fig.subplots_adjust(hspace=0)
-    pathplot = savepath + '01_Raw_data.pdf'
-    fig.savefig(pathplot, bbox_inches='tight')
+    
+    if savepath!=None:
+        pathplot = savepath + '01_Raw_data.pdf'
+        fig.savefig(pathplot, bbox_inches='tight')
+    else:
+        plt.show()
+    
+    plt.close()
     return
 
 
@@ -128,6 +134,7 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
     fig.subplots_adjust(hspace=0)
     pathplot = savepath + 'Centroids.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
+    plt.close()
     return
 
 
@@ -172,6 +179,9 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
         plt.savefig(pathplot, bbox_inches='tight')
     else:
         plt.show()
+    
+    plt.close()
+    return
 
 
 def plot_detec_syst(time, data, init):
@@ -180,11 +190,12 @@ def plot_detec_syst(time, data, init):
     plt.plot(time, init, '+', label='guess')
     plt.title('Initial Guess')
     plt.xlabel('Time (BMJD)')
-    plt.ylabel('Relative Flux')	
-    
+    plt.ylabel('Relative Flux')
+    plt.show()
+    plt.close()
     return
 
-def plot_init_guess(time, data, astro, detec_full, savepath, mode):
+def plot_init_guess(time, data, astro, detec_full, showplot=True, savepath=None):
     '''
     Makes a multi-panel plots for the initial light curve guesses.
     params:
@@ -230,8 +241,12 @@ def plot_init_guess(time, data, astro, detec_full, savepath, mode):
     axes[3].set_xlim(np.min(time), np.max(time))
     
     fig.subplots_adjust(hspace=0)
-    pathplot = savepath + '02_Initial_Guess.pdf'
-    fig.savefig(pathplot, bbox_inches='tight')
+    if savepath is not None:
+        pathplot = savepath + '02_Initial_Guess.pdf'
+        fig.savefig(pathplot, bbox_inches='tight')
+    if showplot:
+        plt.show()
+    plt.close()
     return
 
 def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
@@ -276,7 +291,7 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         axes[3].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[3].set_ylabel('Residuals', fontsize=fontsize)
-    axes[3].set_xlabel('Orbital Phase', fontsize=fontsize)
+    axes[3].set_xlabel('Time (BMJD)', fontsize=fontsize)
     # axes[3].set_ylim(-4*np.nanstd(flux/detec - astro), 4*np.nanstd(flux/detec - astro))
 
     for i in range(len(axes)):
@@ -295,12 +310,13 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         fig.savefig(plotname, bbox_inches='tight')
     if showplot:
         plt.show()
-    
+        
+    plt.close()
     return
 
 def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
     maxbins = int(np.rint(residuals.size/minbins))
-    rms, rmslo, rmshi, stderr, binsz = binrms(residuals, maxbins)
+    rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
     plt.clf()
     ax = plt.gca()
     ax.set_yscale('log')
@@ -323,6 +339,8 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
         plt.savefig(plotname, bbox_inches='tight')
     if showplot:
         plt.show()
+        
+    plt.close()
     
     #Ingress Duration
     sreal = rms[np.where(binsz<=ingrDuration)[0][-1]]*1e6
