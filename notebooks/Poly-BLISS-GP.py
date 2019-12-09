@@ -49,15 +49,20 @@ import bliss
 
 
 
-planets = ['WASP121b', 'WASP121b', 'KELT16b', 'MASCARA1b']
-channels = ['ch2', 'ch1', 'ch2', 'ch2']
+
+# planets = ['WASP121b', 'WASP121b', 'KELT16b', 'MASCARA1b']
+# channels = ['ch2', 'ch1', 'ch2', 'ch2']
+
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b']
+channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch1']
+
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
 
-mode_appendix = '_autoRun2'
+mode_appendix = '_autoRun'
 
 # parameters you do not wish to fit
-dparams_input = ['ecosw','esinw']
+dparams_input = []#['ecosw','esinw']
 
 # parameters you want to place a gaussian prior on
 gparams = ['t0', 'per', 'a', 'inc']
@@ -68,14 +73,12 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-
-
-minPolys = [2,2,2,2]                     # minimum polynomial order to consider
-maxPolys = [5,5,5,5]                     # maximum polynomial order to consider (set < minPoly to not use polynomial models)
+minPolys = [2,2,2,2,2]                   # minimum polynomial order to consider
+maxPolys = [1,5,5,5,5]                   # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
-tryPSFW = True
+tryPSFW = False
 
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
@@ -85,25 +88,21 @@ blissNBin = 8                            # number of knots to allow in each dire
 secondOrderOffset = False                # should you use the second order sinusoid terms when calculating offset
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
 nFrames  = 64                            # number of frames per binned data point
-initializeWithOld = False                # initial with previous mcmc results
+initializeWithOld = False                # initial with previous mcmc results using the same method
 
 
 #non-unity multiplicative factors if you have dilution from a nearby companion
 compFactors = np.ones(len(planets))
 
+# non-zero if you want to remove some initial data points
+cuts = np.zeros(len(planets)).astype(int)
+
+
+
+
 ######### FIX: REMOVE THIS LATER!!!! ###############
 # compFactors[0] += 0.8858*0.1196
 ###############################################
-
-# non-zero if you want to remove some initial data points
-cuts = np.zeros(len(planets)).astype(int)
-# For datasets where the first AOR is peak-up data
-cutFirstAORs = [False, False, True, True]
-
-
-
-
-
 ######### FIX: REMOVE THIS LATER!!!! ###############
 # if 'WASP-12' in planet:
 #     if 'old' in planet.lower() and channel=='ch1':
@@ -135,9 +134,11 @@ for iterationNumber in range(len(planets)):
     channel = channels[iterationNumber]
     compFactor = compFactors[iterationNumber]
     cut_tmp = cuts[iterationNumber]
-    cutFirstAOR = cutFirstAORs[iterationNumber]
     minPoly = minPolys[iterationNumber]
     maxPoly = maxPolys[iterationNumber]
+
+    with open(rootpath+planet+'/analysis/'+channel+'/cutFirstAOR.txt', 'r') as file:
+        cutFirstAOR = file.readline().strip()=='True'
 
     #Download the most recent masterfile of the best data on each target
     try:
@@ -318,7 +319,7 @@ for iterationNumber in range(len(planets)):
 
         AOR_snip = ''
         with open(rootpath+planet+'/analysis/aorSnippet.txt') as f:
-            AOR_snip = f.readline().strip()[1:]
+            AOR_snip = f.readline().strip()
 
         mainpath   = rootpath+planet+'/analysis/'+channel+'/'
         phoption = ''
@@ -384,15 +385,16 @@ for iterationNumber in range(len(planets)):
         savepath   = foldername + mode + '/'
         if not os.path.exists(savepath):
             os.makedirs(savepath)
+        
+        aors = os.listdir(rootpath+planet+'/data/'+channel)
+        aors = np.sort([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
+        AOR_snip = AOR_snip[1:]
+        
         # path to photometry outputs
         filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
         filenamef  = channel + '_datacube_full_AORs'+AOR_snip+'.dat'
         # Path to previous mcmc results (optional)
         path_params = foldername + mode + '/ResultMCMC_'+mode+'_Params.npy'
-
-
-        aors = os.listdir(rootpath+planet+'/data/'+channel)
-        aors = np.sort([aor for aor in aors if AOR_snip==aor[1:1+len(AOR_snip)]])
 
         # For datasets where the first AOR is peak-up data
         if cutFirstAOR:
@@ -403,7 +405,7 @@ for iterationNumber in range(len(planets)):
             cut = cut_tmp
 
         breaks = []
-        for aor in aors[1:]:
+        for aor in aors:
             rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
             rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
             rawImage = fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0])
@@ -411,7 +413,7 @@ for iterationNumber in range(len(planets)):
             # Get the time of the first exposure of each AOR after the first
             #     - this allows us to plot dashed lines where AOR breaks happen and where jump discontinuities happen
             breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
-
+        breaks = np.sort(breaks)[1:]
 
 
 
@@ -478,7 +480,8 @@ for iterationNumber in range(len(planets)):
         mid_x, mid_y = np.mean(xdata), np.mean(ydata)
 
 
-        if 'ecosw' in dparams_input and 'esinw' in dparams_input:
+        ## FIX: peritime doesn't get made
+        if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
             # make photometry plots
             make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                             time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath)
@@ -787,11 +790,11 @@ for iterationNumber in range(len(planets)):
             for p0_temp in p0_temps:
                 ndim = len(p0)
                 nwalkers = ndim*3
-                nBurnInSteps1 = nwalkers*200
+                nBurnInSteps1 = nwalkers*500
 
                 # get scattered starting point in parameter space 
                 # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
-                p0_rel_errs = 5e-2*np.ones_like(p0_temp)
+                p0_rel_errs = 1e-3*np.ones_like(p0_temp)
                 gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
                 p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
                 pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
@@ -892,7 +895,7 @@ for iterationNumber in range(len(planets)):
         if runMCMC:
             # get scattered starting point in parameter space 
             # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
-            p0_rel_errs = 1e-4*np.ones_like(p0_temp)
+            p0_rel_errs = 1e-3*np.ones_like(p0_temp)
             gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
             p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
             pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
@@ -1235,32 +1238,33 @@ for iterationNumber in range(len(planets)):
 
 
         # Differences from eccentricity
-        if 'ecosw' in dparams and 'esinw' in dparams:
-            # converting time into orbital phases
-            if 't0' in p0_labels:
-                t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
-            else:
-                t0MCMC = p0_obj.t0
-            if 'per' in p0_labels:
-                perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
-            else:
-                perMCMC = p0_obj.per
-            x = (time-t0MCMC)/perMCMC
-            orbNum = int(np.min(x))
-            if np.min(x)>0:
-                orbNum += 1
-            x -= orbNum
+        # if 'ecosw' in dparams and 'esinw' in dparams:
+        #     # converting time into orbital phases
+        #     if 't0' in p0_labels:
+        #         t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
+        #     else:
+        #         t0MCMC = p0_obj.t0
+        #     if 'per' in p0_labels:
+        #         perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+        #     else:
+        #         perMCMC = p0_obj.per
+        #     x = (time-t0MCMC)/perMCMC
+        #     orbNum = int(np.min(x))
+        #     if np.min(x)>0:
+        #         orbNum += 1
+        #     x -= orbNum
+        # 
+        #     orb_breaks = np.empty(len(breaks))
+        #     for j in range(len(breaks)):
+        #         orb_breaks[j] = ((breaks[j]-t0MCMC)/perMCMC-orbNum)      
+        # else:
+        #     x       = time - peritime
+        #     xbreaks = breaks - peritime
 
-            orb_breaks = np.empty(len(breaks))
-            for j in range(len(breaks)):
-                orb_breaks[j] = ((breaks[j]-t0MCMC)/perMCMC-orbNum)      
-        else:
-            x       = time - peritime
-            xbreaks = breaks - peritime
-
-
-        if 'ecosw' in dparams and 'esinw' in dparams:
-            make_plots.plot_bestfit(x, flux, mcmc_lightcurve, mcmc_detec, mode, orb_breaks, savepath, nbin=bestfitNbin, fontsize=24)
+        # FIX: peritime isn't defined, so just using time for all plots for now
+        orb_breaks = breaks
+        if True:#'ecosw' in dparams and 'esinw' in dparams:
+            make_plots.plot_bestfit(time, flux, mcmc_lightcurve, mcmc_detec, mode, orb_breaks, savepath, nbin=bestfitNbin, fontsize=24)
             plt.close()
         else:
             # FIX: make this default plotting option
@@ -1546,7 +1550,7 @@ for iterationNumber in range(len(planets)):
         data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
         data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
         data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
-
+	
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
         helpers.triangle_colors(data1, data2, data3, data4, plotname)
         plt.close()
