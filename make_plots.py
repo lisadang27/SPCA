@@ -3,9 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
 
-import bliss
-import helpers
-
 import os,sys
 lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
 sys.path.append(lib_path)
@@ -14,6 +11,10 @@ try:
     from mc3.stats import time_avg
 except ImportError:
     print('Error: time_avg from mc3.stats failed to import')
+
+# SPCA Packages
+import bliss
+import helpers
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 

@@ -60,10 +60,10 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
     if 'poly' in mode.lower():
         return signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                            c1,  c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17,
-                           c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1, sigF)
+                           c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1)
     elif 'bliss' in mode.lower():
         return signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                            d1, d2, d3, s1, s2, m1, sigF)
+                            d1, d2, d3, s1, s2, m1)
     elif 'gp' in mode.lower():
         return signal_GP(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                          d1, d2, d3, s1, s2, m1,
@@ -75,7 +75,7 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
 
 def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                 c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
-                d1, d2, d3, s1, s2, m1, sigF):
+                d1, d2, d3, s1, s2, m1):
     """Model the flux variations as a product of astrophysical varations multiplied by a 2D polynomial detector sensitivity model.
 
     Args:
@@ -104,7 +104,6 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
-        sigF (float): The white noise in units of F_star.
 
     Returns:
         ndarray: The modelled flux variations due to the astrophysical model modified by the detector model.

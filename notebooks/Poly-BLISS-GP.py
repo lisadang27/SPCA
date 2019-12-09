@@ -23,13 +23,6 @@ import csv
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
-import helpers
-import astro_models
-import make_plots
-import make_plots_custom
-import detec_models
-import bliss
-
 import inspect
 
 import warnings
@@ -46,7 +39,13 @@ from astropy.io import fits
 
 import urllib.request
 
-
+# SPCA Packages
+import helpers
+import astro_models
+import make_plots
+import make_plots_custom
+import detec_models
+import bliss
 
 
 
@@ -605,7 +604,7 @@ for iterationNumber in range(len(planets)):
                                          lnprior_custom_uniform_helper(p0, upriorInds, uparams_limits)+
                                          lnprior_custom_gamma_helper(p0, gammaInd, 1, 100))
         else:
-            lnprior_custom = 'none'
+            lnprior_custom = None
 
         # detemining which params in p0 is part of ideal_lightcurve, detec, psfw
         p0_astro  = inspect.getargspec(astro_models.ideal_lightcurve).args[1:]
@@ -1547,8 +1546,7 @@ for iterationNumber in range(len(planets)):
         data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
         data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
         data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
-        label = [r'$x_0$', r'$y_0$', r'$\sigma _x$', r'$\sigma _y$', r'$F$', r'Residuals']
 
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
-        helpers.triangle_colors(data1, data2, data3, data4, label, plotname)
+        helpers.triangle_colors(data1, data2, data3, data4, plotname)
         plt.close()

@@ -18,9 +18,9 @@ from numba import jit
 
 class signal_params(object):
     # class constructor
-    def __init__(self, name='planet', t0=1.97, per=3.19, rp=0.08,
-                 a=7., inc=84.2, ecosw=0.0, esinw=0.0, q1=0.01, q2=0.01,
-                 fp=0.002, A=0.1, B=0.0, C=0.0, D=0.0, sigF=0.002, mode=''):
+    def __init__(self, name='planet', t0=0., per=1., rp=0.1,
+                 a=8., inc=90., ecosw=0.0, esinw=0.0, q1=0.01, q2=0.01,
+                 fp=0.001, A=0.1, B=0.0, C=0.0, D=0.0, sigF=0.0003, mode=''):
         self.name    = name
         self.t0      = t0
         self.t0_err  = 0.0
@@ -78,36 +78,21 @@ class signal_params(object):
         self.Tstar_err = None
 
 def get_data(path):
-    '''
-    Retrieve binned data
-    
-    Parameters
-    ----------
-    
-    path : string object
-        Full path to the data file output by photometry routine
+    """Retrieve binned data.
 
-    Returns
-    -------
+    Args:
+        path (string): Full path to the data file output by photometry routine.
 
-    flux            : 1D array
-        Flux extracted for each frame
+    Returns:
+        tuple: flux (ndarray; Flux extracted for each frame),
+            flux_err (ndarray; uncertainty on the flux for each frame),
+            time (ndarray; Time stamp for each frame),
+            xdata (ndarray; X-coordinate of the centroid for each frame),
+            ydata (ndarray; Y-coordinate of the centroid for each frame), 
+            psfwx (ndarray; X-width of the target's PSF for each frame), 
+            psfwy (ndarray; Y-width of the target's PSF for each frame).
 
-    time             : 1D array
-        Time stamp for each frame
-
-    xdata            : 1D array
-        X-coordinate of the centroid for each frame
-
-    ydata            : 1D array
-        Y-coordinate of the centroid for each frame   
-
-    psfwx            : 1D array
-        X-width of the target's PSF for each frame     
-
-    psfwy            : 1D array
-    Y-width of the target's PSF for each frame     
-    '''
+    """
     
     #Loading Data
     flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
@@ -124,6 +109,23 @@ def get_data(path):
     return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
 
 def get_full_data(foldername, filename):
+    """Retrieve unbinned data.
+
+    Args:
+        foldername (string): Full path to the data file output by photometry routine.
+        filename (string): File name of the unbinned data file output by photometry routine.
+
+    Returns:
+        tuple: flux (ndarray; Flux extracted for each frame),
+            flux_err (ndarray; uncertainty on the flux for each frame),
+            time (ndarray; Time stamp for each frame),
+            xdata (ndarray; X-coordinate of the centroid for each frame),
+            ydata (ndarray; Y-coordinate of the centroid for each frame), 
+            psfwx (ndarray; X-width of the target's PSF for each frame), 
+            psfwy (ndarray; Y-width of the target's PSF for each frame).
+
+    """
+    
     path = foldername + filename
     #Loading Data
     flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
@@ -142,6 +144,28 @@ def get_full_data(foldername, filename):
     return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
 def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=np.array([])):
+    """Sigma cip the unbinned data.
+
+    Args:
+        flux (ndarray): Flux extracted for each frame.
+        flux_err (ndarray): uncertainty on the flux for each frame.
+        time (ndarray): Time stamp for each frame.
+        xdata (ndarray): X-coordinate of the centroid for each frame.
+        ydata (ndarray): Y-coordinate of the centroid for each frame.
+        psfwx (ndarray): X-width of the target's PSF for each frame.
+        psfwy (ndarray): Y-width of the target's PSF for each frame.
+
+    Returns:
+        tuple: flux (ndarray; Flux extracted for each frame),
+            flux_err (ndarray; uncertainty on the flux for each frame),
+            time (ndarray; Time stamp for each frame),
+            xdata (ndarray; X-coordinate of the centroid for each frame),
+            ydata (ndarray; Y-coordinate of the centroid for each frame), 
+            psfwx (ndarray; X-width of the target's PSF for each frame), 
+            psfwy (ndarray; Y-width of the target's PSF for each frame).
+
+    """
+    
     # chronological order
     index = np.argsort(TIME)
     FLUX  = FLUX[index]
@@ -197,9 +221,31 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     # normalizing the flux
     FERR  = FERR/np.ma.median(FLUX)
     FLUX  = FLUX/np.ma.median(FLUX)
-    return FLUX, TIME, XDATA, YDATA, PSFXW, PSFYW, FERR
+    return FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW
 
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
+    """Sort the data in time and cut off any bad data at the start of the observations (e.g. ditered AOR).
+
+    Args:
+        flux (ndarray): Flux extracted for each frame.
+        flux_err (ndarray): uncertainty on the flux for each frame.
+        time (ndarray): Time stamp for each frame.
+        xdata (ndarray): X-coordinate of the centroid for each frame.
+        ydata (ndarray): Y-coordinate of the centroid for each frame.
+        psfwx (ndarray): X-width of the target's PSF for each frame.
+        psfwy (ndarray): Y-width of the target's PSF for each frame.
+
+    Returns:
+        tuple: flux (ndarray; Flux extracted for each frame),
+            flux_err (ndarray; uncertainty on the flux for each frame),
+            time (ndarray; Time stamp for each frame),
+            xdata (ndarray; X-coordinate of the centroid for each frame),
+            ydata (ndarray; Y-coordinate of the centroid for each frame), 
+            psfwx (ndarray; X-width of the target's PSF for each frame), 
+            psfwy (ndarray; Y-width of the target's PSF for each frame).
+
+    """
+    
     # sorting chronologically
     index      = np.argsort(time)
     time0      = time[index]
@@ -210,7 +256,7 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     psfxw0     = psfxw[index]
     psfyw0     = psfyw[index]
 
-    # chop dithered-calibration AOR
+    # chop off dithered-calibration AOR if requested
     time       = time0[cut:]
     flux       = flux0[cut:]
     flux_err   = flux_err0[cut:]
@@ -221,6 +267,17 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def expand_dparams(dparams, mode):
+    """Add any implicit dparams given the mode (e.g. GP parameters if using a Polynomial model).
+
+    Args:
+        dparams (ndarray): A list of strings specifying which parameters shouldn't be fit.
+        mode (string): The string specifying the detector and astrophysical model to use.
+
+    Returns:
+        ndarray: The updated dparams array.
+
+    """
+    
     modeLower = mode.lower()
     
     if 'ellipse' not in modeLower:
@@ -234,14 +291,11 @@ def expand_dparams(dparams, mode):
     if 'poly' not in modeLower:
         dparams = np.append(dparams, ['c'+str(int(i)) for i in range(22)])  
     elif 'poly2' in modeLower:
-        dparams = np.append(dparams, ['c7','c8', 'c9', 'c10', 'c11', 
-                                      'c12', 'c13', 'c14', 'c15', 'c16', 
-                                      'c17','c18', 'c19', 'c20', 'c21'])
+        dparams = np.append(dparams, ['c'+str(int(i)) for i in range(7,22)])
     elif 'poly3' in modeLower:
-        dparams = np.append(dparams, ['c11', 'c12', 'c13', 'c14', 'c15', 'c16', 
-                                      'c17','c18', 'c19', 'c20', 'c21'])
+        dparams = np.append(dparams, ['c'+str(int(i)) for i in range(11,22)])
     elif 'poly4' in modeLower:
-        dparams = np.append(dparams, ['c16', 'c17','c18', 'c19', 'c20', 'c21'])
+        dparams = np.append(dparams, ['c'+str(int(i)) for i in range(16,22)])
         
     if 'ecosw' in dparams and 'esinw' in dparams:
         dparams = np.append(dparams, ['ecc', 'anom', 'w'])
@@ -260,65 +314,71 @@ def expand_dparams(dparams, mode):
     
     return dparams
 
-def get_lparams(function):
-    return inspect.getargspec(function).args
 
-def get_p0(lparams, fancyNames, dparams, obj):
-    nparams = np.array([sa for sa in lparams if not any(sb in sa for sb in dparams)])
-    fancyLabels = np.array([fancyNames[i] for i in range(len(lparams)) if not any(sb in lparams[i] for sb in dparams)])
-    p0 = np.empty(len(nparams))
-    for i in range(len(nparams)):
-         p0[i] = eval('obj.'+ nparams[i])
-    return p0, nparams, fancyLabels
+def get_p0(function_params, fancy_names, dparams, obj):
+    """Initialize the p0 variable to the defaults.
 
+    Args:
+        function_params (ndarray): Array of strings listing all parameters required by a function.
+        fancy_names (ndarray): Array of fancy (LaTeX or nicely formatted) strings labelling each parameter for plots.
+        dparams (ndarray): A list of strings specifying which parameters shouldn't be fit.
+        obj (object): An object containing the default values for all fittable parameters. #FIX: change this to dict later
+
+    Returns:
+        tuple: p0 (ndarray; the initialized values),\
+            fit_params (ndarray; the names of the fitted variables),
+            fancy_labels (ndarray; the nicely formatted names of the fitted variables)
+    
+    """
+    
+    fit_params = np.array([sa for sa in function_params if not any(sb in sa for sb in dparams)])
+    fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not any(sb in function_params[i] for sb in dparams)])
+    p0 = np.zeros(len(fit_params),dtype=float)
+    for i in range(len(fit_params)):
+        # FIX: switch to using dictionaries to cut out this instance of eval
+        p0[i] = eval('obj.'+ fit_params[i])
+    return p0, fit_params, fancy_labels
+
+# FIX - this is currently empty!!!
 def load_past_params(path):
-    '''
-    Params:
-    -------
-    path     : str
-        path to the file containing past mcmc result (must be a table saved as .npy)
+    """Load the fitted parameters from a previous run.
 
+    Args:
+        path (string): Path to the file containing past mcmc result (must be a table saved as .npy file).
 
-    '''
+    Returns:
+        ndarray: p0 (the previously fitted values)
+    
+    """
+    
     return
 
-
+# FIX - keep trying to think of ways of removing any/all instances of eval...
 def make_lambdafunc(function, dparams=[], obj=[], debug=False):
-    '''
-    Create a lambda function called dynamic_funk that will fixed the parameters listed in
-    dparams with the values in obj.
+    """Create a lambda function called dynamic_funk that will fix the parameters listed in dparams with the values in obj.
 
-    Params:
-    -------
-    function     : str
-        name of the original function.
-    dparams      : list (optional)
-        list of all input parameters the user does not wish to fit. 
-        Default is none.
-    obj          : str (optional)
-        bject containing all initial and fixed parameter values.
-        Default is none.
-    debug        : bool (optional)
-        If true, will print mystr so the user can read the command because executing it.
+    Note: The module where the original function is needs to be loaded in this file.
     
-    Return:
-    -------
-    dynamic_funk : function
-        lambda function with fixed parameters.
+    Args:
+        function (string): Name of the original function.
+        dparams (list, optional): List of all input parameters the user does not wish to fit (default is None.)
+        obj (string, optional): Object containing all initial and fixed parameter values (default is None.)
+        debug (bool, optional): If true, will print mystr so the user can read the command because executing it (default is False).
 
-    Note:
-    -----
-    The module where the original function is needs to be loaded here.
-    '''
+    Returns:
+        function: dynamic_funk (the lambda function with fixed parameters.)
+    
+    """
+    
     module   = function.__module__
     namefunc = function.__name__
     # get list of params you wish to fit
-    lparams  = np.asarray(inspect.getargspec(function).args)
-    index    = np.in1d(lparams, dparams)
-    nparams  = lparams[np.where(index==False)[0]]
+    function_params  = np.asarray(inspect.getargspec(function).args)
+    index    = np.in1d(function_params, dparams)
+    fit_params  = function_params[np.where(index==False)[0]]
     # assign value to fixed variables
     varstr  = ''
-    for label in lparams:
+    for label in function_params:
         if label in dparams and label != 'r2':
             tmp = 'obj.' + label
             varstr += str(eval(tmp)) + ', '
@@ -344,11 +404,11 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     
     # generate the line to execute
     mystr = 'global dynamic_funk; dynamic_funk = lambda '
-    for i in range(len(nparams)-nOptionalParms):
-        mystr = mystr + nparams[i] +', '
+    for i in range(len(fit_params)-nOptionalParms):
+        mystr = mystr + fit_params[i] +', '
     # add in any optional parameters
     for i in range(nOptionalParms):
-        mystr = mystr + nparams[len(nparams)-nOptionalParms+i] + '=' + parmDefaults[i] + ', '
+        mystr = mystr + fit_params[len(fit_params)-nOptionalParms+i] + '=' + parmDefaults[i] + ', '
     #remove extra ', '
     mystr = mystr[:-2]
     #mystr = mystr +': '+namefunc+'(' + varstr + ')'
@@ -362,25 +422,22 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(mystr)
     return dynamic_funk
 
-# def lnlike(p0, signalfunc, signal_input):
-#     '''
-#     Notes:
-#     ------
-#     Assuming that we are always fitting for the photometric scatter (sigF). 
-#     '''
-#     flux = signal_input[0]
-#     inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
-    
-#     # define model
-#     model = signalfunc(signal_input, *p0)
-#     return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
 
+# FIX - is it possible to remove the assumption that we're always fitting for sigF? What if we wrap everything with super functions that lazily evaluate freezings, rather than making a lambda function at the start?
 def lnlike(p0, signalfunc, signal_input):
-    '''
-    Notes:
-    ------
-    Assuming that we are always fitting for the photometric scatter (sigF). 
-    '''
+    """Evaluate the ln-likelihood at the position p0.
+    
+    Note: We assumine that we are always fitting for the photometric scatter (sigF). 
+
+    Args:
+        p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        signalfunc (function): The super function to model the astrophysical and detector functions.
+        signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
+
+    Returns:
+        float: The ln-likelihood evaluated at the position p0.
+    
+    """
     
     flux = signal_input[0]
     mode = signal_input[-1]
@@ -390,37 +447,81 @@ def lnlike(p0, signalfunc, signal_input):
         
         return gp.log_likelihood(flux-model)
     else:
-        # inv_sigma = 1/p0[-1] #using inverse sigma since multiplying is faster than dividing
         # define model
         model = signalfunc(signal_input, *p0)
-        # return -0.5*np.sum((flux-model)**2)*inv_sigma**2 + flux.size*np.log(inv_sigma)
         return loglikelihood(flux, model, p0[-1])
     
 
-def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom='none'):
-    '''
-    Calculating log probability of the signal function with input parameters p0 and 
-    input_data to describe flux.
+def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+    """Evaluate the ln-probability of the signal function at the position p0, including priors.
 
-    Params:
-    -------
+    Args:
+        p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        signalfunc (function): The super function to model the astrophysical and detector functions.
+        lnpriorfunc (function): The function to evaluate the default ln-prior.
+        signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
+        checkPhasePhis (ndarray): The phase angles to use when checking that the phasecurve is always positive.
+        lnpriorcustom (function, optional): An additional function to evaluate the a user specified ln-prior function
+            (default is None).
 
-    '''
+    Returns:
+        float: The ln-probability evaluated at the position p0.
+    
+    """
+    
+    # Evalute the prior first since this is much quicker to compute
     lp = lnpriorfunc(*p0, signal_input[-1], checkPhasePhis)
 
-    if (lnpriorcustom!='none'):
+    if (lnpriorcustom is not None):
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
+    
     return lp + lnlike(p0, signalfunc, signal_input)
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-            c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15,
-            c16, c17, c18, c19, c20, c21,
+            c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
             gpAmp, gpLx, gpLy, sigF,
             mode, checkPhasePhis):
-    # checking that the parameters are physically plausible
+    """Check that the parameters are physically plausible.
+
+    Args:
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecosw (float): Eccentricity multiplied by the cosine of the longitude of periastron (value between -1 and 1).
+        esinw (float): Eccentricity multiplied by the sine of the longitude of periastron (value between -1 and 1).
+        q1 (float): Limb darkening coefficient 1, parametrized to range between 0 and 1.
+        q2 (float): Limb darkening coefficient 2, parametrized to range between 0 and 1.
+        fp (float): Planet-to-star flux ratio.
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float): Amplitude of the second-order cosine term. Default=0.
+        D (float): Amplitude of the second-order sine term. Default=0.
+        r2 (float): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
+        r2off (float): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
+        c1--c21 (float): The polynomial model amplitudes.
+        d1 (float): The constant offset term. #FIX - I don't think this should be here.
+        d2 (float): The slope in sensitivity with the PSF width in the x direction.
+        d3 (float): The slope in sensitivity with the PSF width in the y direction.
+        s1 (float): The amplitude of the heaviside step function.
+        s2 (float): The location of the step in the heaviside function.
+        m1 (float): The slope in sensitivity over time with respect to time[0].
+        gpAmp (float): The natural logarithm of the GP covariance amplitude.
+        gpLx (float): The natural logarithm of the GP covariance lengthscale in x.
+        gpLy (float): The natural logarithm of the GP covariance lengthscale in y.
+        sigF (float): The white noise in units of F_star.
+        mode (string): The string specifying the detector and astrophysical model to use.
+        checkPhasePhis (ndarray): The phase angles to use when checking that the phasecurve is always positive.
+
+    Returns:
+        float: The default ln-prior evaluated at the position p0.
+    
+    """
+    
     check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and
         (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False) and (sigF > 0)
@@ -429,15 +530,24 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
     else:
         return -np.inf
 
+# FIX - move this to make_plots.py
 def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
-    '''
-    input:
-        ndim    = number of free parameters
-        nwalk   = number of walkers
-        samples = samples chain
-        interv  = take every 'interv' element to thin out the plot
-        subsamp = only show the last 'subsamp' steps
-    '''
+    """Make a plot showing the evolution of the walkers throughout the emcee sampling.
+
+    Args:
+        ndim (int): Number of free parameters
+        nwalk (int): Number of walkers
+        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
+        interv (int): Take every 'interv' element to thin out the plot
+        subsamp (int): Only show the last 'subsamp' steps
+        labels (ndarray): The fancy labels for each dimension
+        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+
+    Returns:
+        None
+    
+    """
+    
     # get first index
     beg   = len(samples[0,:,0]) - subsamp
     end   = len(samples[0,:,0]) 
@@ -471,18 +581,43 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     if fname != None:
         plt.savefig(fname, bbox_inches='tight')
     else:
+        # FIX - return the figure instead
         plt.show()
     plt.close()
     return    
 
 @jit(nopython=True, parallel=False)
 def chi2(data, fit, err):
+    """Compute the chi-squared statistic.
+
+    Args:
+        data (ndarray): The real y values.
+        fit (ndarray): The fitted y values.
+        err (ndarray or float): The y error(s).
+
+    Returns:
+        float: The chi-squared statistic.
+    
+    """
+    
     #using inverse sigma since multiplying is faster than dividing
     inv_err = err**-1
     return np.sum(((data - fit)*inv_err)**2)
 
 @jit(nopython=True, parallel=False)
 def loglikelihood(data, fit, err):
+    """Compute the lnlikelihood.
+
+    Args:
+        data (ndarray): The real y values.
+        fit (ndarray): The fitted y values.
+        err (ndarray or float): The y error(s).
+
+    Returns:
+        float: The lnlikelihood.
+    
+    """
+    
     #using inverse sigma since multiplying is faster than dividing
     inv_err = err**-1
     len_fit = len(fit)
@@ -490,33 +625,73 @@ def loglikelihood(data, fit, err):
 
 @jit(nopython=True, parallel=False)
 def evidence(logL, Npar, Ndat):
+    """Compute the Bayesian evidence.
+
+    Args:
+        logL (float): The lnlikelihood.
+        Npar (int): The number of fitted parameters.
+        Ndat (int): The number of data fitted.
+
+    Returns:
+        float: The Bayesian evidence.
+    
+    """
+    
     return logL - (Npar/2.)*np.log(Ndat)
 
-@jit(nopython=True, parallel=False)
 def BIC(logL, Npar, Ndat):
-    return -2.*(logL - (Npar/2.)*np.log(Ndat))
+    """Compute the Bayesian Information Criterion.
 
-def triangle_colors(data1, data2, data3, data4, label, path):
+    Args:
+        logL (float): The lnlikelihood.
+        Npar (int): The number of fitted parameters.
+        Ndat (int): The number of data fitted.
+
+    Returns:
+        float: The Bayesian Information Criterion.
+    
+    """
+    
+    return -2.*evidence(logL, Npar, Ndat)
+
+# FIX - move this to make_plots.py
+def triangle_colors(all_data, _data, transit_data, secondEcl_data, fname=None):
+    """Make a triangle plot like figure to help look for any residual correlations in the data.
+
+    Args:
+        all_data (list): A list of the all of the xdata, ydata, psfxw, psfyw, flux, residuals.
+        all_data (list): A list of the all of the xdata, ydata, psfxw, psfyw, flux, residuals.
+        firstEcl_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the first eclipse.
+        transit_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the transit.
+        secondEcl_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the second eclipse.
+        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+
+    Returns:
+        None
+    
+    """
+    
+    label = [r'$x_0$', r'$y_0$', r'$\sigma _x$', r'$\sigma _y$', r'$F$', r'Residuals']
+    
     fig = plt.figure(figsize = (8,8))
-    gs  = gridspec.GridSpec(len(data1)-1,len(data1)-1)
+    gs  = gridspec.GridSpec(len(all_data)-1,len(all_data)-1)
     i = 0
-    for k in range(np.sum(np.arange(len(data1)))):
+    for k in range(np.sum(np.arange(len(all_data)))):
         j= k - np.sum(np.arange(i+1))
         ax = fig.add_subplot(gs[i,j])
-        ax.plot(data1[j], data1[i+1],'k.', markersize = 0.2)
-        l1 = ax.plot(data2[j], data2[i+1],'.', color = '#66ccff', markersize = 0.7, label='$1^{st}$ secondary eclipse')
-        l2 = ax.plot(data3[j], data3[i+1],'.', color = '#ff9933', markersize = 0.7, label='transit')
-        l3 = ax.plot(data4[j], data4[i+1],'.', color = '#0066ff', markersize = 0.7, label='$2^{nd}$ secondary eclipse')
+        ax.plot(all_data[j], all_data[i+1],'k.', markersize = 0.2)
+        l1 = ax.plot(firstEcl_data[j], firstEcl_data[i+1],'.', color = '#66ccff', markersize = 0.7, label='$1^{st}$ secondary eclipse')
+        l2 = ax.plot(transit_data[j], transit_data[i+1],'.', color = '#ff9933', markersize = 0.7, label='transit')
+        l3 = ax.plot(secondEcl_data[j], secondEcl_data[i+1],'.', color = '#0066ff', markersize = 0.7, label='$2^{nd}$ secondary eclipse')
         if (j == 0):
             plt.setp(ax.get_yticklabels(), rotation = 45)
             ax.yaxis.set_major_locator(MaxNLocator(5, prune = 'both'))
             ax.set_ylabel(label[i+1])
         else:
             plt.setp(ax.get_yticklabels(), visible=False)
-        if (i == len(data1)-2):
+        if (i == len(all_data)-2):
             plt.setp(ax.get_xticklabels(), rotation = 45)
             plt.axhline(y=0, color='k', linestyle='dashed')
-            #ax.plot(bins[j], res[j], '.', color='#ff5050', markersize = 3)  # plot bin residual
             ax.xaxis.set_major_locator(MaxNLocator(5, prune = 'both'))
             ax.set_xlabel(label[j])
         else:
@@ -524,12 +699,32 @@ def triangle_colors(data1, data2, data3, data4, label, path):
         if(i == j):
             i += 1
     handles = [l1,l2,l3]
+    
     fig.subplots_adjust(hspace=0)
     fig.subplots_adjust(wspace=0)
-    fig.savefig(path, bbox_inches='tight')
-    return
+    
+    if fname is not None:
+        fig.savefig(path, bbox_inches='tight')
+        plt.close(fig)
+        return
+    else:
+        return fig
 
 def binValues(values, binAxisValues, nbin, assumeWhiteNoise=False):
+    """Bin values and compute their binned noise.
+
+    Args:
+        values (ndarray): An array of values to bin.
+        binAxisValues (ndarray): Values of the axis along which binning will occur.
+        nbin (int): The number of bins desired.
+        assumeWhiteNoise (bool, optional): Divide binned noise by sqrt(nbinned) (True) or not (False, default).
+
+    Returns:
+        tuple: binned (ndarray; the binned values),
+            binnedErr (ndarray; the binned errors)
+    
+    """
+    
     bins = np.linspace(np.nanmin(binAxisValues), np.nanmax(binAxisValues), nbin)
     digitized = np.digitize(binAxisValues, bins)
     binned = np.array([np.nanmedian(values[digitized == i]) for i in range(1, nbin)])
@@ -539,12 +734,39 @@ def binValues(values, binAxisValues, nbin, assumeWhiteNoise=False):
     return binned, binnedErr
 
 def binnedNoise(x, y, nbin):
+    """Compute the binned noise (not assuming white noise)
+
+    Args:
+        x (ndarray): The values along the binning axis.
+        y (ndarray): The values which should be binned.
+        nbin (int): The number of bins desired.
+
+    Returns:
+        ndarray: The binned noise (not assuming white noise).
+    
+    """
+    
     bins = np.linspace(np.min(x), np.max(x), nbin)
     digitized = np.digitize(x, bins)
     y_means = np.array([np.nanmean(y[digitized == i]) for i in range(1, nbin)])
     return np.nanstd(y_means)
 
 def getIngressDuration(p0_mcmc, p0_labels, p0_obj, intTime):
+    """Compute the transit/eclipse ingress duration in units of datapoints.
+    
+    Warning - this assumes a circular orbit!
+
+    Args:
+        p0_mcmc (ndarray): The array containing the fitted values.
+        p0_labels (ndarray): The array containing all of the names of the fittable parameters.
+        p0_obj (object): The object containing the default values for non-fitted variables.
+        intTime (float): The integration time of each measurement.
+
+    Returns:
+        float: The transit/eclipse ingress duration in units of datapoints.
+    
+    """
+    
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
@@ -558,9 +780,24 @@ def getIngressDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     else:
         perMCMC = p0_obj.per
 
-    return (2*rpMCMC/(2*np.pi*aMCMC/perMCMC))/intTime #Eclipse/transit ingress time
+    return (2*rpMCMC/(2*np.pi*aMCMC/perMCMC))/intTime
 
 def getOccultationDuration(p0_mcmc, p0_labels, p0_obj, intTime):
+    """Compute the full transit/eclipse duration in units of datapoints.
+    
+    Warning - this assumes a circular orbit!
+
+    Args:
+        p0_mcmc (ndarray): The array containing the fitted values.
+        p0_labels (ndarray): The array containing all of the names of the fittable parameters.
+        p0_obj (object): The object containing the default values for non-fitted variables.
+        intTime (float): The integration time of each measurement.
+
+    Returns:
+        float: The full transit/eclipse duration in units of datapoints
+    
+    """
+    
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
@@ -574,4 +811,4 @@ def getOccultationDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     else:
         perMCMC = p0_obj.per
 
-    return (2/(2*np.pi*aMCMC/perMCMC))/intTime #Transit/eclipse duration
+    return (2/(2*np.pi*aMCMC/perMCMC))/intTime
