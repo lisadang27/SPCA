@@ -1,8 +1,7 @@
 #--------------------------------------------------------------
-#Author: Lisa Dang
-#Created: 2016-11-09 1:21 AM EST
-#Branched: 2017-05-18 from main to taylor
-#Last Modified: 2017-10-24 by Taylor Bell
+#Authors: Lisa Dang, Taylor Bell
+#Created: 2016-11-09 1:21 AM EST by Lisa Dang
+#Last Modified: 2019-12-10 by Taylor Bell
 #Title: Aperture Photometry
 #--------------------------------------------------------------
 import numpy as np
@@ -130,7 +129,7 @@ def get_time(hdu_list, time, ignoreFrames):
     time.extend(t)
     return time
 
-def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = [], bounds = (13, 18, 13, 18), sigma=4, iters=2):
+def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = [], bounds = (13, 18, 13, 18), sigma=4, maxiters=2):
     '''
     Sigma clips bad pixels and mask entire frame if the sigma clipped
     pixel is too close to the target.
@@ -167,9 +166,9 @@ def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0
     # mask invalids
     image_data2 = np.ma.masked_invalid(image_data)
     # make mask to mask entire bad frame
-    x = np.ones(shape = (w, l))
+    x = np.ones((w, l))
     mask = np.ma.make_mask(x)
-    sig_clipped_data = sigma_clip(image_data2, sigma=sigma, iters=iters, cenfunc=np.ma.median, axis = 0)
+    sig_clipped_data = sigma_clip(image_data2, sigma=sigma, maxiters=maxiters, cenfunc=np.ma.median, axis = 0)
     for i in range (h):
         if np.ma.is_masked(sig_clipped_data[i, lbx:ubx, lby:uby]):
             sig_clipped_data[i,:,:] = np.ma.masked_array(sig_clipped_data[i,:,:], mask = mask)
@@ -214,7 +213,7 @@ def bgsubtract(img_data, bg_flux = [], bg_err = [], bounds = (11, 19, 11, 19)):
     lbx, ubx, lby, uby = bounds
     image_data = np.ma.copy(img_data)
     h, w, l = image_data.shape
-    x = np.zeros(shape = image_data.shape)
+    x = np.zeros(image_data.shape)
     x[:, lbx:ubx,lby:uby] = 1
     mask   = np.ma.make_mask(x)
     masked = np.ma.masked_array(image_data, mask = mask)
@@ -248,7 +247,7 @@ def oversampling(image_data, a = 2):
         Data cube of oversampled images (2D arrays of pixel values).
     '''
     l, h, w = image_data.shape
-    gridx, gridy = np.mgrid[0:h:1/a, 0:w:1/a]
+    gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
     image_over = np.empty((l, h*a, w*a))
     for i in range(l):
         image_masked = np.ma.masked_invalid(image_data[i,:,:])
@@ -259,7 +258,7 @@ def oversampling(image_data, a = 2):
         image_over[i,:,:] = interpolate.griddata(points, image_compre, (gridx, gridy), method = 'linear')
     return image_over/(a**2)
 
-def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, bounds = (14, 18, 14, 18)):
+def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds=(14, 18, 14, 18)):
     '''
     Gets the centroid of the target by flux weighted mean and the PSF width
     of the target.
@@ -308,16 +307,25 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     wy        : list
         Updated list of PSF width (x-axis) obtained previously.
     '''
-    lbx, ubx, lby, uby = bounds
-    lbx, ubx, lby, uby = lbx*scale, ubx*scale, lby*scale, uby*scale
+    
+    if xo is None:
+        xo=[]
+    if yo is None:
+        yo=[]
+    if wx is None:
+        wx=[]
+    if wy is None:
+        wy=[]
+    
+    lbx, ubx, lby, uby = np.array(bounds)*scale
     starbox = image_data[:, lbx:ubx, lby:uby]
     h, w, l = starbox.shape
-    # get centroid	
-    X, Y    = np.mgrid[:w,:l]
+    # get centroid
+    Y, X    = np.mgrid[:w,:l]
     cx      = (np.sum(np.sum(X*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lbx
     cy      = (np.sum(np.sum(Y*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lby
-    cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
-    cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
+    cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
     xo.extend(cx/scale)
     yo.extend(cy/scale)
     # get PSF widths
@@ -326,8 +334,8 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     X2, Y2  = (X + lbx - cx)**2, (Y + lby - cy)**2
     widx    = np.sqrt(np.sum(np.sum(X2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
     widy    = np.sqrt(np.sum(np.sum(Y2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
-    widx    = sigma_clip(widx, sigma=4, iters=2, cenfunc=np.ma.median)
-    widy    = sigma_clip(widy, sigma=4, iters=2, cenfunc=np.ma.median)
+    widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
     wx.extend(widx/scale)
     wy.extend(widy/scale)
     return xo, yo, wx, wy
@@ -437,8 +445,8 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
         tmp_sum.extend(phot_table['aperture_sum']*factor)
         tmp_err.extend(phot_table['aperture_sum_err']*factor)
     # removing outliers
-    tmp_sum = sigma_clip(tmp_sum, sigma=4, iters=2, cenfunc=np.ma.median)
-    tmp_err = sigma_clip(tmp_err, sigma=4, iters=2, cenfunc=np.ma.median)
+    tmp_sum = sigma_clip(tmp_sum, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    tmp_err = sigma_clip(tmp_err, sigma=4, maxiters=2, cenfunc=np.ma.median)
     ape_sum.extend(tmp_sum)
     ape_sum_err.extend(tmp_err)
     return ape_sum, ape_sum_err
@@ -460,7 +468,7 @@ def binning_data(data, size):
     binned_data: 1D array
         Array of binned data.
 
-    binned_data: 1D array
+    binned_data_std: 1D array
         Array of standard deviation for each entry in binned_data.
     '''
     data = np.ma.masked_invalid(data)
@@ -747,7 +755,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         binned_bg_err, binned_bg_err_std = binning_data(np.asarray(bg_err), bin_size)
 
         #sigma clip binned data to remove wildly unacceptable data
-        binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+        binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
         if np.ma.is_masked(binned_flux_mask):
             binned_time = binned_time[binned_flux_mask==binned_flux]
             binned_time_std = binned_time_std[binned_flux_mask==binned_flux]
@@ -810,3 +818,35 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     toc = tim.clock()
 #     print('Number of discarded frames:', tossed)
 #     print('Time:', toc-tic, 'seconds')
+
+
+
+
+
+
+import unittest
+
+class TestAperturehotometryMethods(unittest.TestCase):
+
+    # Test that centroiding gives the expected values and doesn't swap x and y
+    def test_centroiding(self):
+        fake_images = np.zeros((4,32,32))
+        for i in range(fake_images.shape[0]):
+            fake_images[i,14+i,15] = 2
+        xo, yo, _, _ = centroid_FWM(fake_images)
+        self.assertTrue(np.all(xo==np.ones_like(xo)*15.))
+        self.assertTrue(np.all(yo==np.arange(14,18)))
+
+    # Test that circular aperture photometry properly follows the input centroids and gives the expected values
+    def test_circularAperture(self):
+        fake_images = np.zeros((4,32,32))
+        for i in range(fake_images.shape[0]):
+            fake_images[i,14+i,15] = 2
+        xo = np.ones(fake_images.shape[0])*15
+        yo = np.arange(14,18)
+        flux, _ = A_photometry(fake_images, np.zeros_like(xo), cx=xo, cy=yo, r=1.,
+                               shape='Circular', method='center')
+        self.assertTrue(np.all(flux==np.ones_like(flux)*2.))
+
+if __name__ == '__main__':
+    unittest.main()
