@@ -295,9 +295,6 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
     xo.extend(cx/scale)
     yo.extend(cy/scale)
-    print(cx,cy)
-    print(len(cx),len(cy))
-    print()
     # get PSF widths
     X, Y    = np.repeat(X[np.newaxis,:,:], h, axis=0), np.repeat(Y[np.newaxis,:,:], h, axis=0)
     cx, cy  = np.reshape(cx, (h, 1, 1)), np.reshape(cy, (h, 1, 1))
