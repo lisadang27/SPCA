@@ -223,7 +223,7 @@ def oversampling(image_data, a = 2):
     	Data cube of oversampled images (2D arrays of pixel values).
     '''
     l, h, w = image_data.shape
-    gridx, gridy = np.mgrid[0:h:1/a, 0:w:1/a]
+    gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
     image_over = np.empty((l, h*a, w*a))
     for i in range(l):
         image_masked = np.ma.masked_invalid(image_data[i,:,:])
@@ -288,7 +288,7 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     starbox = image_data[:, lbx:ubx, lby:uby]
     h, w, l = starbox.shape
     # get centroid	
-    X, Y    = np.mgrid[:w,:l]
+    Y, X    = np.mgrid[:w,:l]
     cx      = (np.sum(np.sum(X*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lbx
     cy      = (np.sum(np.sum(Y*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lby
     cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
@@ -520,3 +520,30 @@ def binning_data2D(data, size):
     binned_data     = np.ma.median(reshaped_data, axis=1)
     binned_data_std = np.ma.std(reshaped_data, axis=1)
     return binned_data, binned_data_std
+
+import unittest
+
+class TestAperturehotometryMethods(unittest.TestCase):
+
+    # Test that centroiding gives the expected values and doesn't swap x and y
+    def test_centroiding(self):
+        fake_images = np.zeros((4,32,32))
+        for i in range(fake_images.shape[0]):
+            fake_images[i,14+i,15] = 2
+        xo, yo, _, _ = centroid_FWM(fake_images)
+        self.assertTrue(np.all(xo==np.ones_like(xo)*15.))
+        self.assertTrue(np.all(yo==np.arange(14,18)))
+
+    # Test that circular aperture photometry properly follows the input centroids and gives the expected values
+    def test_circularAperture(self):
+        fake_images = np.zeros((4,32,32))
+        for i in range(fake_images.shape[0]):
+            fake_images[i,14+i,15] = 2
+        xo = np.ones(fake_images.shape[0])*15
+        yo = np.arange(14,18)
+        flux, _ = A_photometry(fake_images, np.zeros_like(xo), cx=xo, cy=yo, r=1.,
+                               shape='Circular', method='center')
+        self.assertTrue(np.all(flux==np.ones_like(flux)*2.))
+
+if __name__ == '__main__':
+    unittest.main()
