@@ -147,7 +147,7 @@ def get_fnames(directory, tag='um'):
         Number of fits file found.
     '''
     lst      = os.listdir(directory)
-    Run_list = [k for k in lst if tag in k]
+    Run_list = [k for k in lst if tag==k[:len(tag)]]
     return sorted(Run_list)
 
 def get_full_data(foldername, channel, AOR_snip):

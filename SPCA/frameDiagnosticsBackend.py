@@ -41,7 +41,7 @@ def get_stacks(stackpath, datapath, AOR_snip, ch):
     keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
 
     data_list = os.listdir(datapath)
-    AOR_list = [a for a in data_list if AOR_snip in a]
+    AOR_list = [a for a in data_list if AOR_snip==a[:len(AOR_snip]]
     calFiles = []
     for i in range(len(AOR_list)):
         path = datapath + '/' + AOR_list[i] + '/' + ch +'/cal/'
