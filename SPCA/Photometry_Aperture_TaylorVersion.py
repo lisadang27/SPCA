@@ -129,7 +129,7 @@ def get_time(hdu_list, time, ignoreFrames):
     time.extend(t)
     return time
 
-def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = [], bounds = (13, 18, 13, 18), sigma=4, maxiters=2):
+def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = None, bounds = (13, 18, 13, 18), sigma=4, maxiters=2):
     '''
     Sigma clips bad pixels and mask entire frame if the sigma clipped
     pixel is too close to the target.
@@ -161,6 +161,9 @@ def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0
     :returns: tossed (int) - Updated total number of image tossed out.
     :returns: badframetable (list) - Updated list of file names and frame number of images tossed out from 'fname'.
     '''
+    if badframetable is None:
+        badframetable = []
+    
     lbx, ubx, lby, uby = bounds
     h, w, l = image_data.shape
     # mask invalids
@@ -176,7 +179,7 @@ def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0
             tossed += 1
     return sig_clipped_data, tossed, badframetable
 
-def bgsubtract(img_data, bg_flux = [], bg_err = [], bounds = (11, 19, 11, 19)):
+def bgsubtract(img_data, bg_flux = None, bg_err = None, bounds = (11, 19, 11, 19)):
     '''
     Measure the background level and subtracts the background from
     each frame.
@@ -210,6 +213,11 @@ def bgsubtract(img_data, bg_flux = [], bg_err = [], bounds = (11, 19, 11, 19)):
         Updated array of uncertainties on background measurements for previous 
         images.
     '''
+    if bg_flux is None:
+        bg_flux = []
+    if bg_err is None:
+        bg_err = []
+    
     lbx, ubx, lby, uby = bounds
     image_data = np.ma.copy(img_data)
     h, w, l = image_data.shape
@@ -340,7 +348,7 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     wy.extend(widy/scale)
     return xo, yo, wx, wy
 
-def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
+def A_photometry(image_data, bg_err, factor = 1, ape_sum = None, ape_sum_err = None,
     cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5, 
     theta = 0, shape = 'Circular', method='center'):
     '''
@@ -419,6 +427,11 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
         Array of flux uncertainties with new flux uncertainties appended.
 
     '''
+    if ape_sum is None:
+        ape_sum = []
+    if ape_sum_err is None:
+        ape_sum_err = []
+    
     l, h, w  = image_data.shape
     tmp_sum  = []
     tmp_err  = []
@@ -483,7 +496,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     bin_size = 64, save_bin = '/ch2_datacube_binned_AORs579.dat', plot = True, 
     plot_name= 'Lightcurve.pdf', oversamp = False, saveoversamp = True, reuse_oversamp = False,
     planet = 'CoRoT-2b', r = 2.5, shape = 'Circular', edge='hard', addStack = False,
-    stackPath = '', ignoreFrames = [], maskStars = [], moveCentroid=False, **kwargs):
+    stackPath = '', ignoreFrames = None, maskStars = None, moveCentroid=False, **kwargs):
 
     '''
     Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
@@ -584,6 +597,11 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         If Photometry method is not supported/recognized by this pipeline.
     '''
 
+    if ignoreFrames is None:
+        ignoreFrames = []
+    if maskStars is None:
+        maskStars = []
+    
     # Ignore warning and starts timing
     warnings.filterwarnings('ignore')
     tic = tim.clock()

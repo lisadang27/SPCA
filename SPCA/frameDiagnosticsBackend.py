@@ -21,9 +21,15 @@ import warnings
 import matplotlib.ticker as mtick
 from photutils.datasets import make_4gaussians_image
 
+# SPCA libraries
+from .Photometry_Aperture_TaylorVersion import sigma_clipping
+from .Photometry_Aperture_TaylorVersion import bgsubtract
+from .Photometry_Aperture_TaylorVersion import centroid_FWM
+from .Photometry_Aperture_TaylorVersion import A_photometry
+
 def get_stacks(stackpath, datapath, AOR_snip, ch):
     '''
-    Find paths to all the fits files.
+    Find paths to all the correction stack FITS files.
 
     Parameters
     ----------
@@ -41,7 +47,7 @@ def get_stacks(stackpath, datapath, AOR_snip, ch):
     keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
 
     data_list = os.listdir(datapath)
-    AOR_list = [a for a in data_list if AOR_snip in a]
+    AOR_list = [a for a in data_list if AOR_snip==a[:len(AOR_snip)]]
     calFiles = []
     for i in range(len(AOR_list)):
         path = datapath + '/' + AOR_list[i] + '/' + ch +'/cal/'
@@ -52,81 +58,10 @@ def get_stacks(stackpath, datapath, AOR_snip, ch):
         loc = fname.find('SPITZER_I')+offset
         key = fname[loc:].split('_')[0]
         calFiles.append(os.path.join(stackpath, stacks[list(good)][np.where(keys == key)[0][0]]))
-    return calFiles
-
-
-
-def sigma_clipping(image_data, tossed, bounds = ( 14, 18, 14, 18)):#,fname):
-    lbx, ubx, lby, uby = bounds
-    h, w, l = image_data.shape
-    # mask invalids
-    image_data2 = np.ma.masked_invalid(image_data)
-    # make mask to mask entire bad frame
-    x = np.ones(shape = (w, l))
-    mask = np.ma.make_mask(x)
-    sig_clipped_data = sigma_clip(image_data2, sigma=4, maxiters=4, cenfunc=np.ma.median, axis = 0)
-    for i in range (h):
-        oldstar = image_data[i, lbx:ubx, lby:uby]
-        newstar = sig_clipped_data[i, lbx:ubx, lby:uby]
-        truth   = newstar==oldstar
-        if(np.ma.sum(truth) < truth.size):
-            sig_clipped_data[i,:,:] = np.ma.masked_array(sig_clipped_data[i,:,:], mask = mask)
-            tossed += 1
-            #print('tossed:', tossed)
-    return sig_clipped_data
-
-def bgsubtract(image_data):
-    bgsubimg=image_data
-    x=np.ndarray ( shape=(64,32,32), dtype=bool)
-    xmask=np.ma.make_mask(x,copy=True, shrink=True, dtype=np.bool)
-    xmask[:,:,:]= False
-    xmask[:,14:18,14:18]=True
-    masked= np.ma.masked_array(bgsubimg, mask=xmask)
-    n=0
-    #Background subtraction for each frame
-    while(n<64):
-        bg_avg=np.ma.median(masked[n])
-        bgsubimg[n]= bgsubimg[n,:,:] - bg_avg
-        n+=1
-    return bgsubimg
-
-def centroid_FWM(image_data, scale = 1, bounds = (14, 18, 14, 18)):
-    lbx, ubx, lby, uby = bounds
-    lbx, ubx, lby, uby = lbx*scale, ubx*scale, lby*scale, uby*scale
-    starbox = image_data[:, lbx:ubx, lby:uby]
-    h, w, l = starbox.shape
-    # get centroid  
-    X, Y    = np.mgrid[:w,:l]
-    cx      = (np.ma.sum(np.ma.sum(X*starbox, axis=1), axis=1)/(np.ma.sum(np.ma.sum(starbox, axis=1), axis=1))) + lbx
-    cy      = (np.ma.sum(np.ma.sum(Y*starbox, axis=1), axis=1)/(np.ma.sum(np.ma.sum(starbox, axis=1), axis=1))) + lby
-    # get PSF widths
-    X, Y    = np.repeat(X[np.newaxis,:,:], h, axis=0), np.repeat(Y[np.newaxis,:,:], h, axis=0)
-    cx, cy  = np.reshape(cx, (h, 1, 1)), np.reshape(cy, (h, 1, 1))
-    X2, Y2  = (X + lbx - cx)**2, (Y + lby - cy)**2
-    widx    = np.ma.sqrt(np.ma.sum(np.ma.sum(X2*starbox, axis=1), axis=1)/(np.ma.sum(np.ma.sum(starbox, axis=1), axis=1)))
-    widy    = np.ma.sqrt(np.ma.sum(np.ma.sum(Y2*starbox, axis=1), axis=1)/(np.ma.sum(np.ma.sum(starbox, axis=1), axis=1)))
-    return cx.ravel(), cy.ravel(), widx.ravel(), widy.ravel()
-
-def A_photometry(image_data, factor = 0.029691810510039204,
-    cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5, 
-    theta = 0, shape = 'Circular', method='center'):
-    l, h, w = image_data.shape
-    position= [cx, cy]
-    ape_sum = []
-    if   (shape == 'Circular'):
-        aperture = CircularAperture(position, r=r)
-    elif (shape == 'Elliptical'):
-        aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
-    elif (shape == 'Rectangular'):
-        aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
-    for i in range(l):
-        phot_table = aperture_photometry(image_data[i,:,:], aperture)
-        ape_sum.extend(phot_table['aperture_sum']*factor)
-    return ape_sum
-
+    return np.array(calFiles)
 
 # Noise pixel param
-def noisepixparam(image_data,edg):
+def noisepixparam(image_data):
     lb= 14
     ub= 18
     npp=[]
@@ -144,54 +79,16 @@ def noisepixparam(image_data,edg):
         denom = np.ma.sum(img)
         param= numer/denom
         npp.append(param)
-    return npp  
+    return np.array(npp)
 
-def bgnormalize(image_data,normbg):
-    x=np.ndarray( shape=(64,32,32))
-    xmask=np.ma.make_mask(x,copy=True, shrink=True)
-    xmask[:,:,:]= False
+def bgnormalize(image_data):
+    
+    xmask = np.ma.make_mask(np.zeros((64,32,32)), shrink=False)
     xmask[:,13:18,13:18]=True
     masked= np.ma.masked_array(image_data, mask=xmask)
-    bgsum = np.zeros(64)
-    # Replace for loop with one line code
-    for i in range (64):
-        bgsum[i] = np.ma.mean(masked[i]) #np.ma.mean
-    #background average for the datecube
-    bgdcbavg= np.ma.median(bgsum)
-    #Normalize
-    bgsum=bgsum/bgdcbavg
-    normbg.append(bgsum)
     
-def normstar(ape_sum,normf):
-    starmean=np.ma.median(ape_sum)
-    ape_sum=ape_sum/starmean
-    normf.append(ape_sum)
-    
-def normxycent(xo,yo,normx,normy):
-    xo=xo/np.ma.median(xo)
-    yo=yo/np.ma.median(yo)
-    normx.append(xo)
-    normy.append(yo)
-
-def normpsfwidth(psfwx,psfwy,normpsfwx,normpsfwy):
-    psfwx=psfwx/np.ma.median(psfwx)
-    psfwy=psfwy/np.ma.median(psfwy)
-    normpsfwx.append(psfwx)
-    normpsfwy.append(psfwy) 
-
-def normnoisepix(npp,normnpp):
-    npp = npp/np.ma.median(npp)
-    normnpp.append(npp)
-
-def stackit(normf,normbg,normx,normy,normpsfwx,normpsfwy,normnpp):
-    normf=np.ma.median(normf,axis=0)
-    normbg=np.ma.median(normbg, axis=0)
-    normx=np.ma.median(normx,axis=0)
-    normy=np.ma.median(normy,axis=0)
-    normpsfwx=np.ma.median(normpsfwx,axis=0)
-    normpsfwy=np.ma.median(normpsfwy,axis=0)
-    normnpp=np.ma.median(normnpp,axis=0)
-    return normf,normbg,normx,normy,normpsfwx,normpsfwy,normnpp
+    #Normalize by average background from whole datecube
+    return np.ma.median(masked.reshape(masked.shape[0], -1), axis=1)/np.ma.median(masked)
  
 def plotcurve(xax,f,b,X,Y,wx,wy,npp,direc,ct, f_med, f_std, b_med, b_std, x_med, x_std, y_med, y_std, xw_med, xw_std, yw_med, yw_std, npp_med, npp_std, savepath, channel):
     devfactor=2
@@ -302,8 +199,8 @@ def load_data(path, AOR):
     pathpsfwy = path + 'psfwy' + AOR + '.npy'
     pathbeta  = path + 'beta'  + AOR + '.npy'
     
-    flux  = np.load(pathflux )
-    bg    = np.load(pathbg   )
+    flux  = np.load(pathflux)
+    bg    = np.load(pathbg)
     xdata = np.load(pathxdata)
     ydata = np.load(pathydata)
     psfwx = np.load(pathpsfwx)
@@ -312,18 +209,13 @@ def load_data(path, AOR):
     
     return flux, bg, xdata, ydata, psfwx, psfwy, beta 
 
-def sigclip(data, sigma=3, maxiters=5):
-    new_data = sigma_clip(data, sigma=sigma, maxiters=maxiters)
-#     print(data.shape)
-#     print(np.where(data!=new_data)[0])
-    return new_data
-
 def get_stats(data, median_arr, std_arr):
-    for i in range(np.array(data).shape[0]):
-        median = np.ma.median(data[i], axis = 0)
-        std    = np.ma.std(data[i], axis = 0)
-        median_arr = np.append(median_arr, [median], axis = 0)
-        std_arr    = np.append(std_arr, [std], axis = 0)
+    median_arr = np.copy(median_arr)
+    std_arr = np.copy(std_arr)
+    
+    median_arr = np.append(median_arr, np.ma.median(data, axis=1), axis=0)
+    median_arr = np.append(median_arr, np.ma.median(data, axis=1), axis=0)
+    
     return median_arr, std_arr
 
 def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
@@ -342,7 +234,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
             os.makedirs(savepath)
 
     dirs_all = os.listdir(datapath)
-    dirs = [k for k in dirs_all if AOR_snip in k]
+    dirs = [k for k in dirs_all if AOR_snip==k[:len(AOR_snip)]]
     print ('Found the following AORs', dirs)
     tossed = 0
     counter=0
@@ -377,19 +269,22 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
             convfact=f[0].header['GAIN']*f[0].header['EXPTIME']/f[0].header['FLUXCONV']
             image_data1=image_data0*convfact        
             #sigma clip
-            image_data2=sigma_clipping(image_data1, tossed)
+            image_data2, tossed, _ = sigma_clipping(image_data1, tossed)
             #b should be calculated on sigmaclipped data
-            bgnormalize(image_data2,normbg)
+            normbg.append(bgnormalize(image_data2))
             #bg subtract
-            image_data3=bgsubtract(image_data2)
+            image_data3, _, _ = bgsubtract(image_data2)
             #centroid
-            xo, yo, psfwx,psfwy = centroid_FWM(image_data3) # xo, yo, psxfwx, psfwy are temp
-            ape_sum = A_photometry(np.ma.masked_invalid(image_data3))
-            npp=noisepixparam(image_data3,4)        
-            normstar(np.ma.masked_invalid(ape_sum),normf)
-            normxycent(xo,yo,normx,normy)
-            normpsfwidth(psfwx,psfwy,normpsfwx,normpsfwy)
-            normnoisepix(npp,normnpp)
+            xo, yo, psfwx, psfwy = centroid_FWM(image_data3)
+            ape_sum, _ = A_photometry(np.ma.masked_invalid(image_data3), np.zeros_like(image_data3))
+            npp = noisepixparam(image_data3)     
+            
+            normf.append(np.ma.masked_invalid(ape_sum)/np.ma.median(np.ma.masked_invalid(ape_sum)))
+            normx.append(xo/np.ma.median(xo))
+            normy.append(yo/np.ma.median(yo))
+            normpsfwx.append(psfwx/np.ma.median(psfwx))
+            normpsfwy.append(psfwy/np.ma.median(psfwy))
+            normnpp.append(npp/np.ma.median(npp))
             ct+=1
         counter+=1
 
@@ -413,18 +308,18 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     #endfor
     
     
-    AOR = [a for a in os.listdir(datapath) if AOR_snip in a]
+    AOR = [a for a in os.listdir(datapath) if AOR_snip==a[:len(AOR_snip)]]
     data = [np.asarray(load_data(savepath, a)) for a in AOR]
     nb_data = [len(data[i]) for i in range(len(data))]
     data = [np.where(np.isfinite(data[i]), data[i], 99999) for i in range(len(data))]
 
-    flux  = np.array([sigclip(data[i][0]) for i in range(len(data))])
-    bg    = np.array([sigclip(data[i][1]) for i in range(len(data))])
-    xdata = np.array([sigclip(data[i][2]) for i in range(len(data))])
-    ydata = np.array([sigclip(data[i][3]) for i in range(len(data))])
-    psfwx = np.array([sigclip(data[i][4]) for i in range(len(data))])
-    psfwy = np.array([sigclip(data[i][5]) for i in range(len(data))])
-    beta  = np.array([sigclip(data[i][6]) for i in range(len(data))])
+    flux  = np.array([sigma_clip(data[i][0], sigma=4, maxiters=5) for i in range(len(data))])
+    bg    = np.array([sigma_clip(data[i][1], sigma=4, maxiters=5) for i in range(len(data))])
+    xdata = np.array([sigma_clip(data[i][2], sigma=4, maxiters=5) for i in range(len(data))])
+    ydata = np.array([sigma_clip(data[i][3], sigma=4, maxiters=5) for i in range(len(data))])
+    psfwx = np.array([sigma_clip(data[i][4], sigma=4, maxiters=5) for i in range(len(data))])
+    psfwy = np.array([sigma_clip(data[i][5], sigma=4, maxiters=5) for i in range(len(data))])
+    beta  = np.array([sigma_clip(data[i][6], sigma=4, maxiters=5) for i in range(len(data))])
 
     fluxval, bgval, xdataval, ydataval, psfwxval, psfwyval, betaval = np.empty((0,64)), np.empty((0,64)), np.empty((0,64)), \
     np.empty((0,64)), np.empty((0,64)), np.empty((0,64)), np.empty((0,64))
@@ -450,7 +345,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     for i in range(np.array(flux).shape[0]):
         bg_all = np.append(bg_all, bg[i], axis = 0)
         bg_all = np.where(np.isfinite(bg_all), bg_all, 99999)
-        bg_all = sigma_clip(bg_all, sigma=2, maxiters=2)
+        bg_all = sigma_clip(bg_all, sigma=4, maxiters=5)
 
     xdata_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
@@ -477,21 +372,15 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
         beta_all = np.append(beta_all, beta[i], axis = 0)
         beta_all = sigma_clip(beta_all, sigma=4, maxiters=5)
 
-    flux_med, flux_err = np.ma.median(flux_all, axis = 0), np.ma.std(flux_all, axis = 0)/1374
-    bg_med, bg_err = np.ma.median(bg_all, axis = 0), np.ma.std(bg_all, axis = 0)/1374
-    xdata_med, xdata_err = np.ma.median(xdata_all, axis = 0), np.ma.std(xdata_all, axis = 0)/1374
-    ydata_med, ydata_err = np.ma.median(ydata_all, axis = 0), np.ma.std(ydata_all, axis = 0)/1374
-    psfwx_med, psfwx_err = np.ma.median(psfwx_all, axis = 0), np.ma.std(psfwx_all, axis = 0)/1374
-    psfwy_med, psfwy_err = np.ma.median(psfwy_all, axis = 0), np.ma.std(psfwy_all, axis = 0)/1374
-    beta_med, beta_err = np.ma.median(beta_all, axis = 0), np.ma.std(beta_all, axis = 0)/1374
-
-    # if planet == 'WASP-12b':
-    #     bgall = np.concatenate((bg[0], bg[1], bg[2]), axis=0)
-    # else:
-    #     bgall = np.concatenate((bg[0], bg[1]), axis=0)
+    flux_med = np.ma.median(flux_all, axis=0)
+    bg_med = np.ma.median(bg_all, axis=0)
+    xdata_med = np.ma.median(xdata_all, axis=0)
+    ydata_med = np.ma.median(ydata_all, axis=0)
+    psfwx_med = np.ma.median(psfwx_all, axis=0)
+    psfwy_med = np.ma.median(psfwy_all, axis=0)
+    beta_med = np.ma.median(beta_all, axis=0)
 
     bgall = np.ma.concatenate([bg[i] for i in range(bg.shape[0])], axis=0)
-    # bgall = bg.reshape(-1,bg.shape[2])
 
     bgmed, bgstd = np.ma.median(bgall, axis = 0), np.ma.std(bgall, axis = 0)
 
