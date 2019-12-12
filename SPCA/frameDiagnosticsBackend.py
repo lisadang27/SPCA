@@ -89,107 +89,7 @@ def bgnormalize(image_data):
     
     #Normalize by average background from whole datecube
     return np.ma.median(masked.reshape(masked.shape[0], -1), axis=1)/np.ma.median(masked)
- 
-def plotcurve(xax,f,b,X,Y,wx,wy,npp,direc,ct, f_med, f_std, b_med, b_std, x_med, x_std, y_med, y_std, xw_med, xw_std, yw_med, yw_std, npp_med, npp_std, savepath, channel):
-    devfactor=2
-    fmed=np.ma.median(f)
-    fstdev=np.ma.std(f)
-    lb=fmed-devfactor*fstdev
-    ub=fmed+devfactor*fstdev
-    avoid=[]
-    i=0
-    for x in (0,57):
-        if( f[x] <=lb or f[x]>=ub):
-            avoid.append(x)
-    #print (avoid)
-    fig, axes = plt.subplots(nrows=7, ncols=1, sharex=True)
-    fig.set_figheight(8)
-    plt.minorticks_on()
-    fig.subplots_adjust(hspace = 0.001)
-    plt.rc('font', family='serif')
-    
-    plt.xlim(0,64)
-    y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
-    if 0 not in (avoid):
-        axes[0].plot(xax,f,color='k', mec ='b', marker='s', markevery=[0],fillstyle='none')
-    if 57 not in (avoid):
-        axes[0].plot(xax,f,color='k', mec ='b', marker='s', markevery=[57],fillstyle='none')
 
-    axes[0].plot(xax,f,color='k', mec ='b', marker='s', markevery=[0],fillstyle='none')
-    axes[0].set_ylabel(r'$F$',fontsize=16)
-    axes[0].yaxis.set_major_formatter(y_formatter)
-    axes[0].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[0].axhline(y = f_med, color='black', linewidth = 1, label = 'Median')
-    axes[0].axhline(y = f_med - f_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[0].axhline(y = f_med + f_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-
-    bmed=np.ma.median(b)
-    bstdev=np.ma.std(b)    
-    blb=bmed-devfactor*bstdev
-    bub=bmed+devfactor*bstdev
-
-    axes[1].plot(xax,b,color='k', mec ='b', marker='s', markevery=[57],fillstyle='none')
-    axes[1].plot(xax,b,color='k', mec ='b', marker='s', markevery=[0],fillstyle='none')
-    axes[1].set_ylabel(r'$b$',fontsize=16)
-    axes[1].yaxis.set_major_formatter(y_formatter)
-    axes[1].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[1].axhline(y = b_med, color='black', linewidth = 1, label = 'Median')
-    axes[1].axhline(y = b_med - b_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[1].axhline(y = b_med + b_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-
-    axes[2].plot(xax,X,color='k', mec ='b',marker='s', markevery=[57],fillstyle='none')
-    axes[2].plot(xax,X,color='k', mec ='b',marker='s', markevery=[0],fillstyle='none')
-    axes[2].set_ylabel(r'$x_0$',fontsize=16)
-    axes[2].yaxis.set_major_formatter(y_formatter)
-    axes[2].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[2].axhline(y = x_med, color='black', linewidth = 1, label = 'Median')
-    axes[2].axhline(y = x_med - x_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[2].axhline(y = x_med + x_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-
-    axes[3].plot(xax,Y,color='k' , mec ='b', marker='s', markevery=[57],fillstyle='none')
-    axes[3].plot(xax,Y,color='k' , mec ='b', marker='s', markevery=[0],fillstyle='none')    
-    axes[3].set_ylabel(r'$y_0$',fontsize=16)
-    axes[3].yaxis.set_major_formatter(y_formatter)
-    axes[3].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[3].axhline(y = y_med, color='black', linewidth = 1, label = 'Median')
-    axes[3].axhline(y = y_med - y_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[3].axhline(y = y_med + y_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-
-    axes[4].plot(xax,wx,color='k' , mec ='b', marker='s', markevery=[57],fillstyle='none')
-    axes[4].plot(xax,wx,color='k' , mec ='b', marker='s', markevery=[0], fillstyle='none')
-    axes[4].set_ylabel(r'$\sigma_x$',fontsize=16)
-    axes[4].yaxis.set_major_formatter(y_formatter)
-    axes[4].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[4].axhline(y = xw_med, color='black', linewidth = 1, label = 'Median')
-    axes[4].axhline(y = xw_med - xw_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[4].axhline(y = xw_med + xw_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-
-    axes[5].plot(xax,wy,color='k' , mec ='b', marker='s', markevery=[57],fillstyle='none')
-    axes[5].plot(xax,wy,color='k' , mec ='b', marker='s', markevery=[0],fillstyle='none')
-    axes[5].set_ylabel(r'$\sigma_y$', fontsize=16)
-    axes[5].yaxis.set_major_formatter(y_formatter)
-    axes[5].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[5].axhline(y = yw_med, color='black', linewidth = 1, label = 'Median')
-    axes[5].axhline(y = yw_med - yw_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[5].axhline(y = yw_med + yw_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)    
-
-    axes[6].plot(xax,npp,color='k' , mec ='b', marker='s', markevery=[57],fillstyle='none')
-    axes[6].plot(xax,npp,color='k' , mec ='b', marker='s', markevery=[0],fillstyle='none')
-    axes[6].set_ylabel(r'$\beta$', fontsize=16)
-    axes[6].set_xlabel('Frame number',fontsize=16)
-    axes[6].yaxis.set_major_formatter(y_formatter)
-    axes[6].yaxis.set_major_locator(MaxNLocator(prune='both',nbins=5))
-    axes[6].axhline(y = npp_med, color='black', linewidth = 1, label = 'Median')
-    axes[6].axhline(y = npp_med - npp_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[6].axhline(y = npp_med + npp_std, color='black', linewidth = 1, label = '$2 \sigma$', alpha = 0.3)
-    axes[6].set_xlim((-0.5, 63.5))
-
-    if channel == 'ch1':
-        wav='3.6'
-    else:
-        wav='4.5'
-    plt.savefig(savepath+wav+'_' +str(ct)+'_' +direc+'.pdf', bbox_inches='tight', dpi=200)
-    
 def load_data(path, AOR):
     pathflux  = path + 'flux'  + AOR + '.npy'
     pathbg    = path + 'bg'    + AOR + '.npy'
@@ -210,12 +110,9 @@ def load_data(path, AOR):
     return flux, bg, xdata, ydata, psfwx, psfwy, beta 
 
 def get_stats(data, median_arr, std_arr):
-    median_arr = np.copy(median_arr)
-    std_arr = np.copy(std_arr)
-    
-    median_arr = np.append(median_arr, np.ma.median(data, axis=1), axis=0)
-    median_arr = np.append(median_arr, np.ma.median(data, axis=1), axis=0)
-    
+    for i in range(np.array(data).shape[0]):
+        median_arr = np.append(median_arr, [np.ma.std(data[i], axis=0)], axis = 0)
+        std_arr    = np.append(std_arr, [np.ma.median(data[i], axis=0)], axis = 0)
     return median_arr, std_arr
 
 def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
@@ -269,7 +166,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
             convfact=f[0].header['GAIN']*f[0].header['EXPTIME']/f[0].header['FLUXCONV']
             image_data1=image_data0*convfact        
             #sigma clip
-            image_data2, tossed, _ = sigma_clipping(image_data1, tossed)
+            image_data2, tossed, _ = sigma_clipping(image_data1, tossed, sigma=4, maxiters=5)
             #b should be calculated on sigmaclipped data
             normbg.append(bgnormalize(image_data2))
             #bg subtract
@@ -395,7 +292,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(flux_med < (meanflux - nsigma*sigmaflux))
-        np.append(index, np.where(flux_med > (meanflux + nsigma*sigmaflux)))
+        index = np.append(index, np.where(flux_med > (meanflux + nsigma*sigmaflux)))
         sigmaflux2 = np.ma.std(np.delete(flux_med, index))
         flag = (sigmaflux2 == sigmaflux)
         sigmaflux = sigmaflux2
@@ -404,7 +301,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(bg_med < (meanbg - nsigma*sigmabg))
-        np.append(index, np.where(bg_med > (meanbg + nsigma*sigmabg)))
+        index = np.append(index, np.where(bg_med > (meanbg + nsigma*sigmabg)))
         sigmabg2 = np.ma.std(np.delete(bg_med, index))
         flag = (sigmabg2 == sigmabg)
         sigmabg = sigmabg2
@@ -412,7 +309,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(xdata_med < (meanxdata - nsigma*sigmaxdata))
-        np.append(index, np.where(xdata_med > (meanxdata + nsigma*sigmaxdata)))
+        index = np.append(index, np.where(xdata_med > (meanxdata + nsigma*sigmaxdata)))
         sigmaxdata2 = np.ma.std(np.delete(xdata_med, index))
         flag = (sigmaxdata2 == sigmaxdata)
         sigmaxdata = sigmaxdata2
@@ -420,7 +317,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(ydata_med < (meanydata - nsigma*sigmaydata))
-        np.append(index, np.where(ydata_med > (meanydata + nsigma*sigmaydata)))
+        index = np.append(index, np.where(ydata_med > (meanydata + nsigma*sigmaydata)))
         sigmaydata2 = np.ma.std(np.delete(ydata_med, index))
         flag = (sigmaydata2 == sigmaydata)
         sigmaydata = sigmaydata2
@@ -428,7 +325,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(psfwx_med < (meanpsfwx - nsigma*sigmapsfwx))
-        np.append(index, np.where(psfwx_med > (meanpsfwx + nsigma*sigmapsfwx)))
+        index = np.append(index, np.where(psfwx_med > (meanpsfwx + nsigma*sigmapsfwx)))
         sigmapsfwx2 = np.ma.std(np.delete(psfwx_med, index))
         flag = (sigmapsfwx2 == sigmapsfwx)
         sigmapsfwx = sigmapsfwx2
@@ -436,7 +333,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(psfwy_med < (meanpsfwy - nsigma*sigmapsfwy))
-        np.append(index, np.where(psfwy_med > (meanpsfwy + nsigma*sigmapsfwy)))
+        index = np.append(index, np.where(psfwy_med > (meanpsfwy + nsigma*sigmapsfwy)))
         sigmapsfwy2 = np.ma.std(np.delete(psfwy_med, index))
         flag = (sigmapsfwy2 == sigmapsfwy)
         sigmapsfwy = sigmapsfwy2
@@ -444,7 +341,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flag = False
     while(flag == False):
         index = np.where(beta_med < (meanbeta - nsigma*sigmabeta))
-        np.append(index, np.where(beta_med > (meanbeta + nsigma*sigmabeta)))
+        index = np.append(index, np.where(beta_med > (meanbeta + nsigma*sigmabeta)))
         sigmabeta2 = np.ma.std(np.delete(beta_med, index))
         flag = (sigmabeta2 == sigmabeta)
         sigmabeta = sigmabeta2
