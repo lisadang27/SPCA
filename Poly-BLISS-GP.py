@@ -20,9 +20,6 @@ import timeit
 import os, sys
 import csv
 
-lib_path = os.path.abspath(os.path.join('../'))
-sys.path.append(lib_path)
-
 import inspect
 
 import warnings

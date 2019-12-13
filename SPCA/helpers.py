@@ -11,10 +11,14 @@ import inspect
 
 from numba import jit
 
+import os, sys
+lib_path = os.path.abspath(os.path.join('../'))
+sys.path.append(lib_path)
+
 # SPCA libraries
-from . import astro_models
-from . import detec_models
-from . import bliss
+from SPCA import astro_models
+from SPCA import detec_models
+from SPCA import bliss
 
 class signal_params(object):
     # class constructor
