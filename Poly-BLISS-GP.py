@@ -155,7 +155,7 @@ for iterationNumber in range(len(planets)):
     # Personalize object default object values
     p0_obj.name = planet
 
-    nameIndex = np.where(names==planet.replace(' ','').replace('-', '').replace('_old','').replace('_',''))[0][0]
+    nameIndex = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0][0]
 
     if np.isfinite(data['pl_ratror'][nameIndex]):
         p0_obj.rp = data['pl_ratror'][nameIndex]
