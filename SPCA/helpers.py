@@ -16,9 +16,8 @@ lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
 # SPCA libraries
-from SPCA import astro_models
-from SPCA import detec_models
-from SPCA import bliss
+import SPCA
+from SPCA import astro_models, detec_models, bliss
 
 class signal_params(object):
     # class constructor

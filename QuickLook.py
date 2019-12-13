@@ -9,15 +9,10 @@ sys.path.append(lib_path)
 from SPCA import make_plots, helpers
 
 
+planets = ['MASCARA-1b', 'KELT-16b', 'WASP-121b', 'CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-9b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-43b_repeatCh1', 'WASP-43b_repeatCh2', 'WASP-43b_repeat2Ch2', 'Qatar1b'][12:]
 
-
-#rootpath = '/home/taylor/Documents/Research/spitzer/'
-#planets=['MASCARA1b', 'KELT16b', 'WASP121b', 'WASP12b']
-#channels=['ch2', 'ch2', 'ch1', 'ch2', 'ch2']
-
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-9b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'Qatar1b']
 rootpath = '/homes/picaro/bellt/research/'
-
+#rootpath = '/home/taylor/Documents/Research/spitzer/'
 
 for planet in planets:
         
