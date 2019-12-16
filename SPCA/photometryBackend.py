@@ -147,7 +147,7 @@ def get_fnames(directory, tag='um'):
         Number of fits file found.
     '''
     lst      = os.listdir(directory)
-    Run_list = [k for k in lst if tag==k[:len(tag)]]
+    Run_list = [k for k in lst if tag in k]
     return sorted(Run_list)
 
 def get_full_data(foldername, channel, AOR_snip):
@@ -238,7 +238,7 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     if not os.path.exists(figpath):
         os.makedirs(figpath)
     
-    Run_list = get_fnames(datapath, tag=AOR_snip)
+    Run_list = get_fnames(datapath)
     Radius = np.array([float(Run_list[i].split('_')[0][-1] + '.' 
                              + Run_list[i].split('_')[1][:]) for i in range(len(Run_list))])
     Run_list = [datapath + st for st in Run_list]
