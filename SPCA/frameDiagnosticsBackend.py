@@ -28,18 +28,19 @@ from .Photometry_Aperture_TaylorVersion import centroid_FWM
 from .Photometry_Aperture_TaylorVersion import A_photometry
 
 def get_stacks(stackpath, datapath, AOR_snip, ch):
-    '''
-    Find paths to all the correction stack FITS files.
+    """Find paths to all the correction stack FITS files.
 
-    Parameters
-    ----------
+    Args:
+        stackpath (string): Full path to the folder containing background correction stacks.
+        datapath (string): Full path to the data folder containing the AOR folders with images to be corrected.
+        AOR_snip (string): AOR snippet used to figure out what folders contain data.
+        ch (string): String specifying which channel is being used.
 
+    Returns:
+        ndarray: The calibration FITS file that should be used for background subtraction correction.
 
-    Returns
-    -------
-
-    :return: 
-    '''
+    """
+    
     stacks = np.array(os.listdir(stackpath))
     locs = np.array([stacks[i].find('SPITZER_I') for i in range(len(stacks))])
     good = np.where(locs!=-1)[0] #filter out all files that don't fit the correct naming convention for correction stacks
@@ -62,6 +63,16 @@ def get_stacks(stackpath, datapath, AOR_snip, ch):
 
 # Noise pixel param
 def noisepixparam(image_data):
+    """Compute the noise pixel parameter.
+
+    Args:
+        image_data (ndarray): FITS images stack.
+
+    Returns:
+        list: The noise pixel parameter for each image in the stack.
+
+    """
+    
     lb= 14
     ub= 18
     npp=[]
@@ -82,6 +93,15 @@ def noisepixparam(image_data):
     return np.array(npp)
 
 def bgnormalize(image_data):
+    """Compute the normalized background from each stack.
+
+    Args:
+        image_data (ndarray): FITS images stack.
+
+    Returns:
+        ndarray: The background in each frame of a datacube, normalized by the median within that datacube.
+
+    """
     
     xmask = np.ma.make_mask(np.zeros((64,32,32)), shrink=False)
     xmask[:,13:18,13:18]=True
@@ -91,6 +111,22 @@ def bgnormalize(image_data):
     return np.ma.median(masked.reshape(masked.shape[0], -1), axis=1)/np.ma.median(masked)
 
 def load_data(path, AOR):
+    """Compute the normalized background from each stack.
+
+    Args:
+        image_data (ndarray): FITS images stack.
+
+    Returns:
+        tuple: flux (ndarray; the aperture sum from each frame, normalized by the median flux from its datacube),
+            bg (ndarray; the background flux from each frame, normalized by the median background from its datacube),
+            xdata (ndarray; the x-centroid from each frame, normalized by the median x-centroid from its datacube),
+            ydata (ndarray; the y-centroid from each frame, normalized by the median y-centroid from its datacube),
+            psfwx (ndarray; the x PSF width from each frame, normalized by the median x PSF width from its datacube),
+            psfwy (ndarray; the y PSF width from each frame, normalized by the median y PSF width from its datacube),
+            beta (ndarray; the noise pixel parameter from each frame, normalized by the median noise pixel parameter from its datacube).
+
+    """
+    
     pathflux  = path + 'flux'  + AOR + '.npy'
     pathbg    = path + 'bg'    + AOR + '.npy'
     pathxdata = path + 'xdata' + AOR + '.npy'
@@ -110,12 +146,40 @@ def load_data(path, AOR):
     return flux, bg, xdata, ydata, psfwx, psfwy, beta 
 
 def get_stats(data, median_arr, std_arr):
+    """Compute the median and std. dev. from an array of data and add it to the previously computed values.
+
+    Args:
+        data (ndarray): The array to get information from.
+        median_arr (ndarray): The previously computed median values to be appended to.
+        std_arr (ndarray): The previously computed std. dev. values to be appended to.
+
+    Returns:
+        tuple: median_arr (ndarray; the median of the data),
+            std_arr (ndarray; the std. dev. of the data).
+
+    """
+    
     for i in range(np.array(data).shape[0]):
         median_arr = np.append(median_arr, [np.ma.std(data[i], axis=0)], axis = 0)
         std_arr    = np.append(std_arr, [np.ma.median(data[i], axis=0)], axis = 0)
     return median_arr, std_arr
 
 def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
+    """Run frame diagnostics and choose which frames within a datacube are consistently bad and should be discarded.
+
+    Args:
+        planet (string): The name of the planet.
+        channel (string): The channel being analyzed.
+        AOR_snip (string): AOR snippet used to figure out what folders contain data.
+        basepath (string): The full path to the folder containing folders for each planet.
+        addStack (bool): Whether or not to add a background subtraction correction stack (will be automatically selected if present).
+        nsigma (float): The number of sigma a frame's median value must be off from the median frame in order to be added to ignore_frames.
+
+    Returns:
+        list: The frames whose photometry is typically nsigma above/below the median frame and should be removed from photometry.
+
+    """
+    
     savepath = basepath+planet+'/analysis/frameDiagnostics/'
     datapath = basepath+planet+'/data/'+channel+'/'
     stackpath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
