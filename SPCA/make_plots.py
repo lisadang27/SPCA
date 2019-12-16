@@ -1,7 +1,8 @@
-
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
+from matplotlib.ticker import MaxNLocator
+from matplotlib import gridspec
 
 import os,sys
 lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))

@@ -2,33 +2,9 @@ import numpy as np
 import matplotlib
 import matplotlib.pyplot as plt
 import os, sys
-from matplotlib import rc
-import matplotlib.patches
-import time
-from matplotlib.ticker import MaxNLocator
-import os, sys
 from astropy.io import fits
 from astropy.stats import sigma_clip
-from photutils import aperture_photometry
-from photutils import CircularAperture
-from numpy import std
-import glob
-import csv
-import operator
-import matplotlib.ticker as mtick
-from photutils.datasets import make_4gaussians_image
-#from photutils.morphology import (centroid_com,centroid_1dg,centroid_2dg)
-from time import time
-#from scipy.linalg.fblas import dgemm
 from astropy.convolution import convolve, Box1DKernel
-import collections
-from astropy.convolution import Gaussian1DKernel
-import astropy.constants as constants
-import astropy.units as units
-
-
-lib_path = os.path.abspath(os.path.join('../'))
-sys.path.append(lib_path)
 
 # SPCA libraries
 from . import Photometry_Aperture_TaylorVersion as APhotometry
@@ -37,9 +13,19 @@ from . import Photometry_Companion as CPhotometry
 from . import Photometry_PLD as PLDPhotometry
 
 
-
-
+# FIX - check if the folder is empty, and if it is, just overwrite it
 def create_folder(fullname, auto=False):
+    """Create a folder unless it exists.
+
+    Args:
+        fullname (string): Full path to the folder to be created.
+        auto (bool, optional): If the folder already exists, should the folder just be skipped (True) or should the user be asked whether they want to overwrite the folder or change the folder name (False, Default).
+
+    Returns:
+        string: The final name used for the folder.
+
+    """
+    
     solved = 'no'
     while(solved == 'no'):
         if not os.path.exists(fullname):
@@ -273,31 +259,9 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     if np.any(hard):
         plt.plot(Radius[hard],  RMS[hard]*1e6, 'o-', label = 'Circle: Hard Edge')
 
-    #plt.axhline(y=1.39485316958, color='orange', linewidth = 1, label = 'PSF Fitting')
-    #plt.axhline(y=RMS45, color='orange', linewidth = 1)
     plt.xlabel('Aperture Radius')
     plt.ylabel('RMS Scatter (ppm)')
-    #plt.ylim(ymin=0)
     plt.legend(loc='best')
-
-#     if highpassWidth == 5:
-#         if planet=='WASP-12b' and channel=='ch2':
-#             plt.ylim(1100,1300)
-#         elif planet=='WASP-12b' and channel=='ch1':
-#             plt.ylim(1150, 1400)
-#         elif planet=='WASP-12b_old' and channel=='ch1':
-#             plt.ylim(1350, 1500)
-#         elif planet=='WASP-12b_old' and channel=='ch2':
-#             plt.ylim(1150, 1250)
-#     else:
-#         if planet=='WASP-12b' and channel=='ch2':
-#             plt.ylim(1500,1700)
-#         elif planet=='WASP-12b_old' and channel=='ch2':
-#             "break"
-#         elif planet=='WASP-12b' and channel=='ch1':
-#             plt.ylim(2400, 2900)
-#         elif planet=='WASP-12b_old' and channel=='ch1':
-#             plt.ylim(2750, 3300)
 
     if channel=='ch2':
         fname = figpath + '4um'

@@ -2,8 +2,6 @@ import numpy as np
 import scipy.optimize as spopt
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
-from matplotlib import gridspec
 
 from astropy.stats import sigma_clip
 

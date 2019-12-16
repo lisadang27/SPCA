@@ -2,24 +2,12 @@ import warnings
 warnings.simplefilter("ignore", UserWarning)
 
 import numpy as np
-import matplotlib
-from matplotlib import rc
 import matplotlib.pyplot as plt
-import matplotlib.patches
-import time
 from matplotlib.ticker import MaxNLocator
 import os, sys
 from astropy.io import fits
 from astropy.stats import sigma_clip
-from photutils import aperture_photometry
-from photutils import CircularAperture
-from numpy import std
 import glob
-import csv
-import operator
-import warnings
-import matplotlib.ticker as mtick
-from photutils.datasets import make_4gaussians_image
 
 # SPCA libraries
 from .Photometry_Aperture_TaylorVersion import sigma_clipping
