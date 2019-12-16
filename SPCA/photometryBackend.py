@@ -176,7 +176,6 @@ def get_data(folderdata, channel, AOR_snip):
     return flux, flux_err, time, xdata, ydata, psfwx, psfwy 
 
 def highpassflist(signal, highpassWidth):
-    #g = Gaussian1DKernel(stddev=10)
     g = Box1DKernel(highpassWidth)
     smooth=convolve(np.asarray(signal), g,boundary='extend')
     return smooth
@@ -210,7 +209,6 @@ def get_RMS(Run_list, channel, AOR_snip, highpassWidth, trim=False, trimStart=0,
         axes[1].set_xlabel('Time since IRAC turn on(days)')
         fig.subplots_adjust(hspace=0)
         fig.savefig(path)
-#         plt.show()
         plt.close()
     return RMS_list
 
@@ -240,7 +238,7 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     if not os.path.exists(figpath):
         os.makedirs(figpath)
     
-    Run_list = get_fnames(datapath)
+    Run_list = get_fnames(datapath, tag=AOR_snip)
     Radius = np.array([float(Run_list[i].split('_')[0][-1] + '.' 
                              + Run_list[i].split('_')[1][:]) for i in range(len(Run_list))])
     Run_list = [datapath + st for st in Run_list]
@@ -335,8 +333,7 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
         print('Hard - Best Aperture Radius:', Radius[hard][np.where(RMS[hard]==np.min(RMS[hard]))[0][0]])
         
     
-    options = ['Exact Moving', 'Soft Moving', 'Hard Moving', 'Exact', 'Soft', 'Hard']
-    optionsSelected = np.array(['' for i in range(len(RMS))])
+    optionsSelected = np.array(['' for i in range(len(RMS))], dtype=str)
     optionsSelected[exact_moving] = 'Exact Moving'
     optionsSelected[soft_moving] = 'Soft Moving'
     optionsSelected[hard_moving] = 'Hard Moving'
@@ -351,3 +348,4 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
         file.write(Run_list[np.argmin(RMS)])
     
     return np.min(RMS), Run_list[np.argmin(RMS)]
+

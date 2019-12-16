@@ -366,3 +366,58 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
             file.write(outStr)
     
     return
+
+def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname=None):
+    """Make a triangle plot like figure to help look for any residual correlations in the data.
+
+    Args:
+        all_data (list): A list of the all of the xdata, ydata, psfxw, psfyw, flux, residuals.
+        firstEcl_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the first eclipse.
+        transit_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the transit.
+        secondEcl_data (list): A list of the xdata, ydata, psfxw, psfyw, flux, residuals during the second eclipse.
+        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+
+    Returns:
+        None
+
+    """
+
+    label = [r'$x_0$', r'$y_0$', r'$\sigma _x$', r'$\sigma _y$', r'$F$', r'Residuals']
+
+    fig = plt.figure(figsize = (8,8))
+    gs  = gridspec.GridSpec(len(all_data)-1,len(all_data)-1)
+    i = 0
+    for k in range(np.sum(np.arange(len(all_data)))):
+        j= k - np.sum(np.arange(i+1))
+        ax = fig.add_subplot(gs[i,j])
+        ax.plot(all_data[j], all_data[i+1],'k.', markersize = 0.2)
+        l1 = ax.plot(firstEcl_data[j], firstEcl_data[i+1],'.', color = '#66ccff', markersize = 0.7, label='$1^{st}$ secondary eclipse')
+        l2 = ax.plot(transit_data[j], transit_data[i+1],'.', color = '#ff9933', markersize = 0.7, label='transit')
+        l3 = ax.plot(secondEcl_data[j], secondEcl_data[i+1],'.', color = '#0066ff', markersize = 0.7, label='$2^{nd}$ secondary eclipse')
+        if (j == 0):
+            plt.setp(ax.get_yticklabels(), rotation = 45)
+            ax.yaxis.set_major_locator(MaxNLocator(5, prune = 'both'))
+            ax.set_ylabel(label[i+1])
+        else:
+            plt.setp(ax.get_yticklabels(), visible=False)
+        if (i == len(all_data)-2):
+            plt.setp(ax.get_xticklabels(), rotation = 45)
+            plt.axhline(y=0, color='k', linestyle='dashed')
+            ax.xaxis.set_major_locator(MaxNLocator(5, prune = 'both'))
+            ax.set_xlabel(label[j])
+        else:
+            plt.setp(ax.get_xticklabels(), visible=False)
+        if(i == j):
+            i += 1
+    handles = [l1,l2,l3]
+
+    fig.subplots_adjust(hspace=0)
+    fig.subplots_adjust(wspace=0)
+
+    if fname is not None:
+        fig.savefig(path, bbox_inches='tight')
+        plt.close(fig)
+        return
+    else:
+        return fig
+

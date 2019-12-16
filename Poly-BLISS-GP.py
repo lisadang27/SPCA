@@ -1544,5 +1544,5 @@ for iterationNumber in range(len(planets)):
         data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
 	
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
-        helpers.triangle_colors(data1, data2, data3, data4, plotname)
-        plt.close()
+        make_plots.triangle_colors(data1, data2, data3, data4, plotname)
+
