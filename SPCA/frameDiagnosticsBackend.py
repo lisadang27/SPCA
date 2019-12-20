@@ -10,10 +10,10 @@ from astropy.stats import sigma_clip
 import glob
 
 # SPCA libraries
-from .Photometry_Aperture_TaylorVersion import sigma_clipping
-from .Photometry_Aperture_TaylorVersion import bgsubtract
-from .Photometry_Aperture_TaylorVersion import centroid_FWM
-from .Photometry_Aperture_TaylorVersion import A_photometry
+from .Photometry_Aperture import sigma_clipping
+from .Photometry_Aperture import bgsubtract
+from .Photometry_Aperture import centroid_FWM
+from .Photometry_Aperture import A_photometry
 
 def get_stacks(stackpath, datapath, AOR_snip, ch):
     """Find paths to all the correction stack FITS files.

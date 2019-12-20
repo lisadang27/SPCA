@@ -7,7 +7,7 @@ from astropy.stats import sigma_clip
 from astropy.convolution import convolve, Box1DKernel
 
 # SPCA libraries
-from . import Photometry_Aperture_TaylorVersion as APhotometry
+from . import Photometry_Aperture as APhotometry
 from . import Photometry_PSF as PSFPhotometry
 from . import Photometry_Companion as CPhotometry
 from . import Photometry_PLD as PLDPhotometry
