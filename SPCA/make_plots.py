@@ -416,7 +416,7 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
     fig.subplots_adjust(wspace=0)
 
     if fname is not None:
-        fig.savefig(path, bbox_inches='tight')
+        fig.savefig(fname, bbox_inches='tight')
         plt.close(fig)
         return
     else:

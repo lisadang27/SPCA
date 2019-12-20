@@ -477,8 +477,13 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
-    
-    return lp + lnlike(p0, signalfunc, signal_input)
+    else:
+        lp += lnlike(p0, signalfunc, signal_input)
+
+    if np.isfinite(lp):
+        return lp
+    else:
+        return -np.inf
 
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
