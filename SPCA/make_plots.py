@@ -11,7 +11,7 @@ sys.path.append(lib_path)
 try:
     from mc3.stats import time_avg
 except ImportError:
-    print('Error: time_avg from mc3.stats failed to import')
+    print('Warning: time_avg from mc3.stats failed to import. To install it, run the getMCcubed.sh script.')
 
 # SPCA libraries
 from . import bliss
@@ -20,48 +20,31 @@ from . import helpers
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                     time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath=None, peritime=''):
-    '''
-    Makes a multi-panel plot from photometry outputs.
-    params:
-    -------
-        time0 : 1D array 
-            array of time stamps. Discarded points not removed.
-        flux0 : 1D array
-            array of flux values for each time stamps. Discarded points not removed.
-        xdata0 : 1D array
-            initial modelled the fluxes for each time stamps. Discarded points not removed.
-        ydata0: 1D array
-            initial modelled astrophysical flux variation for each time stamps. 
-            Discarded points not removed.
-        psfxw0: 1D array
-            Point-Spread-Function (PSF) width along the x-direction. Discarded points not removed.
-        psfyw0: 1D array
-            Point-Spread-Function (PSF) width along the x-direction. Discarded points not removed.
-        time  : 1D array 
-            array of time stamps. Discarded points removed.
-        flux  : 1D array
-            array of flux values for each time stamps. Discarded points removed.
-        xdata  : 1D array
-            initial modelled the fluxes for each time stamps. Discarded points removed.
-        ydata : 1D array
-            initial modelled astrophysical flux variation for each time stamps. Discarded points removed.
-        psfxw : 1D array
-            Point-Spread-Function (PSF) width along the x-direction. Discarded points removed.
-        psfyw : 1D array
-            Point-Spread-Function (PSF) width along the x-direction. Discarded points removed.
-        break : 1D array
-            time of the breaks from one AOR to another.
-        savepath : str
-            path to directory where the plot will be saved
-        pertime  : float
-            time of periapsis
-    returns:
-    --------
-        none
-    '''
+    """Makes a multi-panel plot from photometry outputs.
+    
+    Args:
+        time0 (1D array): Array of time stamps. Discarded points not removed.
+        flux0 (1D array): Array of flux values for each time stamps. Discarded points not removed.
+        xdata0 (1D array): Initial modelled the fluxes for each time stamps. Discarded points not removed.
+        ydata0 (1D array): Initial modelled astrophysical flux variation for each time stamps. Discarded points not removed.
+        psfxw0 (1D array): Point-Spread-Function (PSF) width along the x-direction. Discarded points not removed.
+        psfyw0 (1D array): Point-Spread-Function (PSF) width along the x-direction. Discarded points not removed.
+        time (1D array): Array of time stamps. Discarded points removed.
+        flux (1D array): Array of flux values for each time stamps. Discarded points removed.
+        xdata (1D array): Initial modelled the fluxes for each time stamps. Discarded points removed.
+        ydata (1D array): Initial modelled astrophysical flux variation for each time stamps. Discarded points removed.
+        psfxw (1D array): Point-Spread-Function (PSF) width along the x-direction. Discarded points removed.
+        psfyw (1D array): Point-Spread-Function (PSF) width along the x-direction. Discarded points removed.
+        break (1D array): Time of the breaks from one AOR to another.
+        savepath (string): Path to directory where the plot will be saved
+        pertime (float): Time of periapsis
+    
+    Returns:
+        None or figure if savepath is None
+        
+    """
     
     fig, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 12))
-    #fig.suptitle("XO-3b Observation")
 
     axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
     axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
@@ -86,7 +69,6 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     axes[4].set_xlabel('Time (BMJD)')
 
     for i in range(5):
-        #axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
         for j in range(len(breaks)):
             axes[i].axvline(x=breaks[j], color ='k', alpha=0.3, linestyle = 'dashed')
 
@@ -101,25 +83,19 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
         return fig
 
 def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
-    '''
-    Makes a multi-panel plot from photometry outputs.
-    params:
-    -------
-        xdata0 : 1D array
-            initial modelled the fluxes for each time stamps. Discarded points not removed.
-        ydata0: 1D array
-            initial modelled astrophysical flux variation for each time stamps. 
-            Discarded points not removed.
-        xdata  : 1D array
-            initial modelled the fluxes for each time stamps. Discarded points removed.
-        ydata : 1D array
-            initial modelled astrophysical flux variation for each time stamps. Discarded points removed.
-        savepath : str
-            path to directory where the plot will be saved
-    returns:
-    --------
-        none
-    '''
+    """Makes a multi-panel plot from photometry outputs.
+    
+    Args:
+        xdata0 (1D array): Initial modelled the fluxes for each time stamps. Discarded points not removed.
+        ydata0 (1D array): Initial modelled astrophysical flux variation for each time stamps. Discarded points not removed.
+        xdata (1D array): Initial modelled the fluxes for each time stamps. Discarded points removed.
+        ydata (1D array): Initial modelled astrophysical flux variation for each time stamps. Discarded points removed.
+        savepath (string): Path to directory where the plot will be saved
+    
+    Returns:
+        None or figure if savepath is None
+    
+    """
     
     fig = plt.figure(figsize=(6, 6))
     ax = plt.gca()
@@ -132,10 +108,14 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
     ax.set_xlabel("$x$")
 
     fig.subplots_adjust(hspace=0)
-    pathplot = savepath + 'Centroids.pdf'
-    fig.savefig(pathplot, bbox_inches='tight')
-    plt.close()
-    return
+    
+    if pathplot is not None:
+        pathplot = savepath + 'Centroids.pdf'
+        fig.savefig(pathplot, bbox_inches='tight')
+        plt.close()
+        return
+    else:
+        return fig
 
 
 def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
@@ -177,43 +157,25 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     if savepath!=None:
         pathplot = savepath+'BLISS_Knots.pdf'
         plt.savefig(pathplot, bbox_inches='tight')
+        plt.close()
+        return
     else:
-        plt.show()
+        return plt.gcf()
+
+def plot_init_guess(time, data, astro, detec_full, savepath=None):
+    """Makes a multi-panel plots for the initial light curve guesses.
     
-    plt.close()
-    return
-
-
-def plot_detec_syst(time, data, init):
-    plt.figure(figsize=(10,3))
-    plt.plot(time, data, '+', label='data')
-    plt.plot(time, init, '+', label='guess')
-    plt.title('Initial Guess')
-    plt.xlabel('Time (BMJD)')
-    plt.ylabel('Relative Flux')
-    plt.show()
-    plt.close()
-    return
-
-def plot_init_guess(time, data, astro, detec_full, showplot=True, savepath=None):
-    '''
-    Makes a multi-panel plots for the initial light curve guesses.
-    params:
-    -------
-        time  : 1D array 
-            array of time stamps
-        data  : 1D array
-            array of flux values for each time stamps
-        astro : 1D array
-            initial modelled astrophysical flux variation for each time stamps
-        detec_full : 1D array
-            initial modelled flux variation due to the detector for each time stamps
-        savepath : str
-            path to directory where the plot will be saved
-    returns:
-    --------
-        none
-    '''
+    Args:
+        time (1D array): Time stamps.
+        data (1D array): Flux values for each time stamps.
+        astro (1D array): Initial modelled astrophysical flux variation for each time stamps.
+        detec_full (1D array): Initial modelled flux variation due to the detector for each time stamps.
+        savepath (str): Path to directory where the plot will be saved.
+    
+    Returns:
+        None or figure if savepath is None
+    
+    """
     
     fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(10,9))
     
@@ -244,16 +206,15 @@ def plot_init_guess(time, data, astro, detec_full, showplot=True, savepath=None)
     if savepath is not None:
         pathplot = savepath + '02_Initial_Guess.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-    if showplot:
-        plt.show()
-    plt.close()
-    return
-
+        plt.close()
+        return
+    else:
+        return fig
+    
 def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
-        #raw_flux_binned, flux_binned_err = helpers.binValues(flux, x, nbin)
         calibrated_binned, calibrated_binned_err = helpers.binValues(flux/detec, x, nbin, assumeWhiteNoise=True)
         residuals_binned, residuals_binned_err = helpers.binValues(flux/detec-astro, x, nbin, assumeWhiteNoise=True)
     
@@ -262,7 +223,6 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     axes[0].set_xlim(np.nanmin(x), np.nanmax(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[0].plot(x, astro*detec, '.', color = 'r', markersize = 2.5, alpha = 0.4)
-    #axes[0].set_ylim(0.975, 1.0125)
     axes[0].set_ylabel('Raw Flux', fontsize=fontsize)
 
     axes[1].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
@@ -271,8 +231,6 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         axes[1].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[1].set_ylabel('Calibrated Flux', fontsize=fontsize)
-    # axes[1].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.nanmax(astro)+4*np.nanstd(flux/detec - astro))
-    #axes[1].set_ylim(0.9825, 1.0125)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
     axes[2].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
@@ -281,8 +239,6 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
         axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
-    #axes[2].set_ylim(0.9975, 1.0035)
-    # axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.nanmax(astro)+4*np.nanstd(flux/detec - astro))
     axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
@@ -292,7 +248,6 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
                          color = 'blue', markersize = 10, alpha = 1)
     axes[3].set_ylabel('Residuals', fontsize=fontsize)
     axes[3].set_xlabel('Time (BMJD)', fontsize=fontsize)
-    # axes[3].set_ylim(-4*np.nanstd(flux/detec - astro), 4*np.nanstd(flux/detec - astro))
 
     for i in range(len(axes)):
         axes[i].xaxis.set_tick_params(labelsize=fontsize)
@@ -308,11 +263,10 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_2.pdf'
         fig.savefig(plotname, bbox_inches='tight')
-    if showplot:
-        plt.show()
-        
-    plt.close()
-    return
+        plt.close(fig)
+        return
+    else:
+        return fig
 
 def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
     maxbins = int(np.rint(residuals.size/minbins))
@@ -379,7 +333,7 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
         fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
 
     Returns:
-        None
+        None or figure if name is None
 
     """
 
