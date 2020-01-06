@@ -305,6 +305,8 @@ for iterationNumber in range(len(planets)):
     modes = [mode+mode_appendix for mode in modes]
 
     for mode in modes:
+
+        print('Beginning', planet, channel, mode)
         
         p0_obj.mode = mode
 
@@ -782,7 +784,7 @@ for iterationNumber in range(len(planets)):
             for p0_temp in p0_temps:
                 ndim = len(p0)
                 nwalkers = ndim*3
-                nBurnInSteps1 = nwalkers*500
+                nBurnInSteps1 = 25500 # Chosen to give 500 steps per walker for Poly2v1 and 250 steps per walker for Poly5v2
 
                 # get scattered starting point in parameter space 
                 # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
