@@ -138,7 +138,7 @@ for iterNum in range(len(planets)):
             output1 += ' & '
             output2 += ' & '
 
-        ndata = ResultMCMC['chi2B']/ResultMCMC['chi2datum']
+        nData = ResultMCMC['chi2B'][0]/ResultMCMC['chi2datum'][0]
             
         val = ResultMCMC['A']
         if twoLimits:
