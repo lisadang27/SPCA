@@ -699,9 +699,6 @@ for iterationNumber in range(len(planets)):
                 signal_guess = signalfunc(signal_inputs, *p0)
                 #includes psfw and/or hside functions if they're being fit
                 detec_full_guess = signal_guess/astro_guess
-
-                # plot detector initial guess
-                make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, True)
             
             
             
@@ -767,7 +764,7 @@ for iterationNumber in range(len(planets)):
             detec_full_guess = signal_guess/astro_guess
 
             # plot detector initial guess
-            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, True, savepath)
+            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
         
         
         
@@ -869,7 +866,7 @@ for iterationNumber in range(len(planets)):
             detec_full_guess = signal_guess/astro_guess
 
             # plot detector initial guess
-            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, True, savepath)
+            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
         
         
         
