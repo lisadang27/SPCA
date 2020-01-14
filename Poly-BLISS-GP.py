@@ -812,7 +812,7 @@ for iterationNumber in range(len(planets)):
                 #Second burn-in
                 #Do quick burn-in to get walkers spread out
                 tic = t.time()
-                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=False)
                 print('Mean burn-in acceptance fraction: {0:.3f}'
                                 .format(np.median(sampler.acceptance_fraction)))
                 # sampler.reset()
@@ -914,7 +914,7 @@ for iterationNumber in range(len(planets)):
             #Do quick burn-in to get walkers spread out
             tic = t.time()
             print('Running second burn-in')
-            pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=True)
+            pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=False)
             print('Mean burn-in acceptance fraction: {0:.3f}'
                             .format(np.median(sampler.acceptance_fraction)))
             fname = savepath+'MCMC_'+mode+'_burninWalkers.pdf'
@@ -929,7 +929,7 @@ for iterationNumber in range(len(planets)):
             tic = t.time()
             # Continue from last positions and run production
             print('Running production')
-            pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=True)
+            pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=False)
             print("Mean acceptance fraction: {0:.3f}"
                             .format(np.mean(sampler.acceptance_fraction)))
             toc = t.time()
