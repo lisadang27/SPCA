@@ -889,10 +889,10 @@ for iterationNumber in range(len(planets)):
         if runMCMC:
             # get scattered starting point in parameter space 
             # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
-            p0_rel_errs = 1e-3*np.ones_like(p0_temp)
+            p0_rel_errs = 1e-3*np.ones_like(p0)
             gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
             p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
-            pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
+            pos0 = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
 
             checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
