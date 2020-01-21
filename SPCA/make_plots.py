@@ -109,7 +109,7 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
 
     fig.subplots_adjust(hspace=0)
     
-    if pathplot is not None:
+    if savepath is not None:
         pathplot = savepath + 'Centroids.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
         plt.close()
