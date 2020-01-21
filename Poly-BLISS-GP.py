@@ -707,72 +707,70 @@ for iterationNumber in range(len(planets)):
             
             
             
-       if 'gp' in mode.lower():
+       
+            
+            
+        ## Run initial optimization to find best location
+
+        if runMCMC:
+            checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
+
+            initial_lnprob = helpers.lnprob(p0, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+
+            spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
+
+            final_lnprob = -np.inf
+            p0_optimized = []
+            p0_temps = []
+            print('Running iterative scipy.optimize')
+            from tqdm import tqdm
+            for i in tqdm(range(20)):
+                p0_rel_errs = 1e-1*np.ones_like(p0)
+                gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
+                p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
+                p0_temp = p0*(1+p0_rel_errs*np.random.randn(len(p0)))+p0_rel_errs/10.*np.abs(np.random.randn(len(p0)))
+
+                p0_temp[p0_labels=='A'] = np.random.uniform(0.,0.3)
+                p0_temp[p0_labels=='B'] = np.random.uniform(-0.2,0.2)
+                # Assignment to non-existent indices is safe (safelt ignores it), so this is fine for all modes
+                p0_temp[p0_labels=='C'] = np.random.uniform(-0.3,0.3)
+                p0_temp[p0_labels=='D'] = np.random.uniform(-0.3,0.3)
+                p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
+                p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
+                p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
+
+                spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom], 'Nelder-Mead')
+                lnprob_temp = helpers.lnprob(spyResult_full.x, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+
+                p0_temps.append(np.copy(spyResult_full.x))
+
+                if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
+                    final_lnprob = lnprob_temp
+                    p0_optimized = np.copy(spyResult_full.x)
+
+                    if final_lnprob > initial_lnprob:
+                        print('Improved ln-likelihood!')
+                        print("ln-likelihood: {0:.2f}".format(final_lnprob))
+                        p0 = np.copy(p0_optimized)
+
+            # if np.isfinite(final_lnprob) and final_lnprob > initial_lnprob:
+            #     print('The full scipy optimize worked:')
+            #     print("Initial ln-likelihood: {0:.2f}".format(initial_lnprob))
+            #     print("Final ln-likelihood: {0:.2f}".format(final_lnprob))
+
+            #     p0 = np.copy(p0_optimized)
+
+            astro_guess = astrofunc(time, *p0[np.where(np.in1d(p0_labels,p0_astro))])
+            signal_guess = signalfunc(signal_inputs, *p0)
+            #includes psfw and/or hside functions if they're being fit
+            detec_full_guess = signal_guess/astro_guess
+
+            # plot detector initial guess
+            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
+            
+            
+        if 'gp' in mode.lower():
             # Only run the improved initial fitting routine if using a GP since it takes so long to run
-            
-            
-            ## Run initial optimization to find best location
-
-            if runMCMC:
-                checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-                initial_lnprob = helpers.lnprob(p0, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
-
-                spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
-
-                final_lnprob = -np.inf
-                p0_optimized = []
-                p0_temps = []
-                print('Running iterative scipy.optimize')
-                from tqdm import tqdm
-                for i in tqdm(range(20)):
-                    p0_rel_errs = 1e-1*np.ones_like(p0)
-                    gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
-                    p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
-                    p0_temp = p0*(1+p0_rel_errs*np.random.randn(len(p0)))+p0_rel_errs/10.*np.abs(np.random.randn(len(p0)))
-
-                    p0_temp[p0_labels=='A'] = np.random.uniform(0.,0.3)
-                    p0_temp[p0_labels=='B'] = np.random.uniform(-0.2,0.2)
-                    # Assignment to non-existent indices is safe (safelt ignores it), so this is fine for all modes
-                    p0_temp[p0_labels=='C'] = np.random.uniform(-0.3,0.3)
-                    p0_temp[p0_labels=='D'] = np.random.uniform(-0.3,0.3)
-                    p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
-                    p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
-                    p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
-
-                    spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom], 'Nelder-Mead')
-                    lnprob_temp = helpers.lnprob(spyResult_full.x, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
-
-                    p0_temps.append(np.copy(spyResult_full.x))
-
-                    if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
-                        final_lnprob = lnprob_temp
-                        p0_optimized = np.copy(spyResult_full.x)
-
-                        if final_lnprob > initial_lnprob:
-                            print('Improved ln-likelihood!')
-                            print("ln-likelihood: {0:.2f}".format(final_lnprob))
-                            p0 = np.copy(p0_optimized)
-
-                # if np.isfinite(final_lnprob) and final_lnprob > initial_lnprob:
-                #     print('The full scipy optimize worked:')
-                #     print("Initial ln-likelihood: {0:.2f}".format(initial_lnprob))
-                #     print("Final ln-likelihood: {0:.2f}".format(final_lnprob))
-
-                #     p0 = np.copy(p0_optimized)
-
-                astro_guess = astrofunc(time, *p0[np.where(np.in1d(p0_labels,p0_astro))])
-                signal_guess = signalfunc(signal_inputs, *p0)
-                #includes psfw and/or hside functions if they're being fit
-                detec_full_guess = signal_guess/astro_guess
-
-                # plot detector initial guess
-                make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
-            
-            
-            
-            
-            
             
             # Run an MCMC centred at the location of each optimization to break free of local minima
             
