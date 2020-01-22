@@ -73,6 +73,7 @@ tryEllipse = False                       # Whether to try an ellipsoidal variati
 tryPSFW = False
 
 runMCMC = True                           # whether to run MCMC or just load-in past results
+nBurnInSteps1 = 1e5                      # number of steps to use for the first mcmc burn-in (only used if not doing GP)
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
 usebestfit = False                       # used best-fit instead of most probable parameters 
