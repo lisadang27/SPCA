@@ -71,8 +71,8 @@ class signal_params(object):
         self.s2    = 0.0
         self.m1    = 0.0
         self.gpAmp = -2.
-        self.gpLx  = -6.
-        self.gpLy  = -6.
+        self.gpLx  = -2.
+        self.gpLy  = -2.
         self.sigF  = sigF
         self.mode  = mode
         self.Tstar = None
