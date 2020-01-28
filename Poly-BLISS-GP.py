@@ -1096,7 +1096,7 @@ for iterationNumber in range(len(planets)):
         def fluxDiff(temp, fStarSummed, wavs):
             #factor of pi likely needed to account for emitting area (pi*rstar^2 where rstar=1)
             return (np.sum(planck(wavs, temp)*np.pi)-fStarSummed)**2
-        temps = np.linspace(5500, 7000, 500)
+        temps = np.linspace(5500, 10000, 3536)
         if channel == 'ch1':
             incides = np.where(np.logical_and(wavStar < 4., wavStar > 3.))[0]
         else:
