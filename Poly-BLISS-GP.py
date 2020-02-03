@@ -42,11 +42,8 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 
 
 
-# planets = ['WASP121b', 'WASP121b', 'KELT16b', 'MASCARA1b']
-# channels = ['ch2', 'ch1', 'ch2', 'ch2']
-
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b']
-channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch1']
+planets = ['MASCARA-1b', 'KELT-16b', 'WASP-121b', 'WASP-121b', 'CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-9b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-43b_repeatCh1', 'WASP-43b_repeatCh2', 'WASP-43b_repeat2Ch2', 'Qatar1b', 'Qatar1b'][-1:]
+channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2'][-1:]
 
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
@@ -65,14 +62,14 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-minPolys = [2,2,2,2,2]                   # minimum polynomial order to consider
-maxPolys = [5,5,5,5,5]                   # maximum polynomial order to consider (set < minPoly to not use polynomial models)
+minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
-runMCMC = True                           # whether to run MCMC or just load-in past results
+runMCMC = False                          # whether to run MCMC or just load-in past results
 nBurnInSteps1 = 1e5                      # number of steps to use for the first mcmc burn-in (only used if not doing GP)
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
@@ -408,6 +405,8 @@ for iterationNumber in range(len(planets)):
             # Get the time of the first exposure of each AOR after the first
             #     - this allows us to plot dashed lines where AOR breaks happen and where jump discontinuities happen
             breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
+            rawHeader = rawImage[0].header
+            rawImage.close()
         breaks = np.sort(breaks)[1:]
 
         # Calculate the photon noise limit
