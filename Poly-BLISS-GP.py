@@ -410,26 +410,10 @@ for iterationNumber in range(len(planets)):
             breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
         breaks = np.sort(breaks)[1:]
 
-
-
-        
-        # In[5]:
-
-
-        # A cell that can be used to calculate the photon noise limit
-        # flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
-        # from astropy.io import fits
-        # #hdu_list = fits.open('/home/taylor/Documents/Research/spitzer/WASP-12b_old/data/ch2/r41587200/ch2/bcd/SPITZER_I2_41587200_0001_0000_2_bcd.fits')
-        # #hdu_list = fits.open('/home/taylor/Documents/Research/spitzer/WASP-12b_old/data/ch1/r41260032/ch1/bcd/SPITZER_I1_41260032_0003_0000_2_bcd.fits')
-        # hdu_list = fits.open('/home/taylor/Documents/Research/spitzer/WASP-12b/data/ch2/r48015872/ch2/bcd/SPITZER_I2_48015872_0330_0000_2_bcd.fits')
-        # #hdu_list = fits.open('/home/taylor/Documents/Research/spitzer/WASP-12b/data/ch1/r48014848/ch1/bcd/SPITZER_I1_48014848_0003_0000_2_bcd.fits')
-        # #flux *= hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']/hdu_list[0].header['FLUXCONV']
-        # flux *= hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']/hdu_list[0].header['FLUXCONV']
-        # 
-        # 1/np.sqrt(np.median(flux))/np.sqrt(64-len(ignoreFrames))*1e6
-
-
-        # In[6]:
+        # Calculate the photon noise limit
+        flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
+        flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
+        sigF_photon_ppm = 1/np.sqrt(np.median(flux))/np.sqrt(64-len(ignoreFrames))*1e6
 
 
 
@@ -1122,7 +1106,7 @@ for iterationNumber in range(len(planets)):
         labels = p0_fancyLabels[:ind_a]
 
         fname = savepath+'MCMC_'+mode+'_astroWalkers.pdf'
-        helpers.walk_style(ind_a, nwalkers, chain, 10, int(np.rint(nProductionSteps/nwalkers)), labels, fname)
+        helpers.walk_style(ind_a, nwalkers, chain, 10, chain.shape[1], labels, fname)
 
 
         # In[ ]:
@@ -1131,7 +1115,7 @@ for iterationNumber in range(len(planets)):
         if 'bliss' not in mode.lower() or 'sigF' not in dparams:
             labels = p0_fancyLabels[ind_a:]
             fname = savepath+'MCMC_'+mode+'_detecWalkers.pdf'
-            helpers.walk_style(len(p0)-ind_a, nwalkers, chain[:,:,ind_a:], 10, int(np.rint(nProductionSteps/nwalkers)), labels, fname)
+            helpers.walk_style(len(p0)-ind_a, nwalkers, chain[:,:,ind_a:], 10, chain.shape[1], labels, fname)
 
 
         # In[ ]:
@@ -1483,6 +1467,7 @@ for iterationNumber in range(len(planets)):
         ResultMCMC_Params['chi2datum'] = [chisB/len(flux)]
         ResultMCMC_Params['logLB'] = [logLB]
         ResultMCMC_Params['evidenceB'] = [EB]
+        ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
         if 'gp' not in mode.lower():
             ResultMCMC_Params['chi2'] = [chis]
