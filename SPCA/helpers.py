@@ -187,12 +187,12 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
     PSFYW = PSFYW[int(cut*nFrames):]
 
     # Sigma clip per data cube (also masks invalids)
-    FLUX_clip  = sigma_clip(FLUX, sigma=6, iters=1)
-    FERR_clip  = sigma_clip(FERR, sigma=6, iters=1)
-    XDATA_clip = sigma_clip(XDATA, sigma=6, iters=1)
-    YDATA_clip = sigma_clip(YDATA, sigma=3.5, iters=1)
-    PSFXW_clip = sigma_clip(PSFXW, sigma=6, iters=1)
-    PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, iters=1)
+    FLUX_clip  = sigma_clip(FLUX, sigma=6, maxiters=1)
+    FERR_clip  = sigma_clip(FERR, sigma=6, maxiters=1)
+    XDATA_clip = sigma_clip(XDATA, sigma=6, maxiters=1)
+    YDATA_clip = sigma_clip(YDATA, sigma=3.5, maxiters=1)
+    PSFXW_clip = sigma_clip(PSFXW, sigma=6, maxiters=1)
+    PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, maxiters=1)
 
     # Clip bad frames
     ind = np.array([])
