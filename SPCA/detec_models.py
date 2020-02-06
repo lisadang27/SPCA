@@ -1,6 +1,11 @@
 import numpy as np
-import george
-from george.modeling import Model
+
+try:
+    import george
+    from george.modeling import Model
+except ImportError:
+    print('Warning: george failed to import. Without this installed, you cannot run GP analyses.')
+    print('For instructions on how to install george, visit https://george.readthedocs.io')
 
 # SPCA libraries
 from . import astro_models
