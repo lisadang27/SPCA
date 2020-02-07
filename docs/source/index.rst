@@ -54,8 +54,8 @@ Indices and tables
 
 .. * :ref:`search`
 
-Contribution
-============
+Contributions
+=============
 
 `Lisa Dang <https://github.com/lisadang27>`_ contributed the initial code and idea for SPCA, and wrote much of the photometry and fitting routines, as well as the polynomial and PLD decorrelation methods.
 

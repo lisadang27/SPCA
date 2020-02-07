@@ -33,7 +33,7 @@ Then decorrelate the data using the Poly-BLISS-GP file. Most parameters here are
 
 Finally, some tables containing a selection of the fitted parameters from each model run can be made using the MakeTables file. These tables will also highlight the best decorrelation method for each analysis, determined using delta-BIC.
 
-## Contribution
+## Contributions
 
 [Lisa Dang](https://github.com/lisadang27) contributed the initial code and idea for SPCA, and wrote much of the photometry and fitting routines, as well as the polynomial and PLD decorrelation methods.
 
