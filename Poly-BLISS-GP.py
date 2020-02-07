@@ -42,8 +42,11 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 
 
 
-planets = ['MASCARA-1b', 'KELT-16b', 'WASP-121b', 'WASP-121b', 'CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-9b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-43b_repeatCh1', 'WASP-43b_repeatCh2', 'WASP-43b_repeat2Ch2', 'Qatar1b', 'Qatar1b'][-1:]
-channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2'][-1:]
+planets = ['MASCARA-1b', 'KELT-16b', 'WASP-121b', 'WASP-121b', 'CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-9b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-43b_repeatCh1', 'WASP-43b_repeatCh2', 'WASP-43b_repeat2Ch2', 'Qatar1b', 'Qatar1b']
+channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch1', 'ch2']
+
+planets = ['WASP-43b_repeatCh1', 'WASP-43b_repeatCh2', 'WASP-43b_repeat2Ch2', 'Qatar1b', 'WASP-18b', 'WASP-19b'][-1:]
+channels = ['ch1', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1'][-1:]
 
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
@@ -118,6 +121,13 @@ if rootpath[-1]!='/':
     rootpath += '/'
 
 
+#Download the most recent masterfile of the best data on each target
+try:
+    _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', './masterfile.ecsv')
+except:
+    print('Unable to download the most recent Exoplanet Archive data - resorting to previously downloaded version.')
+
+
 for iterationNumber in range(len(planets)):
     
     planet = planets[iterationNumber]
@@ -130,14 +140,8 @@ for iterationNumber in range(len(planets)):
     with open(rootpath+planet+'/analysis/'+channel+'/cutFirstAOR.txt', 'r') as file:
         cutFirstAOR = file.readline().strip()=='True'
 
-    #Download the most recent masterfile of the best data on each target
-    try:
-        _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', '../masterfile.ecsv')
-    except:
-        print('Unable to download the most recent Exoplanet Archive data - resorting to previously downloaded version.')
-
-    if os.path.exists('../masterfile.ecsv'):
-        data = Table.to_pandas(Table.read('../masterfile.ecsv'))
+    if os.path.exists('./masterfile.ecsv'):
+        data = Table.to_pandas(Table.read('./masterfile.ecsv'))
     else:
         print('ERROR: No previously downloaded Exoplanet Archive data - try again when you are connected to the internet.')
         print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), '../masterfile.ecsv'))
@@ -882,13 +886,13 @@ for iterationNumber in range(len(planets)):
         
         
         
-        
-        # plot detector initial guess
-        astro_guess = astrofunc(time, *p0[np.where(np.in1d(p0_labels,p0_astro))])
-        signal_guess = signalfunc(signal_inputs, *p0)
-        #includes psfw and/or hside functions if they're being fit
-        detec_full_guess = signal_guess/astro_guess
-        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
+        if runMCMC:
+            # plot detector initial guess
+            astro_guess = astrofunc(time, *p0[np.where(np.in1d(p0_labels,p0_astro))])
+            signal_guess = signalfunc(signal_inputs, *p0)
+            #includes psfw and/or hside functions if they're being fit
+            detec_full_guess = signal_guess/astro_guess
+            make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath)
         
         
         # In[ ]:
@@ -962,6 +966,9 @@ for iterationNumber in range(len(planets)):
         else:
 
             pathchain = savepath + 'samplerchain_'+mode+'.npy'
+            if not os.path.exists(pathchain):
+                print('ERROR: Cannot load data from mode', mode, 'as it has not been run for planet', planet, 'and channel', channel)
+                continue # Skip this method and keep trying the others
             chain = np.load(pathchain)
             pathlnpro = savepath + 'samplerlnpr_'+mode+'.npy'
             if os.path.exists(pathlnpro):
@@ -1079,7 +1086,7 @@ for iterationNumber in range(len(planets)):
         def fluxDiff(temp, fStarSummed, wavs):
             #factor of pi likely needed to account for emitting area (pi*rstar^2 where rstar=1)
             return (np.sum(planck(wavs, temp)*np.pi)-fStarSummed)**2
-        temps = np.linspace(5500, 10000, 3536)
+        temps = np.linspace(4000, 10000, 4715)
         if channel == 'ch1':
             incides = np.where(np.logical_and(wavStar < 4., wavStar > 3.))[0]
         else:
