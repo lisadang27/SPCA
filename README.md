@@ -2,6 +2,8 @@
 
 SPCA is an open-source, modular, and automated pipeline for Spitzer Phase Curve Analyses.
 
+The full API can be found at [https://spca.readthedocs.io](https://spca.readthedocs.io).
+
 ##Installation Instructions
 
 To install SPCA, run the following in a terminal:
