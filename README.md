@@ -4,7 +4,7 @@ SPCA is an open-source, modular, and automated pipeline for Spitzer Phase Curve 
 
 The full API can be found at [https://spca.readthedocs.io](https://spca.readthedocs.io).
 
-##Installation Instructions
+## Installation Instructions
 
 To install SPCA, run the following in a terminal:
 
@@ -17,7 +17,7 @@ To install SPCA, run the following in a terminal:
 Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects and encorporate PLD analyses as well as PSF fitting and nearby companion removal using PSF subtraction.
 
 
-##Package Usage
+## Package Usage
 
 To use SPCA, you must first download your data from the Spitzer Heritage Archive: https://sha.ipac.caltech.edu/applications/Spitzer/SHA/. Place the downloaded zip files in a directory with the same name as the planet (exluding spaces).
 
@@ -33,7 +33,7 @@ Then decorrelate the data using the Poly-BLISS-GP file. Most parameters here are
 
 Finally, some tables containing a selection of the fitted parameters from each model run can be made using the MakeTables file. These tables will also highlight the best decorrelation method for each analysis, determined using delta-BIC.
 
-##Contribution
+## Contribution
 
 [Lisa Dang](https://github.com/lisadang27) contributed the initial code and idea for SPCA, and wrote much of the photometry and fitting routines, as well as the polynomial and PLD decorrelation methods.
 
@@ -41,11 +41,11 @@ Both authors worked extensively to debug the code and simplify the user experien
 
 [Taylor James Bell](https://github.com/taylorbell57) further generalized and streamlined SPCA, allowing it to be run quickly and easily for any given planet with minimal effort. Taylor also contributed much of the documentation, and the GP decorrelation method.
 
-##Acknowledgements
+## Acknowledgements
 
 We thank Joel Schwartz for his aid in writing out BLISS decorrelation method. We also thank Dylan Keating for alpha testing SPCA.
 
-##License & Attribution
+## License & Attribution
 
 Copyright © 2019 Lisa Dang & Taylor James Bell.
 
