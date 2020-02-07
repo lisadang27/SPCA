@@ -2,3 +2,10 @@ numpy
 astropy
 scipy
 matplotlib
+emcee
+batman-package
+corner
+photutils
+pandas
+pyyaml
+threadpoolctl
