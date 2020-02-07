@@ -6,9 +6,9 @@ import os
 import decimal
 
 
-mainpath   = '/home/taylor/Documents/Research/spitzer/'
-planets = ['WASP12b', 'WASP121b', 'WASP121b', 'MASCARA1b', 'KELT16b']            # Name of the planet
-channels = ['ch2', 'ch2', 'ch1', 'ch2', 'ch2']                     # Spitzer channel
+mainpath   = '/home/taylor/Documents/Research/spitzer/MEGA/'
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
 twoLimits = False
 bicThresh = 5
 
@@ -64,7 +64,11 @@ for iterNum in range(len(planets)):
             BICs.append(-2*ResultMCMC['evidenceB'][0])
     BICs = np.array(BICs)
 
-    bestBIC = np.min(BICs)
+    try:
+        bestBIC = np.min(BICs)
+    except:
+        # There are no analyses for this planet
+        print('No analyses for planet', planet, 'channel', channel)
 
     ######################## MAKE TABLE2 #1 AND #2 ########################
 
@@ -537,4 +541,5 @@ print(output3)
 print('\n%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%\n\n')
 
 print(output4)
+
 
