@@ -7,8 +7,6 @@ from astropy.stats import sigma_clip
 
 import inspect
 
-from numba import jit
-
 import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
@@ -592,7 +590,6 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     plt.close()
     return    
 
-@jit(nopython=True, parallel=False)
 def chi2(data, fit, err):
     """Compute the chi-squared statistic.
 
@@ -610,7 +607,6 @@ def chi2(data, fit, err):
     inv_err = err**-1
     return np.sum(((data - fit)*inv_err)**2)
 
-@jit(nopython=True, parallel=False)
 def loglikelihood(data, fit, err):
     """Compute the lnlikelihood.
 
@@ -629,7 +625,6 @@ def loglikelihood(data, fit, err):
     len_fit = len(fit)
     return -0.5*np.sum(((data - fit)*inv_err)**2) + len_fit*np.log(inv_err) - len_fit*np.log(np.sqrt(2*np.pi))
 
-@jit(nopython=True, parallel=False)
 def evidence(logL, Npar, Ndat):
     """Compute the Bayesian evidence.
 

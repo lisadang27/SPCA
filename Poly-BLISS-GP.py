@@ -20,6 +20,9 @@ import timeit
 import os, sys
 import csv
 
+from multiprocessing import Pool
+from threadpoolctl import threadpool_limits
+
 import inspect
 
 import warnings
@@ -69,6 +72,7 @@ tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
+ncpu = 24                                # The number of cpu threads to be used when running MCMC
 runMCMC = False                          # whether to run MCMC or just load-in past results
 nBurnInSteps1 = 1e5                      # number of steps to use for the first mcmc burn-in (only used if not doing GP)
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
@@ -846,10 +850,8 @@ for iterationNumber in range(len(planets)):
 
             checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-            #sampler
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, a = 2,
-                                            args=(signalfunc, lnpriorfunc, 
-                                                  signal_inputs, checkPhasePhis, lnprior_custom))
+            def templnprob(pars):
+                return helpers.lnprob(pars, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
 
             priorlnls = np.array([(lnpriorfunc(*p_tmp, mode, checkPhasePhis) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
             iters = 10
@@ -866,7 +868,11 @@ for iterationNumber in range(len(planets)):
             #First burn-in
             tic = t.time()
             print('Running first burn-in')
-            pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+            with threadpool_limits(limits=1, user_api='blas'):
+                with Pool(ncpu) as pool:
+                    #sampler
+                    sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+                    pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
             print('Mean burn-in acceptance fraction: {0:.3f}'
                         .format(np.median(sampler.acceptance_fraction)))
 
@@ -906,10 +912,8 @@ for iterationNumber in range(len(planets)):
 
             checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-            #sampler
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, a = 2,
-                                            args=(signalfunc, lnpriorfunc, 
-                                                  signal_inputs, checkPhasePhis, lnprior_custom))
+            def templnprob(pars):
+                return helpers.lnprob(pars, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
 
             priorlnls = np.array([(lnpriorfunc(*p_tmp, mode, checkPhasePhis) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
             iters = 10
@@ -927,7 +931,11 @@ for iterationNumber in range(len(planets)):
             #Do quick burn-in to get walkers spread out
             tic = t.time()
             print('Running second burn-in')
-            pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=False)
+            with threadpool_limits(limits=1, user_api='blas'):
+                with Pool(ncpu) as pool:
+                    #sampler
+                    sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+                    pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=True)
             print('Mean burn-in acceptance fraction: {0:.3f}'
                             .format(np.median(sampler.acceptance_fraction)))
             fname = savepath+'MCMC_'+mode+'_burninWalkers.pdf'
@@ -942,7 +950,11 @@ for iterationNumber in range(len(planets)):
             tic = t.time()
             # Continue from last positions and run production
             print('Running production')
-            pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=False)
+            with threadpool_limits(limits=1, user_api='blas'):
+                with Pool(ncpu) as pool:
+                    #sampler
+                    sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+                    pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=True)
             print("Mean acceptance fraction: {0:.3f}"
                             .format(np.mean(sampler.acceptance_fraction)))
             toc = t.time()
@@ -1299,7 +1311,7 @@ for iterationNumber in range(len(planets)):
 
             sigmas = []
             for i in range(3,len(residuals)):
-                sigmas.append(helpers.binnedNoise(x,residuals,i))
+                sigmas.append(helpers.binnedNoise(time,residuals,i))
             sigmas = np.array(sigmas)
 
             n_binned = len(residuals)/np.arange(3,len(residuals))
@@ -1395,11 +1407,11 @@ for iterationNumber in range(len(planets)):
         BICB = -2*EB
 
         out = """Binned data:
-        chi2 = {0}
-        chi2datum = {1}
-        Likelihood = {2}
-        Evidence = {3}
-        BIC = {4}""".format(chisB, chisB/len(flux), logLB, EB, BICB)
+chi2 = {0}
+chi2datum = {1}
+Likelihood = {2}
+Evidence = {3}
+BIC = {4}""".format(chisB, chisB/len(flux), logLB, EB, BICB)
 
         if 'gp' not in mode.lower():
             #Unbinned data
@@ -1438,12 +1450,12 @@ for iterationNumber in range(len(planets)):
 
             out += """
 
-            Unbinned data:
-            chi2 = {0}
-            chi2datum = {1}
-            Likelihood = {2}
-            Evidence = {3}
-            BIC = {4}""".format(chis, chis/len(xdata_full), logL, E, BIC)
+Unbinned data:
+chi2 = {0}
+chi2datum = {1}
+Likelihood = {2}
+Evidence = {3}
+BIC = {4}""".format(chis, chis/len(xdata_full), logL, E, BIC)
 
         with open(savepath+'EVIDENCE_'+mode+'.txt','w') as file:
             file.write(out)

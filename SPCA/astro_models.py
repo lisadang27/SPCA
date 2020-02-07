@@ -1,6 +1,5 @@
 import numpy as np
 import batman
-from numba import jit
 
 def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
     """Get a model transit lightcurve.
@@ -286,7 +285,6 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
 
 
 
-@jit(nopython=True, parallel=False)
 def check_phase(phis, A, B, C=0, D=0):
     """Check if the phasecurve ever dips below zero, implying non-physical negative flux coming from the planet.
 
