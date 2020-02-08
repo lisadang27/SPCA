@@ -73,7 +73,7 @@ tryEllipse = False                       # Whether to try an ellipsoidal variati
 tryPSFW = False
 
 ncpu = 24                                # The number of cpu threads to be used when running MCMC
-runMCMC = False                          # whether to run MCMC or just load-in past results
+runMCMC = True                          # whether to run MCMC or just load-in past results
 nBurnInSteps1 = 1e5                      # number of steps to use for the first mcmc burn-in (only used if not doing GP)
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
@@ -90,6 +90,9 @@ compFactors = np.ones(len(planets))
 
 # non-zero if you want to remove some initial data points
 cuts = np.zeros(len(planets)).astype(int)
+#planets = ['WASP-19b', 'WASP-14b', 'WASP-18b', 'WASP-33b', 'WASP-33b'][1:]
+#channels = ['ch1', 'ch1', 'ch1', 'ch1', 'ch2'][1:]
+#cuts = np.array([42, 89, 152, 243, 243]).astype(int)[-len(planets):]
 
 
 
@@ -184,6 +187,12 @@ for iterationNumber in range(len(planets)):
     p0_obj.t0 = data['pl_tranmid'][nameIndex]-2.4e6-0.5
     p0_obj.t0_err = np.mean([data['pl_tranmiderr1'][nameIndex],
                              -data['pl_tranmiderr2'][nameIndex]])
+    if planet=='WASP-33b':
+        p0_obj.t0_err = 0.0003
+    elif planet=='WASP-14b':
+        p0_obj.t0_err = 0.00047
+    elif planet=='KELT-7b':
+        p0_obj.t0_err = 0.0001
     p0_obj.inc = data['pl_orbincl'][nameIndex]
     p0_obj.inc_err = np.mean([data['pl_orbinclerr1'][nameIndex],
                               -data['pl_orbinclerr2'][nameIndex]])
@@ -197,7 +206,7 @@ for iterationNumber in range(len(planets)):
     if e != 0:
 
         if not np.isfinite(argp):
-            print('Randomly generating an argument of periastron...')
+            print('Randomly generating an argument of periastron...')   
             argp = np.random.uniform(0.,360.,1)
 
         p0_obj.ecosw = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
