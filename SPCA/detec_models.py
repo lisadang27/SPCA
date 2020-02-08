@@ -15,10 +15,14 @@ from . import astro_models
 ######################################################################################
 #THIS IS THE MAIN SIGNAL FUNCTION WHICH BRANCHES OUT TO THE CORRECT SIGNAL FUNCTION
 def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
-                d1, d2, d3, s1, s2, m1, 
-                gpAmp, gpLx, gpLy, sigF,
-                predictGp=True, returnGp=False):
+           c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
+           d1, d2, d3, s1, s2, m1, 
+           p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+           p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+           p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
+           p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
+           gpAmp, gpLx, gpLy, sigF,
+           predictGp=True, returnGp=False):
     """Model the flux variations as a product of astrophysical varations multiplied by a non-uniform detector sensitivity.
     
     This is a super-function that sets up the framework of SPCA. It calls the relevant astrophysical functions and the relevant detector model functions, depending on the value of mode: the last variable in the signal_input parameter.
@@ -49,6 +53,8 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
+        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         gpAmp (float): The natural logarithm of the GP covariance amplitude.
         gpLx (float): The natural logarithm of the GP covariance lengthscale in x.
         gpLy (float): The natural logarithm of the GP covariance lengthscale in y.
@@ -66,6 +72,13 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
         return signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                            c1,  c2,  c3,  c4,  c5,  c6,  c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17,
                            c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1)
+    elif 'pld' in mode.lower():
+        return signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+                          p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+                          p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+                          p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
+                          p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
+                          s1, s2, m1, sigF)
     elif 'bliss' in mode.lower():
         return signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
                             d1, d2, d3, s1, s2, m1)
@@ -138,6 +151,69 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
         model *= tslope(time, m1)
   
     return model
+
+def signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
+               p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+               p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+               p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
+               p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
+               s1, s2, m1, sigF):
+    """Model the flux variations as a product of astrophysical varations multiplied by a PLD sensitivity model.
+    
+    Args:
+        signal_input (tuple): (flux, time, Pgroup, mode) with dtypes (ndarray, ndarray, ndarray, string).
+        t0 (float): Time of inferior conjunction.
+        per (float): Orbital period.
+        rp (float): Planet radius (in units of stellar radii).
+        a (float): Semi-major axis (in units of stellar radii).
+        inc (float): Orbital inclination (in degrees).
+        ecosw (float): Eccentricity multiplied by the cosine of the longitude of periastron (value between -1 and 1).
+        esinw (float): Eccentricity multiplied by the sine of the longitude of periastron (value between -1 and 1).
+        q1 (float): Limb darkening coefficient 1, parametrized to range between 0 and 1.
+        q2 (float): Limb darkening coefficient 2, parametrized to range between 0 and 1.
+        fp (float): Planet-to-star flux ratio.
+        A (float): Amplitude of the first-order cosine term.
+        B (float): Amplitude of the first-order sine term.
+        C (float): Amplitude of the second-order cosine term. Default=0.
+        D (float): Amplitude of the second-order sine term. Default=0.
+        r2 (float): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
+        r2off (float): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
+        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        s1 (float): The amplitude of the heaviside step function.
+        s2 (float): The location of the step in the heaviside function.
+        m1 (float): The slope in sensitivity over time with respect to time[0].
+        sigF (float): The white noise in units of F_star.
+        
+    Returns:
+        ndarray: The modelled flux variations due to the astrophysical model modified by the detector model.
+
+    """
+    
+    
+    #flux, time, Pgroup, mode = signal_input
+    time   = signal_input[1]
+    Pgroup = signal_input[2]
+    mode   = signal_input[-1]
+    
+    astroModel   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
+                                           A, B, C, D, r2, r2off)
+    detec  = detec_model_PLD((Pgroup, mode), p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
+                             p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1, p18_1, p19_1,
+                             p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+                             p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2,
+                             p12_2, p13_2, p14_2, p15_2, p16_2, p17_2, p18_2, p19_2, p20_2, p21_2,
+                             p22_2, p23_2, p24_2, p25_2)
+    
+    model = astroModel*detec
+    
+    if 'hside' in mode.lower():
+        model *= hside(time, s1, s2)
+    
+    if 'tslope' in mode.lower():
+        model *= tslope(time, m1)
+    
+    return astr*detec*hstep*tcurve
 
 def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, 
                  d1, d2, d3, s1, s2, m1):
@@ -380,6 +456,83 @@ def tslope(time, m1):
 
     """
     return 1+(time-time[0])*m1
+
+def detec_model_PLD(input_data, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
+                    p10_1=0, p11_1=0, p12_1=0, p13_1=0, p14_1=0, p15_1=0,
+                    p16_1=0, p17_1=0, p18_1=0, p19_1=0, p20_1=0, p21_1=0,
+                    p22_1=0, p23_1=0, p24_1=0, p25_1=0,
+                    p1_2=0, p2_2=0, p3_2=0, p4_2=0, p5_2=0, p6_2=0, p7_2=0,
+                    p8_2=0, p9_2=0, p10_2=0, p11_2=0, p12_2=0, p13_2=0, p14_2=0,
+                    p15_2=0, p16_2=0, p17_2=0, p18_2=0, p19_2=0, p20_2=0, p21_2=0,
+                    p22_2=0, p23_2=0, p24_2=0, p25_2=0):
+    """Model the detector systematics with a PLD model.
+    
+    Args:
+        input_data (tuple): (Pgroup, mode) with dtypes (ndarray, string).
+        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        
+    Returns:
+        ndarray: The flux variations due to the detector systematics.
+
+    """
+    
+    Pgroup, mode = input_data # Pgroup are pixel "lightcurves" 
+    
+    detec = np.array([p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1])
+    if '5x5' in mode.lower():
+        # Add additional pixels
+        detec.append([p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1,
+                      p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1])
+    if 'pld2' in mode.lower():
+        # Add higher order terms for 3x3 pixels
+        detec.append([p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2])
+    if 'pld2' in mode.lower() and '5x5' in mode.lower():
+        # Add higher order terms for 5x5 pixels
+        detec.append([p10_2, p11_2, p12_2, p13_2, p14_2, p15_2, p16_2, p17_2,
+                      p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2])
+        
+    if '3x3' in mode.lower():
+        npix = 9
+    else:
+        npix = 25
+        
+    pixels = np.split(Pgroup, npix, axis=0)
+    if 'pld2' in mode.lower():
+        # Add the flux**2 terms for 2nd order PLD
+        pixels = np.append(pixels, pixels**2)
+    
+    return np.dot(detec, pixels).reshape(-1)
+    
+    
+#     if '3x3' in mode.lower():
+#         P1, P2, P3, P4, P5, P6, P7, P8, P9 = np.split(Pgroup, 9, axis=0)
+#         if 'pld1' in mode.lower():
+#             detec = np.asarray(p1_1*P1+ p2_1*P2+ p3_1*P3+ p4_1*P4+ p5_1*P5+ p6_1*P6+ p7_1*P7+ p8_1*P8+ p9_1*P9)
+#         elif 'pld2' in mode.lower():
+#             detec = np.asarray(p1_1*P1   + p2_1*P2   + p3_1*P3   + p4_1*P4   + p5_1*P5   + p6_1*P6   + p7_1*P7   + 
+#                                p8_1*P8   + p9_1*P9+ 
+#                                p1_2*P1**2+ p2_2*P2**2+ p3_2*P3**2+ p4_2*P4**2+ p5_2*P5**2+ p6_2*P6**2+ p7_2*P7**2+ 
+#                                p8_2*P8**2+ p9_2*P9**2)
+            
+#     elif '5x5' in mode.lower():
+#         P1, P2, P3, P4, P5, P6, P7, P8, P9 , P10, P11, P12, P13, P14, P15, \
+#         P16, P17, P18, P19, P20, P21, P22, P23, P24, P25 = np.split(Pgroup, 25, axis=0)
+#         if 'pld1' in mode.lower():
+#             detec = np.asarray(p1*P1+ p2_1*P2+ p3_1*P3+ p4_1*P4+ p5_1*P5+ p6_1*P6+ p7_1*P7+ p8_1*P8+ p9_1*P9+ 
+#                                p10_1*P10+ p11_1*P11+ p12_1*P12+ p13_1*P13+ p14_1*P14+ p15_1*P15+ p16_1*P16+ 
+#                                p17_1*P17+ p18_1*P18+ p19_1*P19+ p20_1*P20+ p21_1*P21+ p22_1*P22+ p23_1*P23+ 
+#                                p24_1*P24+ p25_1*P25)
+#         elif 'pld2' in mode.lower():
+#             detec = np.asarray(p1_1*P1     + p2_1*P2     + p3_1*P3     + p4_1*P4     + p5_1*P5     + p6_1*P6     + p7_1*P7     +
+#                                p8_1*P8     + p9_1*P9     + p10_1*P10   + p11_1*P11   + p12_1*P12   + p13_1*P13   + p14_1*P14   +
+#                                p15_1*P15   + p16_1*P16   + p17_1*P17   + p18_1*P18   + p19_1*P19   + p20_1*P20   + p21_1*P21   +
+#                                p22_1*P22   + p23_1*P23   + p24_1*P24   + p25_1*P25   + p1_2*P1**2  + p2_2*P2**2  + p3_2*P3**2  +
+#                                p4_2*P4**2  + p5_2*P5**2  + p6_2*P6**2  + p7_2*P7**2  + p8_2*P8**2  + p9_2*P9**2  + p10_2*P10**2+
+#                                p11_2*P11**2+ p12_2*P12**2+ p13_2*P13**2+ p14_2*P14**2+ p15_2*P15**2+ p16_2*P16**2+ p17_2*P17**2+
+#                                p18_2*P18**2+ p19_2*P19**2+ p20_2*P20**2+ p21_2*P21**2+ p22_2*P22**2+ p23_2*P23**2+ p24_2*P24**2+
+#                                p25_2*P25**2)
+#     return detec.ravel()
 
 def detec_model_bliss(signal_input, astroModel):
     """Model the detector systematics with a BLISS model based on the centroid.

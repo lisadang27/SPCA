@@ -67,6 +67,10 @@ uparams_limits = [[0,-3],[0,-3]]
 
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
+tryPLD1_3x3 = False                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD2_3x3 = False                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD1_5x5 = False                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD2_5x5 = False                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
@@ -293,6 +297,19 @@ for iterationNumber in range(len(planets)):
             modes.append('Poly'+str(polyOrder)+'_v1_ellipse')
             modes.append('Poly'+str(polyOrder)+'_v1_ellipseOffset')
 
+    if tryPLD1_3x3:
+        modes.append('PLD1_3x3_v1')
+        modes.append('PLD1_3x3_v2')
+    if tryPLD2_3x3:
+        modes.append('PLD2_3x3_v1')
+        modes.append('PLD2_3x3_v2')
+    if tryPLD1_5x5:
+        modes.append('PLD1_5x5_v1')
+        modes.append('PLD1_5x5_v2')
+    if tryPLD2_5x5:
+        modes.append('PLD2_5x5_v1')
+        modes.append('PLD2_5x5_v2')
+        
     if tryBliss:
         modes.append('BLISS_v1')
         modes.append('BLISS_v2')
@@ -301,7 +318,6 @@ for iterationNumber in range(len(planets)):
         modes.append('GP_v1')
         modes.append('GP_v2')
 
-    #FIX: Make it so that it does an extend, not a replace
     if tryPSFW:
         modes.extend([mode+'_PSFW' for mode in modes])
 
@@ -359,6 +375,12 @@ for iterationNumber in range(len(planets)):
                              'A', 'B', 'C', 'D', 'r2', 'r2off', 'c1', 'c2', 'c3', 'c4', 'c5', 'c6', 'c7',
                              'c8', 'c9', 'c10', 'c11', 'c12', 'c13', 'c14', 'c15', 'c16', 'c17',
                              'c18', 'c19', 'c20', 'c21', 'd1', 'd2', 'd3', 's1', 's2', 'm1',
+                             'p1_1', 'p2_1', 'p3_1', 'p4_1', 'p5_1', 'p6_1', 'p7_1', 'p8_1', 'p9_1',
+                             'p10_1', 'p11_1', 'p12_1', 'p13_1', 'p14_1', 'p15_1', 'p16_1', 'p17_1',
+                             'p18_1', 'p19_1', 'p20_1', 'p21_1', 'p22_1', 'p23_1', 'p24_1', 'p25_1',
+                             'p1_2', 'p2_2', 'p3_2', 'p4_2', 'p5_2', 'p6_2', 'p7_2', 'p8_2', 'p9_2',
+                             'p10_2', 'p11_2', 'p12_2', 'p13_2', 'p14_2', 'p15_2', 'p16_2', 'p17_2',
+                             'p18_2', 'p19_2', 'p20_2', 'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'
                              'gpAmp', 'gpLx', 'gpLy', 'sigF'])
 
         # fancy labels for plot purposed  for all possible fit parameters
@@ -369,6 +391,15 @@ for iterationNumber in range(len(planets)):
                                   r'$C_{10}$', r'$C_{11}$', r'$C_{12}$', r'$C_{13}$', r'$C_{14}$',
                                   r'$C_{15}$', r'$C_{16}$', r'$C_{17}$', r'$C_{18}$', r'$C_{19}$',
                                   r'$C_{20}$', r'$C_{21}$',r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$',
+                                  r'$p_{1-1}$', r'$p_{2-1}$', r'$p_{3-1}$', r'$p_{4-1}$', r'$p_{5-1}$', r'$p_{6-1}$',
+                                  r'$p_{7-1}$', r'$p_{8-1}$', r'$p_{9-1}$', r'$p_{10-1}$', r'$p_{11-1}$', r'$p_{12-1}$',
+                                  r'$p_{13-1}$', r'$p_{14-1}$', r'$p_{15-1}$', r'$p_{16-1}$', r'$p_{17-1}$', r'$p_{18-1}$',
+                                  r'$p_{19-1}$', r'$p_{20-1}$', r'$p_{21-1}$', r'$p_{22-1}$', r'$p_{23-1}$', r'$p_{24-1}$',
+                                  r'$p_{25-1}$', r'$p_{1-2}$', r'$p_{2-2}$', r'$p_{3-2}$', r'$p_{4-2}$', r'$p_{5-2}$',
+                                  r'$p_{6-2}$', r'$p_{7-2}$', r'$p_{8-2}$', r'$p_{9-2}$', r'$p_{10-2}$', r'$p_{11-2}$',
+                                  r'$p_{12-2}$', r'$p_{13-2}$', r'$p_{14-2}$', r'$p_{15-2}$', r'$p_{16-2}$', r'$p_{17-2}$',
+                                  r'$p_{18-2}$', r'$p_{19-2}$', r'$p_{20-2}$', r'$p_{21-2}$', r'$p_{22-2}$', r'$p_{23-2}$',
+                                  r'$p_{24-2}$', r'$p_{25-2}$',
                                   r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
 
         gparams_unsorted = np.copy(gparams)
@@ -417,7 +448,7 @@ for iterationNumber in range(len(planets)):
         # Calculate the photon noise limit
         flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
         flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
-        sigF_photon_ppm = 1/np.sqrt(np.median(flux))/np.sqrt(64-len(ignoreFrames))*1e6
+        sigF_photon_ppm = 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
 
 
@@ -430,12 +461,14 @@ for iterationNumber in range(len(planets)):
 
         if 'poly' in mode.lower():
             detecfunc = detec_models.detec_model_poly
+        elif 'pld' in mode.lower():
+            detecfunc = detec_models.detec_model_PLD
         elif 'bliss' in mode.lower():
             detecfunc = detec_models.detec_model_bliss
         elif 'gp' in mode.lower():
             detecfunc = detec_models.detec_model_GP
         else:
-            raise NotImplementedError('Only polynomial, BLISS, and GP models are currently implemented! \nmode=\''+mode+'\' does not include \'poly\', \'Poly\', \'bliss\', \'BLISS\', \'gp\', or \'GP\'.')
+            raise NotImplementedError('Only Polynomial, PLD, BLISS, and GP models are currently implemented! \nmode=\''+mode+'\' does not include \'poly\', \'Poly\', \'PLD\', \'pld\', \'bliss\', \'BLISS\', \'gp\', or \'GP\'.')
 
 
 
@@ -443,24 +476,62 @@ for iterationNumber in range(len(planets)):
 
 
         # loading full data set for BIC calculation afterwards
-        data_full = helpers.get_full_data(foldername, filenamef)
+        if 'pld' in mode.lower():
+            # get data from photometry
+            data = helpers.get_full_data(foldername+filenamef, mode)
+            # Keeping P_full for chi2 on unbinned data calculation
+            P_full = data[0]
+            # transposing
+            P_full = P_full.T
+            P_full = P_full/np.median(np.sum(P_full, axis=0))
+            # calculate the flux by summing over P
+            flux_full = np.sum(P_full, axis=0)
+            # sigma clip the data
+            flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.clip_full_data(flux_full, [], *data[1:], nFrames, cut, ignoreFrames)
+            mid_x_full, mid_y_full = np.nanmean(xdata_full), np.nanmean(ydata_full)
+            # get Pnorm
+            Pnorm_full = P_full/flux_full
 
-        # sigma clip the data
-        flux_full, fluxerr_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.clip_full_data(*data_full, nFrames, cut, ignoreFrames)
-        mid_x_full, mid_y_full = np.nanmean(xdata_full), np.nanmean(ydata_full)
+        else:
+            # get data from photometry
+            data_full = helpers.get_full_data(foldername+filenamef, mode)
+
+            # sigma clip the data
+            flux_full, fluxerr_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.clip_full_data(*data_full, nFrames, cut, ignoreFrames)
+            mid_x_full, mid_y_full = np.nanmean(xdata_full), np.nanmean(ydata_full)
 
 
         # In[11]:
 
 
-        # Get Data
-        data = helpers.get_data(foldername+filename)
-        # Sort data
-        flux0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.time_sort_data(*data)
-        # Trim AOR
-        flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data, cut=cut)
-        # pre-calculation
-        mid_x, mid_y = np.mean(xdata), np.mean(ydata)
+        # Get Data we'll analyze
+        if 'pld' in mode.lower():
+            # Get Data
+            data = helpers.get_data(foldername+filename, mode)    
+            # Sort data
+            P_0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.time_sort_data(*data)
+            # Trim AOR
+            P, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data, cut=cut)
+            # pre-calculation
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
+            # transposing Pixel intensities and normalizing
+            P_0, P = P_0.T, P.T
+            P_0, P = P_0/np.median(np.sum(P_0, axis=0)), P/np.median(np.sum(P_0, axis=0))
+            # calculate flux by summing P
+            flux0 = np.sum(P_0, axis=0)
+            flux  = np.sum(P, axis=0)
+            # get P-hats from Deming et al. 2015
+            Pnorm_0,Pnorm = P_0/flux0, P/flux
+
+        else:
+            # Get Data
+            data = helpers.get_data(foldername+filename, mode)
+            # Sort data
+            flux0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.time_sort_data(*data)
+            # Trim AOR
+            flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data, cut=cut)
+            # pre-calculation
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
 
 
         ## FIX: peritime doesn't get made
@@ -632,9 +703,9 @@ for iterationNumber in range(len(planets)):
             signal_inputs = [flux, time, xdata, ydata, psfxw, psfyw, mode]
             detec_inputs = [flux, xdata, ydata, time, True, astro_guess]
         elif 'pld' in mode.lower():
-            #Something will need to go here
-            print('PLD not yet implemented!')
-        elif 'poly' in mode.lower():# and 'psfw' in mode.lower():
+            signal_inputs = (flux, time, Pnorm, mode)
+            detec_inputs  = (Pnorm, mode)
+        elif 'poly' in mode.lower():
             signal_inputs = [flux, time, xdata, ydata, psfxw, psfyw, mode]
             detec_inputs = [xdata, ydata, mode]
 
@@ -646,6 +717,7 @@ for iterationNumber in range(len(planets)):
         # Run a first fit on the detector parameters to get into the right ballpark
         if runMCMC:
             if not initializeWithOld and 'bliss' not in mode.lower() and 'gp' not in mode.lower():
+                # Should work for PLD and Poly
                 spyFunc0 = lambda p0_temp, inputs: np.mean((resid-detecfunc(inputs, *p0_temp))**2)
                 spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_detec))], detec_inputs, 'Nelder-Mead')
 
@@ -653,8 +725,6 @@ for iterationNumber in range(len(planets)):
                 if spyResult0.success:
                     p0[np.where(np.in1d(p0_labels,p0_detec))] = spyResult0.x
                     resid /= detecfunc(detec_inputs, *p0[np.where(np.in1d(p0_labels,p0_detec))])
-
-
 
                 # 2) get initial guess for psfw model
                 if 'psfw' in mode.lower():
@@ -1426,10 +1496,8 @@ BIC = {4}""".format(chisB, chisB/len(flux), logLB, EB, BICB)
                                                       psfxw_full, psfyw_full, mode,
                                                       astro_full, blissNBin, savepath, False)
             elif 'pld' in mode.lower():
-                #Something will need to go here
-                print('PLD not yet implemented!')
-            elif 'gp' in mode.lower():
-                signal_inputs_full = [flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode]
+                signal_inputs_full = (flux_full, time_full, Pnorm_full, mode)
+                detec_inputs  = (Pnorm, mode)
             elif 'poly' in mode.lower():# and 'psfw' in mode.lower():
                 signal_inputs_full = (flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode)
 

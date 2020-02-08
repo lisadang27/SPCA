@@ -41,46 +41,97 @@ class signal_params(object):
         self.D     = D
         self.r2    = rp
         self.r2off = 0.0
-        self.c1    = 1.0
-        self.c2    = 0.0
-        self.c3    = 0.0
-        self.c4    = 0.0
-        self.c5    = 0.0
-        self.c6    = 0.0
-        self.c7    = 0.0
-        self.c8    = 0.0
-        self.c9    = 0.0
-        self.c10   = 0.0
-        self.c11   = 0.0
-        self.c12   = 0.0
-        self.c15   = 0.0
-        self.c13   = 0.0
-        self.c14   = 0.0
-        self.c16   = 0.0
-        self.c17   = 0.0
-        self.c18   = 0.0
-        self.c19   = 0.0
-        self.c20   = 0.0
-        self.c21   = 0.0
-        self.d1    = 1.0
-        self.d2    = 0.0
-        self.d3    = 0.0
-        self.s1    = 0.0
-        self.s2    = 0.0
-        self.m1    = 0.0
-        self.gpAmp = -2.
-        self.gpLx  = -2.
-        self.gpLy  = -2.
-        self.sigF  = sigF
+        self.c1    = 1.0     # Poly coeff 
+        self.c2    = 0.0     # Poly coeff 
+        self.c3    = 0.0     # Poly coeff 
+        self.c4    = 0.0     # Poly coeff 
+        self.c5    = 0.0     # Poly coeff 
+        self.c6    = 0.0     # Poly coeff 
+        self.c7    = 0.0     # Poly coeff 
+        self.c8    = 0.0     # Poly coeff 
+        self.c9    = 0.0     # Poly coeff 
+        self.c10   = 0.0     # Poly coeff 
+        self.c11   = 0.0     # Poly coeff 
+        self.c12   = 0.0     # Poly coeff 
+        self.c15   = 0.0     # Poly coeff 
+        self.c13   = 0.0     # Poly coeff 
+        self.c14   = 0.0     # Poly coeff 
+        self.c16   = 0.0     # Poly coeff 
+        self.c17   = 0.0     # Poly coeff 
+        self.c18   = 0.0     # Poly coeff 
+        self.c19   = 0.0     # Poly coeff 
+        self.c20   = 0.0     # Poly coeff 
+        self.c21   = 0.0     # Poly coeff 
+        self.d1    = 1.0     # PSF width coeff 
+        self.d2    = 0.0     # PSF width coeff 
+        self.d3    = 0.0     # PSF width coeff 
+        self.s1    = 0.0     # step function coeff 
+        self.s2    = 0.0     # step function coeff
+        self.m1    = 0.0     # tslope coeff 
+        self.p1_1  = 1.0     # PLD coefficient
+        self.p2_1  = 1.0     # PLD coefficient
+        self.p3_1  = 1.0     # PLD coefficient
+        self.p4_1  = 1.0     # PLD coefficient
+        self.p5_1  = 1.0     # PLD coefficient
+        self.p6_1  = 1.0     # PLD coefficient
+        self.p7_1  = 1.0     # PLD coefficient
+        self.p8_1  = 1.0     # PLD coefficient
+        self.p9_1  = 1.0     # PLD coefficient
+        self.p10_1 = 0.0     # PLD coefficient
+        self.p11_1 = 0.0     # PLD coefficient
+        self.p12_1 = 0.0     # PLD coefficient
+        self.p13_1 = 0.0     # PLD coefficient
+        self.p14_1 = 0.0     # PLD coefficient
+        self.p15_1 = 0.0     # PLD coefficient
+        self.p16_1 = 0.0     # PLD coefficient
+        self.p17_1 = 0.0     # PLD coefficient
+        self.p18_1 = 0.0     # PLD coefficient
+        self.p19_1 = 0.0     # PLD coefficient
+        self.p20_1 = 0.0     # PLD coefficient
+        self.p21_1 = 0.0     # PLD coefficient
+        self.p22_1 = 0.0     # PLD coefficient
+        self.p23_1 = 0.0     # PLD coefficient
+        self.p24_1 = 0.0     # PLD coefficient
+        self.p25_1 = 0.0     # PLD coefficient        
+        self.p1_2  = 0.0     # PLD coefficient
+        self.p2_2  = 0.0     # PLD coefficient
+        self.p3_2  = 0.0     # PLD coefficient
+        self.p4_2  = 0.0     # PLD coefficient
+        self.p5_2  = 0.0     # PLD coefficient
+        self.p6_2  = 0.0     # PLD coefficient
+        self.p7_2  = 0.0     # PLD coefficient
+        self.p8_2  = 0.0     # PLD coefficient
+        self.p9_2  = 0.0     # PLD coefficient
+        self.p10_2 = 0.0     # PLD coefficient
+        self.p11_2 = 0.0     # PLD coefficient
+        self.p12_2 = 0.0     # PLD coefficient
+        self.p13_2 = 0.0     # PLD coefficient
+        self.p14_2 = 0.0     # PLD coefficient
+        self.p15_2 = 0.0     # PLD coefficient
+        self.p16_2 = 0.0     # PLD coefficient
+        self.p17_2 = 0.0     # PLD coefficient
+        self.p18_2 = 0.0     # PLD coefficient
+        self.p19_2 = 0.0     # PLD coefficient
+        self.p20_2 = 0.0     # PLD coefficient
+        self.p21_2 = 0.0     # PLD coefficient
+        self.p22_2 = 0.0     # PLD coefficient
+        self.p23_2 = 0.0     # PLD coefficient
+        self.p24_2 = 0.0     # PLD coefficient
+        self.p25_2 = 0.0     # PLD coefficient
+        self.gpAmp = -2.     # GP covariance amplitude
+        self.gpLx  = -2.     # GP lengthscale in x
+        self.gpLy  = -2.     # GP lengthscale in y
+        self.sigF  = sigF    # White noise
         self.mode  = mode
         self.Tstar = None
         self.Tstar_err = None
 
-def get_data(path):
+def get_data(path, mode=''):
     """Retrieve binned data.
 
     Args:
         path (string): Full path to the data file output by photometry routine.
+        mode (string): The string specifying the detector and astrophysical model to use.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -93,26 +144,45 @@ def get_data(path):
 
     """
     
-    #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
-    xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
-    ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
-    psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
-    psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
-    
-    factor = 1/(np.median(flux))
-    flux = factor*flux
-    flux_err = factor*flux
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
+            flux_err = np.loadtxt(path, usecols=np.arange(9,18), skiprows=1)     # MJy/str
+            time     = np.loadtxt(path, usecols=[18], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[20], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[22], skiprows=1)     # pixel
+            psfxwdat = np.loadtxt(path, usecols=[24], skiprows=1)     # pixel
+            psfywdat = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
+        elif '5x5' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
+            flux_err = np.loadtxt(path, usecols=np.arange(25,50), skiprows=1)    # mJr/str
+            time     = np.loadtxt(path, usecols=[50], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[52], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[54], skiprows=1)     # pixel
+            psfxwdat = np.loadtxt(path, usecols=[56], skiprows=1)     # pixel
+            psfywdat = np.loadtxt(path, usecols=[58], skiprows=1)     # pixel
+        else:
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+    else:
+        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
+        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
+        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
+        xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
+        ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
+        psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
+        psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
+
+        factor = 1/(np.median(flux))
+        flux = factor*flux
+        flux_err = factor*flux
     return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
 
-def get_full_data(foldername, filename):
+def get_full_data(path, mode=''):
     """Retrieve unbinned data.
 
     Args:
-        foldername (string): Full path to the data file output by photometry routine.
-        filename (string): File name of the unbinned data file output by photometry routine.
+        path (string): Full path to the unbinned data file output by photometry routine.
+        mode (string): The string specifying the detector and astrophysical model to use.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -125,22 +195,43 @@ def get_full_data(foldername, filename):
 
     """
     
-    path = foldername + filename
-    #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
-    xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
-    ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
-    psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
-    psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
+            time     = np.loadtxt(path, usecols=[9], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[10], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[11], skiprows=1)     # pixel
+            psfxw    = np.loadtxt(path, usecols=[12], skiprows=1)     # pixel
+            psfyw    = np.loadtxt(path, usecols=[13], skiprows=1)     # pixel
+            
+        elif '5x5' in mode.lower():
+            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
+            time     = np.loadtxt(path, usecols=[25], skiprows=1)     # BMJD
+            xdata    = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
+            ydata    = np.loadtxt(path, usecols=[27], skiprows=1)     # pixel
+            psfxw    = np.loadtxt(path, usecols=[28], skiprows=1)     # pixel
+            psfyw    = np.loadtxt(path, usecols=[29], skiprows=1)     # pixel
+        else:
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+        
+        # FIX: Implement proper sigma clipping for PLD
+        return flux, time, xdata, ydata, psfxw, psfyw
+    else:
+        #Loading Data
+        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
+        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
+        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
+        xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
+        ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+
+        #remove bad values so that BLISS mapping will work
+        mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
+                                                      np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
+                                       np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
     
-    #remove bad values so that BLISS mapping will work
-    mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
-                                                  np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
-                                   np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
-    
-    return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
+        return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
 
 def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=np.array([])):
     """Sigma cip the unbinned data.
@@ -202,11 +293,6 @@ def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut
 
     # Ultimate Clipping
     MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
-    #FLUX  = np.ma.masked_array(FLUX, mask=MASK)
-    #XDATA = np.ma.masked_array(XDATA, mask=MASK)
-    #YDATA = np.ma.masked_array(YDATA, mask=MASK)
-    #PSFXW = np.ma.masked_array(PSFXW, mask=MASK)
-    #PSFYW = np.ma.masked_array(PSFYW, mask=MASK)
     
     #remove bad values so that BLISS mapping will work
     FLUX  = FLUX[np.logical_not(MASK)]
@@ -255,7 +341,7 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     psfxw0     = psfxw[index]
     psfyw0     = psfyw[index]
 
-    # chop off dithered-calibration AOR if requested
+    # chop off dithered-calibration AOR or any extra frames if requested
     time       = time0[cut:]
     flux       = flux0[cut:]
     flux_err   = flux_err0[cut:]
@@ -308,6 +394,18 @@ def expand_dparams(dparams, mode):
     if 'tslope' not in modeLower:
         dparams = np.append(dparams, ['m1'])
         
+    if 'pld' not in mode.lower():
+        dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(1,26)])
+        dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
+    elif 'pld' in mode.lower():
+        if 'pld1' in mode.lower():
+            if '3x3' in mode.lower():
+                dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
+            dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
+        elif 'pld2' in mode.lower() and '3x3' in mode.lower():
+            dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
+            dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(10,26)])
+        
     if 'gp' not in modeLower:
         dparams = np.append(dparams, ['gpAmp', 'gpLx', 'gpLy'])
     
@@ -337,6 +435,10 @@ def get_p0(function_params, fancy_names, dparams, obj):
         # FIX: switch to using dictionaries to cut out this instance of eval
         p0[i] = eval('obj.'+ fit_params[i])
     return p0, fit_params, fancy_labels
+
+# FIX - is this actually used anywhere?
+def get_lparams(function):
+    return inspect.getargspec(function).args
 
 # FIX - this is currently empty!!!
 def load_past_params(path):
@@ -486,6 +588,10 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
+            p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+            p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+            p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
+            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2
             gpAmp, gpLx, gpLy, sigF,
             mode, checkPhasePhis):
     """Check that the parameters are physically plausible.
@@ -514,6 +620,8 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
+        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         gpAmp (float): The natural logarithm of the GP covariance amplitude.
         gpLx (float): The natural logarithm of the GP covariance lengthscale in x.
         gpLy (float): The natural logarithm of the GP covariance lengthscale in y.
