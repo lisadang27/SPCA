@@ -576,7 +576,7 @@ for iterationNumber in range(len(planets)):
 
 
         # redefining the zero centroid position
-        if 'bliss' not in mode.lower():
+        if 'bliss' not in mode.lower() and 'pld' not in mode.lower():
             xdata -= mid_x
             ydata -= mid_y
             xdata_full -= mid_x_full
