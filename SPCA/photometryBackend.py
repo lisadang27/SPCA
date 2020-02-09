@@ -29,9 +29,13 @@ def create_folder(fullname, auto=False):
     solved = 'no'
     while(solved == 'no'):
         if not os.path.exists(fullname):
+            # Folder doesn't exist yet and can be safely written to
             os.makedirs(fullname)
             solved = 'yes'
-        else :
+        elif len(os.listdir(fullname))==0:
+            # Folder exists but is empty and can be safely written to
+            solved = 'yes'
+        else:
             if auto:
                 fullname = None
                 solved = 'yes'
@@ -47,7 +51,16 @@ def create_folder(fullname, auto=False):
                     fullname = '/'.join(fullname.split('/')[0:-1])+'/'+folder
     return fullname
 
-def run_photometry(basepath, addStack, planet, channel, subarray, AOR_snip, ignoreFrames, maskStars, photometryMethod, shape, edge, moveCentroid, radius):
+def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_snip,
+                   addStack=False, bin_data=True, bin_size=64, 
+                   ignoreFrames=None, maskStars=None,
+                   stamp_size=3,
+                   shape='Circular', edge='Exact', moveCentroid=False, radius=3):
+    
+    if ignoreFrames is None:
+        ignoreFrames = []
+    if maskStars is None:
+        maskStars = []
     
     stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
     
@@ -59,6 +72,9 @@ def run_photometry(basepath, addStack, planet, channel, subarray, AOR_snip, igno
         folder += edge+shape+"_".join(str(np.round(radius, 2)).split('.'))
         if moveCentroid:
             folder += '_movingCentroid'
+    elif photometryMethod=='PLD':
+        folder += 'PLD_'+str(int(stamp_size))+'x'+str(int(stamp_size))
+    folder += '/'
     datapath   = basepath+planet+'/data/'+channel
     
     savepath = basepath+planet+'/analysis/'+channel+'/'
@@ -89,18 +105,23 @@ def run_photometry(basepath, addStack, planet, channel, subarray, AOR_snip, igno
     # Call requested function
     if   (photometryMethod == 'Aperture'):
         APhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
-                                   save_full=save_full, save_bin=save_bin, planet=planet,
+                                   save=True, save_full=save_full,
+                                   bin_data=bin_data, bin_size=bin_size, save_bin=save_bin,
+                                   planet=planet,
                                    r=radius, shape=shape, edge=edge, plot=False, plot_name=plot_name,
                                    addStack=addStack, stackPath=stackPath, ignoreFrames=ignoreFrames,
-                                   moveCentroid=moveCentroid)
+                                   moveCentroid=moveCentroid, maskStars=maskStars)
     elif (photometryMethod == 'PSFfit'):
         PSFPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray)
     elif (photometryMethod == 'Companion'):
         CPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray, r = radius)
     elif (photometryMethod == 'PLD'):
-        PLDPhotometry.get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray)
-    elif (photometryMethod == 'Routine'):
-        Routine.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray, r = radius*2+0.5)
+        PLDPhotometry.get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
+                                           save=True, save_full=save_full,
+                                           bin_data=bin_data, bin_size=bin_size, save_bin=save_bin,
+                                           plot=False, plot_name=plot_name, planet=planet,
+                                           stamp_size=stamp_size, addStack=addStack, stackPath=stackPath,
+                                           ignoreFrames=ignoreFrames, maskStars=maskStars)
     else:
         print('Sorry,', photometryMethod, 'is not supported by this pipeline!')
         
@@ -225,6 +246,8 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
         os.makedirs(figpath)
     
     Run_list = get_fnames(datapath)
+    # Remove PLD runs from comparing photometry
+    Run_list = [Run for Run in Run_list if 'PLD' not in Run]
     Radius = np.array([float(Run_list[i].split('_')[0][-1] + '.' 
                              + Run_list[i].split('_')[1][:]) for i in range(len(Run_list))])
     Run_list = [datapath + st for st in Run_list]
