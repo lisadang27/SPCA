@@ -336,33 +336,34 @@ for iterationNumber in range(len(planets)):
             AOR_snip = f.readline().strip()
 
         mainpath   = rootpath+planet+'/analysis/'+channel+'/'
-        ignoreFrames = np.array([])
         if 'pld' in mode.lower():
-            pldIgnoreFrames = True                   # Whether or not to use the PLD photometry that ignored bad frames
-            pldAddStack = False
             foldername = mainpath
+            
+            if pldIgnoreFrames:
+                with open(mainpath+'PLD_ignoreFrames.txt') as f:
+                    line = f.readline()
+                ignoreFrames = np.array(line.strip().replace(' ','').split('=')[1].split(','))
+                if np.all(ignoreFrames==['']):
+                    ignoreFrames = np.array([]).astype(int)
+                else:
+                    ignoreFrames = ignoreFrames.astype(int)
+            else:
+                ignoreFrames = np.array([]).astype(int)
+            
             if pldAddStack:
                 foldername += 'addedStack/'
             else:
                 foldername += 'addedBlank/'
-            if pldIgnoreFrames:
-                foldername += 'ignore/'
-            else:
+            if len(ignoreFrames)==0:
                 foldername += 'noIgnore/'
+            else:
+                foldername += 'ignore/'
             if channel=='ch2':
                 foldername += '4um'
             else:
                 foldername += '3um'
             foldername += 'PLD_'
             foldername += mode.split('x')[0][-1]+'x'+mode.split('x')[1][0]+'/'
-
-            with open(mainpath+'PLD_ignoreFrames.txt') as f:
-                line = f.readline()
-            ignoreFrames = np.array(line.strip().replace(' ','').split('=')[1].split(','))
-            if np.all(ignoreFrames==['']):
-                ignoreFrames = np.array([]).astype(int)
-            else:
-                ignoreFrames = ignoreFrames.astype(int)
 
         else:
             phoption = ''
