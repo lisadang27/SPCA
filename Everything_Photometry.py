@@ -12,10 +12,10 @@ from SPCA import frameDiagnosticsBackend
 from SPCA import photometryBackend
 
 # The number of CPU threads you want to use for running photometry methods in parallel
-ncpu = 7
+ncpu = 23
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 # WASP-103b is full-frame, 55Cnce is going to be tough
 
 #folder containing data from each planet
