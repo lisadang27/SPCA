@@ -126,12 +126,13 @@ class signal_params(object):
         self.Tstar = None
         self.Tstar_err = None
 
-def get_data(path, mode=''):
+def get_data(path, mode='', cut=0):
     """Retrieve binned data.
 
     Args:
         path (string): Full path to the data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
+        cut (int): Number of data points to remove from the start of the arrays.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -146,43 +147,78 @@ def get_data(path, mode=''):
     
     if 'pld' in mode.lower():
         if '3x3' in mode.lower():
-            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
-            flux_err = np.loadtxt(path, usecols=np.arange(9,18), skiprows=1)     # MJy/str
-            time     = np.loadtxt(path, usecols=[18], skiprows=1)     # BMJD
-            xdata    = np.loadtxt(path, usecols=[20], skiprows=1)     # pixel
-            ydata    = np.loadtxt(path, usecols=[22], skiprows=1)     # pixel
-            psfxwdat = np.loadtxt(path, usecols=[24], skiprows=1)     # pixel
-            psfywdat = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
+            npix = 3
         elif '5x5' in mode.lower():
-            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
-            flux_err = np.loadtxt(path, usecols=np.arange(25,50), skiprows=1)    # mJr/str
-            time     = np.loadtxt(path, usecols=[50], skiprows=1)     # BMJD
-            xdata    = np.loadtxt(path, usecols=[52], skiprows=1)     # pixel
-            ydata    = np.loadtxt(path, usecols=[54], skiprows=1)     # pixel
-            psfxwdat = np.loadtxt(path, usecols=[56], skiprows=1)     # pixel
-            psfywdat = np.loadtxt(path, usecols=[58], skiprows=1)     # pixel
+            npix = 5
         else:
+            # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            return
+        flux     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
+        
+        order = np.argsort(time)
+        flux = flux[order][cut:]
+        time = time[order][cut:]
+        
+        mask = np.logical_not(sigma_clip(flux.sum(axis=1), sigma=6).mask)
+        
+        flux = flux[mask]
+        time = time[mask]
+        
+        return flux, time
     else:
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
         time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
         xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
         ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
-        psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
-        psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
+        psfxw = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
+        psfyw = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
 
         factor = 1/(np.median(flux))
         flux = factor*flux
         flux_err = factor*flux
-    return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
+        
+        order = np.argsort(time)
+        flux = flux[order][cut:]
+        flux_err = flux_err[order][cut:]
+        time = time[order][cut:]
+        xdata = xdata[order][cut:]
+        ydata = ydata[order][cut:]
+        psfxw = psfxw[order][cut:]
+        psfyw = psfyw[order][cut:]
+        
+        # Sigma clip per data cube (also masks invalids)
+        FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+        FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+        XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+        YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+        PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+        PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+        
+        # Ultimate Clipping
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
+        mask = np.logical_not(MASK)
+        
+        flux = flux[mask]
+        flux_err = flux_err[mask]
+        time = time[mask]
+        xdata = xdata[mask]
+        ydata = ydata[mask]
+        psfxw = psfxw[mask]
+        psfyw = psfyw[mask]
+        
+        return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
-def get_full_data(path, mode=''):
+def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
     """Retrieve unbinned data.
 
     Args:
         path (string): Full path to the unbinned data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
+        cut (int): Number of data points to remove from the start of the arrays.
+        ignore (ndarray): Array specifying which frames were found to be bad and should be ignored.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -197,25 +233,36 @@ def get_full_data(path, mode=''):
     
     if 'pld' in mode.lower():
         if '3x3' in mode.lower():
-            flux     = np.loadtxt(path, usecols=np.arange(9), skiprows=1)        # MJy/str
-            time     = np.loadtxt(path, usecols=[9], skiprows=1)     # BMJD
-            xdata    = np.loadtxt(path, usecols=[10], skiprows=1)     # pixel
-            ydata    = np.loadtxt(path, usecols=[11], skiprows=1)     # pixel
-            psfxw    = np.loadtxt(path, usecols=[12], skiprows=1)     # pixel
-            psfyw    = np.loadtxt(path, usecols=[13], skiprows=1)     # pixel
-            
+            npix = 3
         elif '5x5' in mode.lower():
-            flux     = np.loadtxt(path, usecols=np.arange(25), skiprows=1)       # mJr/str
-            time     = np.loadtxt(path, usecols=[25], skiprows=1)     # BMJD
-            xdata    = np.loadtxt(path, usecols=[26], skiprows=1)     # pixel
-            ydata    = np.loadtxt(path, usecols=[27], skiprows=1)     # pixel
-            psfxw    = np.loadtxt(path, usecols=[28], skiprows=1)     # pixel
-            psfyw    = np.loadtxt(path, usecols=[29], skiprows=1)     # pixel
+            npix = 5
         else:
+            # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            return
+        flux     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
         
-        # FIX: Implement proper sigma clipping for PLD
-        return flux, time, xdata, ydata, psfxw, psfyw
+        order = np.argsort(time)
+        flux = flux[order][int(cut*nFrames):]
+        time = time[order][int(cut*nFrames):]
+        
+        # Clip bad frames
+        ind = np.array([])
+        for i in ignore:
+            ind = np.append(ind, np.arange(i, len(flux), nFrames))
+        mask_id = np.zeros(len(flux))
+        mask_id[ind.astype(int)] = 1
+        mask_id = np.ma.make_mask(mask_id)
+
+        # Ultimate Clipping
+        MASK  = sigma_clip(flux.sum(axis=1), sigma=6).mask + mask_id
+        mask = np.logical_not(MASK)
+        
+        flux = flux[mask]
+        time = time[mask]
+        
+        return flux, time
     else:
         #Loading Data
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
@@ -226,130 +273,44 @@ def get_full_data(path, mode=''):
         psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
         psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
 
-        #remove bad values so that BLISS mapping will work
-        mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
-                                                      np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
-                                       np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
+        order = np.argsort(time)
+        flux = flux[order][int(cut*nFrames):]
+        flux_err = flux_err[order][int(cut*nFrames):]
+        time = time[order][int(cut*nFrames):]
+        xdata = xdata[order][int(cut*nFrames):]
+        ydata = ydata[order][int(cut*nFrames):]
+        psfxw = psfxw[order][int(cut*nFrames):]
+        psfyw = psfyw[order][int(cut*nFrames):]
+        
+        # Sigma clip per data cube (also masks invalids)
+        FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+        FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+        XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+        YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+        PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+        PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+        
+        # Clip bad frames
+        ind = np.array([])
+        for i in ignore:
+            ind = np.append(ind, np.arange(i, len(flux), nFrames))
+        mask_id = np.zeros(len(flux))
+        mask_id[ind.astype(int)] = 1
+        mask_id = np.ma.make_mask(mask_id)
     
-        return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
-
-def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=np.array([])):
-    """Sigma cip the unbinned data.
-
-    Args:
-        flux (ndarray): Flux extracted for each frame.
-        flux_err (ndarray): uncertainty on the flux for each frame.
-        time (ndarray): Time stamp for each frame.
-        xdata (ndarray): X-coordinate of the centroid for each frame.
-        ydata (ndarray): Y-coordinate of the centroid for each frame.
-        psfwx (ndarray): X-width of the target's PSF for each frame.
-        psfwy (ndarray): Y-width of the target's PSF for each frame.
-
-    Returns:
-        tuple: flux (ndarray; Flux extracted for each frame),
-            flux_err (ndarray; uncertainty on the flux for each frame),
-            time (ndarray; Time stamp for each frame),
-            xdata (ndarray; X-coordinate of the centroid for each frame),
-            ydata (ndarray; Y-coordinate of the centroid for each frame), 
-            psfwx (ndarray; X-width of the target's PSF for each frame), 
-            psfwy (ndarray; Y-width of the target's PSF for each frame).
-
-    """
+        # Ultimate Clipping
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
+        mask = np.logical_not(MASK)
     
-    # chronological order
-    index = np.argsort(TIME)
-    FLUX  = FLUX[index]
-    FERR  = FERR[index]
-    TIME  = TIME[index]
-    XDATA = XDATA[index]
-    YDATA = YDATA[index]
-    PSFXW = PSFXW[index]
-    PSFYW = PSFYW[index]
-
-    # crop the first AOR (if asked)
-    FLUX  = FLUX[int(cut*nFrames):]
-    FERR  = FERR[int(cut*nFrames):]
-    TIME  = TIME[int(cut*nFrames):]
-    XDATA = XDATA[int(cut*nFrames):]
-    YDATA = YDATA[int(cut*nFrames):]
-    PSFXW = PSFXW[int(cut*nFrames):]
-    PSFYW = PSFYW[int(cut*nFrames):]
-
-    # Sigma clip per data cube (also masks invalids)
-    FLUX_clip  = sigma_clip(FLUX, sigma=6, maxiters=1)
-    FERR_clip  = sigma_clip(FERR, sigma=6, maxiters=1)
-    XDATA_clip = sigma_clip(XDATA, sigma=6, maxiters=1)
-    YDATA_clip = sigma_clip(YDATA, sigma=3.5, maxiters=1)
-    PSFXW_clip = sigma_clip(PSFXW, sigma=6, maxiters=1)
-    PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, maxiters=1)
-
-    # Clip bad frames
-    ind = np.array([])
-    for i in ignore:
-        ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
-    mask_id = np.zeros(len(FLUX))
-    mask_id[ind.astype(int)] = 1
-    mask_id = np.ma.make_mask(mask_id)
-
-    # Ultimate Clipping
-    MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
+        flux = flux[mask]
+        flux_err = flux_err[mask]
+        time = time[mask]
+        xdata = xdata[mask]
+        ydata = ydata[mask]
+        psfxw = psfxw[mask]
+        psfyw = psfyw[mask]
     
-    #remove bad values so that BLISS mapping will work
-    FLUX  = FLUX[np.logical_not(MASK)]
-    FERR  = FERR[np.logical_not(MASK)]
-    TIME  = TIME[np.logical_not(MASK)]
-    XDATA = XDATA[np.logical_not(MASK)]
-    YDATA = YDATA[np.logical_not(MASK)]
-    PSFXW = PSFXW[np.logical_not(MASK)]
-    PSFYW = PSFYW[np.logical_not(MASK)]
-
-    # normalizing the flux
-    FERR  = FERR/np.ma.median(FLUX)
-    FLUX  = FLUX/np.ma.median(FLUX)
-    return FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW
-
-def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
-    """Sort the data in time and cut off any bad data at the start of the observations (e.g. ditered AOR).
-
-    Args:
-        flux (ndarray): Flux extracted for each frame.
-        flux_err (ndarray): uncertainty on the flux for each frame.
-        time (ndarray): Time stamp for each frame.
-        xdata (ndarray): X-coordinate of the centroid for each frame.
-        ydata (ndarray): Y-coordinate of the centroid for each frame.
-        psfwx (ndarray): X-width of the target's PSF for each frame.
-        psfwy (ndarray): Y-width of the target's PSF for each frame.
-
-    Returns:
-        tuple: flux (ndarray; Flux extracted for each frame),
-            flux_err (ndarray; uncertainty on the flux for each frame),
-            time (ndarray; Time stamp for each frame),
-            xdata (ndarray; X-coordinate of the centroid for each frame),
-            ydata (ndarray; Y-coordinate of the centroid for each frame), 
-            psfwx (ndarray; X-width of the target's PSF for each frame), 
-            psfwy (ndarray; Y-width of the target's PSF for each frame).
-
-    """
-    
-    # sorting chronologically
-    index      = np.argsort(time)
-    time0      = time[index]
-    flux0      = flux[index]
-    flux_err0  = flux_err[index]
-    xdata0     = xdata[index]
-    ydata0     = ydata[index]
-    psfxw0     = psfxw[index]
-    psfyw0     = psfyw[index]
-
-    # chop off dithered-calibration AOR or any extra frames if requested
-    time       = time0[cut:]
-    flux       = flux0[cut:]
-    flux_err   = flux_err0[cut:]
-    xdata      = xdata0[cut:]
-    ydata      = ydata0[cut:]
-    psfxw      = psfxw0[cut:]
-    psfyw      = psfyw0[cut:]
-    return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+        return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def expand_dparams(dparams, mode):
     """Add any implicit dparams given the mode (e.g. GP parameters if using a Polynomial model).
@@ -436,8 +397,7 @@ def get_p0(function_params, fancy_names, dparams, obj):
         p0[i] = eval('obj.'+ fit_params[i])
     return p0, fit_params, fancy_labels
 
-# FIX - is this actually used anywhere?
-def get_lparams(function):
+def get_lambdaparams(function):
     return inspect.getargspec(function).args
 
 # FIX - this is currently empty!!!
@@ -591,7 +551,7 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
             p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
             p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
             p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
-            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2
+            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
             gpAmp, gpLx, gpLy, sigF,
             mode, checkPhasePhis):
     """Check that the parameters are physically plausible.

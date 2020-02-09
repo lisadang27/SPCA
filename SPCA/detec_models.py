@@ -213,7 +213,7 @@ def signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B
     if 'tslope' in mode.lower():
         model *= tslope(time, m1)
     
-    return astr*detec*hstep*tcurve
+    return model
 
 def signal_bliss(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off, 
                  d1, d2, d3, s1, s2, m1):
@@ -479,28 +479,30 @@ def detec_model_PLD(input_data, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, 
     
     Pgroup, mode = input_data # Pgroup are pixel "lightcurves" 
     
-    detec = np.array([p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1])
+    detec = [p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1]
     if '5x5' in mode.lower():
         # Add additional pixels
-        detec.append([p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1,
+        detec.extend([p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1,
                       p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1])
     if 'pld2' in mode.lower():
         # Add higher order terms for 3x3 pixels
-        detec.append([p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2])
+        detec.extend([p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2])
     if 'pld2' in mode.lower() and '5x5' in mode.lower():
         # Add higher order terms for 5x5 pixels
-        detec.append([p10_2, p11_2, p12_2, p13_2, p14_2, p15_2, p16_2, p17_2,
+        detec.extend([p10_2, p11_2, p12_2, p13_2, p14_2, p15_2, p16_2, p17_2,
                       p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2])
-        
+    
+    detec = np.array(detec)
+    
     if '3x3' in mode.lower():
         npix = 9
     else:
         npix = 25
         
-    pixels = np.split(Pgroup, npix, axis=0)
+    pixels = np.array(np.split(Pgroup, npix, axis=0))[:,0,:] # Get rid of the unneccesary axis
     if 'pld2' in mode.lower():
         # Add the flux**2 terms for 2nd order PLD
-        pixels = np.append(pixels, pixels**2)
+        pixels = np.append(pixels, pixels**2, axis=0)
     
     return np.dot(detec, pixels).reshape(-1)
     

@@ -65,13 +65,13 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+minPolys = 6*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
-tryPLD1_3x3 = False                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD2_3x3 = False                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD1_5x5 = False                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryPLD2_5x5 = False                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryBliss = True                          # whether to try BLISS detector model
+tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD2_5x5 = True                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryBliss = False                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
@@ -87,7 +87,8 @@ secondOrderOffset = False                # should you use the second order sinus
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
 nFrames  = 64                            # number of frames per binned data point
 initializeWithOld = False                # initial with previous mcmc results using the same method
-
+pldIgnoreFrames = True                   # Whether or not to use the PLD photometry that ignored bad frames
+pldAddStack = False                      # Whether or not to use the PLD photometry that used background correction stacks
 
 #non-unity multiplicative factors if you have dilution from a nearby companion
 compFactors = np.ones(len(planets))
@@ -335,11 +336,39 @@ for iterationNumber in range(len(planets)):
             AOR_snip = f.readline().strip()
 
         mainpath   = rootpath+planet+'/analysis/'+channel+'/'
-        phoption = ''
         ignoreFrames = np.array([])
-        rms = None
-        with open(mainpath+'bestPhOption.txt') as f:
-            lines = f.readlines()
+        if 'pld' in mode.lower():
+            pldIgnoreFrames = True                   # Whether or not to use the PLD photometry that ignored bad frames
+            pldAddStack = False
+            foldername = mainpath
+            if pldAddStack:
+                foldername += 'addedStack/'
+            else:
+                foldername += 'addedBlank/'
+            if pldIgnoreFrames:
+                foldername += 'ignore/'
+            else:
+                foldername += 'noIgnore/'
+            if channel=='ch2':
+                foldername += '4um'
+            else:
+                foldername += '3um'
+            foldername += 'PLD_'
+            foldername += mode.split('x')[0][-1]+'x'+mode.split('x')[1][0]+'/'
+
+            with open(mainpath+'PLD_ignoreFrames.txt') as f:
+                line = f.readline()
+            ignoreFrames = np.array(line.strip().replace(' ','').split('=')[1].split(','))
+            if np.all(ignoreFrames==['']):
+                ignoreFrames = np.array([]).astype(int)
+            else:
+                ignoreFrames = ignoreFrames.astype(int)
+
+        else:
+            phoption = ''
+            rms = None
+            with open(mainpath+'bestPhOption.txt') as f:
+                lines = f.readlines()
             for i in range(len(lines)):
                 if phoption=='' and lines[i][0]=='/':
                     foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
@@ -380,7 +409,7 @@ for iterationNumber in range(len(planets)):
                              'p18_1', 'p19_1', 'p20_1', 'p21_1', 'p22_1', 'p23_1', 'p24_1', 'p25_1',
                              'p1_2', 'p2_2', 'p3_2', 'p4_2', 'p5_2', 'p6_2', 'p7_2', 'p8_2', 'p9_2',
                              'p10_2', 'p11_2', 'p12_2', 'p13_2', 'p14_2', 'p15_2', 'p16_2', 'p17_2',
-                             'p18_2', 'p19_2', 'p20_2', 'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2'
+                             'p18_2', 'p19_2', 'p20_2', 'p21_2', 'p22_2', 'p23_2', 'p24_2', 'p25_2',
                              'gpAmp', 'gpLx', 'gpLy', 'sigF'])
 
         # fancy labels for plot purposed  for all possible fit parameters
@@ -445,18 +474,24 @@ for iterationNumber in range(len(planets)):
             rawImage.close()
         breaks = np.sort(breaks)[1:]
 
+        
         # Calculate the photon noise limit
-        flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
-        # FIX: I'm pretty sure I should divide by this instead!
+        if 'pld' in mode.lower():
+            if '3x3' in mode.lower():
+                npix = 3
+            elif '5x5' in mode.lower():
+                npix = 5
+            flux = np.loadtxt(foldername+filename, usecols=list(np.arange(npix**2).astype(int)), skiprows=1)     # mJr/str
+            flux = np.sum(flux, axis=1)
+        else:
+            flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
+        # FIX: Check that I'm calculating this properly!
         flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
         sigF_photon_ppm = 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
 
-
-        # # Everything below is now automated
-
-        # In[8]:
-
+        
+        
 
         signalfunc = detec_models.signal
 
@@ -478,43 +513,28 @@ for iterationNumber in range(len(planets)):
 
         # loading full data set for BIC calculation afterwards
         if 'pld' in mode.lower():
-            # get data from photometry
-            data = helpers.get_full_data(foldername+filenamef, mode)
-            # Keeping P_full for chi2 on unbinned data calculation
-            P_full = data[0]
+            # get data from unbinned photometry for chi2 on unbinned data calculation later
+            P_full, time_full = helpers.get_full_data(foldername+filenamef, mode, cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # transposing
             P_full = P_full.T
+            # Divide each stamp by the median stamp sum
             P_full = P_full/np.median(np.sum(P_full, axis=0))
             # calculate the flux by summing over P
             flux_full = np.sum(P_full, axis=0)
-            # sigma clip the data
-            flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.clip_full_data(flux_full, [], *data[1:], nFrames, cut, ignoreFrames)
-            mid_x_full, mid_y_full = np.nanmean(xdata_full), np.nanmean(ydata_full)
             # get Pnorm
             Pnorm_full = P_full/flux_full
 
         else:
             # get data from photometry
-            data_full = helpers.get_full_data(foldername+filenamef, mode)
+            flux_full, fluxerr_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.get_full_data(foldername+filenamef, mode, cut=cut, nFrames=nFrames, ignore=ignoreFrames)
 
-            # sigma clip the data
-            flux_full, fluxerr_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full = helpers.clip_full_data(*data_full, nFrames, cut, ignoreFrames)
             mid_x_full, mid_y_full = np.nanmean(xdata_full), np.nanmean(ydata_full)
-
-
-        # In[11]:
-
 
         # Get Data we'll analyze
         if 'pld' in mode.lower():
             # Get Data
-            data = helpers.get_data(foldername+filename, mode)    
-            # Sort data
-            P_0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.time_sort_data(*data)
-            # Trim AOR
-            P, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data, cut=cut)
-            # pre-calculation
-            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
+            P_0, time0 = helpers.get_data(foldername+filename, mode)
+            P, time = helpers.get_data(foldername+filename, mode, cut=cut)
             # transposing Pixel intensities and normalizing
             P_0, P = P_0.T, P.T
             P_0, P = P_0/np.median(np.sum(P_0, axis=0)), P/np.median(np.sum(P_0, axis=0))
@@ -524,28 +544,25 @@ for iterationNumber in range(len(planets)):
             # get P-hats from Deming et al. 2015
             Pnorm_0,Pnorm = P_0/flux0, P/flux
 
+            # FIX: Add an initial PLD plot
+
         else:
             # Get Data
-            data = helpers.get_data(foldername+filename, mode)
-            # Sort data
-            flux0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.time_sort_data(*data)
-            # Trim AOR
-            flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data, cut=cut)
+            flux0, flux_err0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.get_data(foldername+filename, mode)
+            flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername+filename, mode, cut=cut)
+
             # pre-calculation
             mid_x, mid_y = np.mean(xdata), np.mean(ydata)
 
-
-        ## FIX: peritime doesn't get made
-        if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
-            # make photometry plots
-            make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
-                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath)
-            plt.close()
-        else:
-            # plot raw data
-            make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
-                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath, peritime)
-            plt.close()
+            ## FIX: peritime doesn't get made
+            if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
+                # make photometry plots
+                make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
+                                time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath)
+            else:
+                # plot raw data
+                make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
+                                time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath, peritime)
 
 
         # In[12]:
@@ -704,8 +721,8 @@ for iterationNumber in range(len(planets)):
             signal_inputs = [flux, time, xdata, ydata, psfxw, psfyw, mode]
             detec_inputs = [flux, xdata, ydata, time, True, astro_guess]
         elif 'pld' in mode.lower():
-            signal_inputs = (flux, time, Pnorm, mode)
-            detec_inputs  = (Pnorm, mode)
+            signal_inputs = [flux, time, Pnorm, mode]
+            detec_inputs  = [Pnorm, mode]
         elif 'poly' in mode.lower():
             signal_inputs = [flux, time, xdata, ydata, psfxw, psfyw, mode]
             detec_inputs = [xdata, ydata, mode]
@@ -723,9 +740,8 @@ for iterationNumber in range(len(planets)):
                 spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_detec))], detec_inputs, 'Nelder-Mead')
 
                 # replace p0 with new detector coefficient values
-                if spyResult0.success:
-                    p0[np.where(np.in1d(p0_labels,p0_detec))] = spyResult0.x
-                    resid /= detecfunc(detec_inputs, *p0[np.where(np.in1d(p0_labels,p0_detec))])
+                p0[np.where(np.in1d(p0_labels,p0_detec))] = spyResult0.x
+                resid /= detecfunc(detec_inputs, *p0[np.where(np.in1d(p0_labels,p0_detec))])
 
                 # 2) get initial guess for psfw model
                 if 'psfw' in mode.lower():
@@ -1528,7 +1544,7 @@ chi2 = {0}
 chi2datum = {1}
 Likelihood = {2}
 Evidence = {3}
-BIC = {4}""".format(chis, chis/len(xdata_full), logL, E, BIC)
+BIC = {4}""".format(chis, chis/len(flux_full), logL, E, BIC)
 
         with open(savepath+'EVIDENCE_'+mode+'.txt','w') as file:
             file.write(out)
@@ -1565,82 +1581,81 @@ BIC = {4}""".format(chis, chis/len(xdata_full), logL, E, BIC)
         # In[ ]:
 
 
-        # determining in-eclipse and in-transit index
+        if 'pld' not in mode.lower()
+            # determining in-eclipse and in-transit index
 
-        # generating transit model
+            # generating transit model
 
-        if 't0' in p0_labels:
-            t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
-        else:
-            t0MCMC = p0_obj.t0
-        if 'per' in p0_labels:
-            perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
-        else:
-            perMCMC = p0_obj.per
-        if 'rp' in p0_labels:
-            rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
-        else:
-            rpMCMC = p0_obj.rp
-        if 'a' in p0_labels:
-            aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
-        else:
-            aMCMC = p0_obj.a
-        if 'inc' in p0_labels:
-            incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
-        else:
-            incMCMC = p0_obj.inc
-        if 'ecosw' in p0_labels:
-            ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
-        else:
-            ecoswMCMC = p0_obj.ecosw
-        if 'esinw' in p0_labels:
-            esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
-        else:
-            esinwMCMC = p0_obj.esinw
-        if 'q1' in p0_labels:
-            q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
-        else:
-            q1MCMC = p0_obj.q1
-        if 'q2' in p0_labels:
-            q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
-        else:
-            q2MCMC = p0_obj.q2
-        if 'fp'in p0_labels:
-            fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
-        else:
-            fpMCMC = p0_obj.fp
+            if 't0' in p0_labels:
+                t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
+            else:
+                t0MCMC = p0_obj['t0']
+            if 'per' in p0_labels:
+                perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+            else:
+                perMCMC = p0_obj['per']
+            if 'rp' in p0_labels:
+                rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+            else:
+                rpMCMC = p0_obj['rp']
+            if 'a' in p0_labels:
+                aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+            else:
+                aMCMC = p0_obj['a']
+            if 'inc' in p0_labels:
+                incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
+            else:
+                incMCMC = p0_obj['inc']
+            if 'ecosw' in p0_labels:
+                ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
+            else:
+                ecoswMCMC = p0_obj['ecosw']
+            if 'esinw' in p0_labels:
+                esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
+            else:
+                esinwMCMC = p0_obj['esinw']
+            if 'q1' in p0_labels:
+                q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
+            else:
+                q1MCMC = p0_obj['q1']
+            if 'q2' in p0_labels:
+                q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
+            else:
+                q2MCMC = p0_obj['q2']
+            if 'fp'in p0_labels:
+                fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
+            else:
+                fpMCMC = p0_obj['fp']
 
-        eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
-        wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
-        u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
-        u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
+            eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
+            wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
+            u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
+            u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
 
-        trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
-                                                             aMCMC, incMCMC, eccMCMC, wMCMC,
-                                                             u1MCMC, u2MCMC)
-        # generating secondary eclipses model
-        eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
-                                     fpMCMC, t_sec)
+            trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
+                                                                 aMCMC, incMCMC, eccMCMC, wMCMC,
+                                                                 u1MCMC, u2MCMC)
+            # generating secondary eclipses model
+            eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
+                                         fpMCMC, t_sec)
 
-        # get in-transit indices
-        ind_trans  = np.where(trans!=1)
-        # get in-eclipse indices
-        ind_eclip  = np.where((eclip!=(1+fpMCMC)))
-        # seperating first and second eclipse
-        ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
-        ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
-
-
-        # In[ ]:
+            # get in-transit indices
+            ind_trans  = np.where(trans!=1)
+            # get in-eclipse indices
+            ind_eclip  = np.where((eclip!=(1+fpMCMC)))
+            # seperating first and second eclipse
+            ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
+            ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
 
 
-        residual = flux/mcmc_detec - mcmc_lightcurve
 
-        data1 = [xdata, ydata, psfxw, psfyw, flux, residual]
-        data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
-        data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
-        data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
-	
-        plotname = savepath + 'MCMC_'+mode+'_7.pdf'
-        make_plots.triangle_colors(data1, data2, data3, data4, plotname)
+            residual = flux/mcmc_detec - mcmc_lightcurve
+
+            data1 = [xdata, ydata, psfxw, psfyw, flux, residual]
+            data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
+            data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
+            data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
+
+            plotname = savepath + 'MCMC_'+mode+'_7.pdf'
+            make_plots.triangle_colors(data1, data2, data3, data4, plotname)
 
