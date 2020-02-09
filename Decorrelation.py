@@ -76,8 +76,8 @@ tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
-ncpu = 24                                # The number of cpu threads to be used when running MCMC
-runMCMC = False                          # whether to run MCMC or just load-in past results
+ncpu = 23                                # The number of cpu threads to be used when running MCMC
+runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps1 = 1e5                      # number of steps to use for the first mcmc burn-in (only used if not doing GP)
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
@@ -1581,7 +1581,7 @@ BIC = {4}""".format(chis, chis/len(flux_full), logL, E, BIC)
         # In[ ]:
 
 
-        if 'pld' not in mode.lower()
+        if 'pld' not in mode.lower():
             # determining in-eclipse and in-transit index
 
             # generating transit model
