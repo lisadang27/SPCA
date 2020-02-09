@@ -447,6 +447,7 @@ for iterationNumber in range(len(planets)):
 
         # Calculate the photon noise limit
         flux = np.loadtxt(foldername+filename, usecols=[0], skiprows=1)     # mJr/str
+        # FIX: I'm pretty sure I should divide by this instead!
         flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
         sigF_photon_ppm = 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
