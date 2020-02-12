@@ -125,6 +125,27 @@ class signal_params(object):
         self.mode  = mode
         self.Tstar = None
         self.Tstar_err = None
+        
+        # labels for all the possible fit parameters
+        self.params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
+                             'A', 'B', 'C', 'D', 'r2', 'r2off'])
+        
+        self.params = np.append(self.params, ['c'+str(i) for i in range(1,22)])
+        self.params = np.append(self.params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
+        self.params = np.append(self.params, ['p'+str(i)+'_1' for i in range(1,26)])
+        self.params = np.append(self.params, ['p'+str(i)+'_2' for i in range(1,26)])
+        self.params = np.append(self.params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
+
+        # fancy labels for plot purposed  for all possible fit parameters
+        self.fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
+                                       r'$e \cos(\omega)$', r'$e \sin(\omega)$', r'$q_1$', r'$q_2$', r'$f_p$', r'$A$', r'$B$',
+                                       r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
+        self.fancyParams = np.append(self.fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
+        self.fancyParams = np.append(self.fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
+        self.fancyParams = np.append(self.fancyParams, ['$p_{'+str(i)+'-1}$' for i in range(1,22)])
+        self.fancyParams = np.append(self.fancyParams, ['$p_{'+str(i)+'-2}$' for i in range(1,22)])
+        self.fancyParams = np.append(self.fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
+        
 
 def get_data(path, mode='', cut=0):
     """Retrieve binned data.
@@ -154,19 +175,29 @@ def get_data(path, mode='', cut=0):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        flux     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
         time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
         
         order = np.argsort(time)
-        flux = flux[order][cut:]
+        stamp = stamp[order][cut:]
         time = time[order][cut:]
         
-        mask = np.logical_not(sigma_clip(flux.sum(axis=1), sigma=6).mask)
+        mask = np.logical_not(sigma_clip(stamp.sum(axis=1), sigma=6).mask)
         
-        flux = flux[mask]
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
         time = time[mask]
         
-        return flux, time
+        stamp /= np.median(np.sum(stamp, axis=0))
+        
+        # Could replace this with aperture photometry flux instead if we wanted
+        flux = np.sum(stamp, axis=0)
+        
+        #Normalize stamp pixel values by the sum of the stamp
+        stamp /= flux
+        
+        return stamp, flux, time
+    
     else:
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
@@ -208,7 +239,13 @@ def get_data(path, mode='', cut=0):
         ydata = ydata[mask]
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
-        
+    
+        # redefining the zero centroid position
+        if 'bliss' not in mode.lower():
+            mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
+            xdata -= mid_x
+            ydata -= mid_y
+    
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
@@ -240,18 +277,18 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        flux     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
         time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
         
         order = np.argsort(time)
-        flux = flux[order][int(cut*nFrames):]
+        stamp = flux[order][int(cut*nFrames):]
         time = time[order][int(cut*nFrames):]
         
         # Clip bad frames
         ind = np.array([])
         for i in ignore:
-            ind = np.append(ind, np.arange(i, len(flux), nFrames))
-        mask_id = np.zeros(len(flux))
+            ind = np.append(ind, np.arange(i, len(stamp), nFrames))
+        mask_id = np.zeros(len(stamp))
         mask_id[ind.astype(int)] = 1
         mask_id = np.ma.make_mask(mask_id)
 
@@ -259,10 +296,20 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         MASK  = sigma_clip(flux.sum(axis=1), sigma=6).mask + mask_id
         mask = np.logical_not(MASK)
         
-        flux = flux[mask]
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
         time = time[mask]
         
-        return flux, time
+        stamp /= np.median(np.sum(stamp, axis=0))
+        
+        # Could replace this with aperture photometry flux instead if we wanted
+        flux = np.sum(stamp, axis=0)
+        
+        #Normalize stamp pixel values by the sum of the stamp
+        stamp /= flux
+        
+        return stamp, flux, time
+    
     else:
         #Loading Data
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
@@ -309,6 +356,12 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         ydata = ydata[mask]
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
+        
+        # redefining the zero centroid position
+        if 'bliss' not in mode.lower():
+            mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
+            xdata -= mid_x
+            ydata -= mid_y
     
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
@@ -373,12 +426,10 @@ def expand_dparams(dparams, mode):
     return dparams
 
 
-def get_p0(function_params, fancy_names, dparams, obj):
+def get_p0(dparams, obj):
     """Initialize the p0 variable to the defaults.
 
     Args:
-        function_params (ndarray): Array of strings listing all parameters required by a function.
-        fancy_names (ndarray): Array of fancy (LaTeX or nicely formatted) strings labelling each parameter for plots.
         dparams (ndarray): A list of strings specifying which parameters shouldn't be fit.
         obj (object): An object containing the default values for all fittable parameters. #FIX: change this to dict later
 
@@ -389,6 +440,9 @@ def get_p0(function_params, fancy_names, dparams, obj):
     
     """
     
+    function_params = p0_obj.params
+    fancy_names = p0_obj.fancyParams
+    
     fit_params = np.array([sa for sa in function_params if not any(sb in sa for sb in dparams)])
     fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not any(sb in function_params[i] for sb in dparams)])
     p0 = np.zeros(len(fit_params),dtype=float)
@@ -398,7 +452,18 @@ def get_p0(function_params, fancy_names, dparams, obj):
     return p0, fit_params, fancy_labels
 
 def get_lambdaparams(function):
-    return inspect.getargspec(function).args
+    return inspect.getargspec(function).args[1:]
+
+def get_fitted_params(function, dparams):
+    if function.__name__=='detec_model_GP':
+        if 'sigF' in dparams:
+            params = []
+        else:
+            params = ['sigF']
+    else:
+        params = get_lambdaparams(function)
+        params = [param for param in params if param not in dparams]
+    return params
 
 # FIX - this is currently empty!!!
 def load_past_params(path):
@@ -481,7 +546,32 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     exec(mystr)
     if debug:
         print(mystr)
+        print()
     return dynamic_funk
+
+def lnprior_gaussian(p0, priorInds, priors, errs):
+    prior = 0
+    for i in range(len(priorInds)):
+        prior -= 0.5*(((p0[priorInds[i]] - priors[i])/errs[i])**2.)
+    return prior
+
+def lnprior_uniform(p0, priorInds, limits):
+    if priorInds == []:
+        return 0
+    elif np.any(np.logical_or(np.array(limits)[:,0] < p0[priorInds],
+                            np.array(limits)[:,1] > p0[priorInds])):
+        return -np.inf
+    else:
+        return 0
+
+def lnprior_gamma(p0, priorInd, shape, rate):
+    if priorInd is not None:
+        x = np.exp(p0[priorInd])
+        alpha = shape
+        beta = rate
+        return np.log(beta**alpha * x**(alpha-1) * np.exp(-beta*x) / np.math.factorial(alpha-1))
+    else:
+        return 0
 
 
 # FIX - is it possible to remove the assumption that we're always fitting for sigF? What if we wrap everything with super functions that lazily evaluate freezings, rather than making a lambda function at the start?
