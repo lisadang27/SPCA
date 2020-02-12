@@ -210,7 +210,8 @@ def plot_init_guess(time, data, astro, detec_full, savepath=None):
         return
     else:
         return fig
-    
+
+# FIX - add docstring for this function
 def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
     
     if nbin is not None:
@@ -263,10 +264,13 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_2.pdf'
         fig.savefig(plotname, bbox_inches='tight')
-        plt.close(fig)
-        return
+        
+    if showplot:
+        plt.show()
     else:
-        return fig
+        plt.close(fig)
+    
+    return
 
 def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
     maxbins = int(np.rint(residuals.size/minbins))

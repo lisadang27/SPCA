@@ -34,6 +34,7 @@ import urllib.request
 from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss
 
 
+# FIX: Add a docstring for this function
 def downloadExoplanetArchive():
     #Download the most recent masterfile of the best data on each target
     try:
@@ -42,6 +43,7 @@ def downloadExoplanetArchive():
         print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.')
     return
 
+# FIX: Add a docstring for this function
 def loadArchivalData(rootpath, planet, channel):
     if os.path.exists('./masterfile.ecsv'):
         data = Table.to_pandas(Table.read('./masterfile.ecsv'))
@@ -58,43 +60,43 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj  = helpers.signal_params() 
 
     # Personalize object default object values
-    p0_obj.name = planet
+    p0_obj['name'] = planet
 
     nameIndex = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0][0]
 
     if np.isfinite(data['pl_ratror'][nameIndex]):
-        p0_obj.rp = data['pl_ratror'][nameIndex]
+        p0_obj['rp'] = data['pl_ratror'][nameIndex]
     else:
-        p0_obj.rp = data['pl_rads'][nameIndex]/data['st_rad'][nameIndex]
+        p0_obj['rp'] = data['pl_rads'][nameIndex]/data['st_rad'][nameIndex]
 
     if np.isfinite(data['pl_ratdor'][nameIndex]):
-        p0_obj.a = data['pl_ratdor'][nameIndex]
-        p0_obj.a_err = np.mean([data['pl_ratdorerr1'][nameIndex],
+        p0_obj['a'] = data['pl_ratdor'][nameIndex]
+        p0_obj['a_err'] = np.mean([data['pl_ratdorerr1'][nameIndex],
                                 -data['pl_ratdorerr2'][nameIndex]])
     else:
-        p0_obj.a = data['pl_orbsmax'][nameIndex]*const.au.value/data['st_rad'][nameIndex]/const.R_sun.value
-        p0_obj.a_err = np.sqrt(
+        p0_obj['a'] = data['pl_orbsmax'][nameIndex]*const.au.value/data['st_rad'][nameIndex]/const.R_sun.value
+        p0_obj['a_err'] = np.sqrt(
             (np.mean([data['pl_orbsmaxerr1'][nameIndex], -data['pl_orbsmaxerr2'][nameIndex]])*const.au.value
              /data['st_rad'][nameIndex]/const.R_sun.value)**2
             + (data['pl_orbsmax'][nameIndex]*const.au.value
                /data['st_rad'][nameIndex]**2/const.R_sun.value
                *np.mean([data['st_raderr1'][nameIndex], -data['st_raderr2'][nameIndex]]))**2
         )
-    p0_obj.per = data['pl_orbper'][nameIndex]
-    p0_obj.per_err = np.mean([data['pl_orbpererr1'][nameIndex],
+    p0_obj['per'] = data['pl_orbper'][nameIndex]
+    p0_obj['per_err'] = np.mean([data['pl_orbpererr1'][nameIndex],
                               -data['pl_orbpererr2'][nameIndex]])
-    p0_obj.t0 = data['pl_tranmid'][nameIndex]-2.4e6-0.5
-    p0_obj.t0_err = np.mean([data['pl_tranmiderr1'][nameIndex],
+    p0_obj['t0'] = data['pl_tranmid'][nameIndex]-2.4e6-0.5
+    p0_obj['t0_err'] = np.mean([data['pl_tranmiderr1'][nameIndex],
                              -data['pl_tranmiderr2'][nameIndex]])
-    p0_obj.inc = data['pl_orbincl'][nameIndex]
-    p0_obj.inc_err = np.mean([data['pl_orbinclerr1'][nameIndex],
+    p0_obj['inc'] = data['pl_orbincl'][nameIndex]
+    p0_obj['inc_err'] = np.mean([data['pl_orbinclerr1'][nameIndex],
                               -data['pl_orbinclerr2'][nameIndex]])
-    p0_obj.Tstar = data['st_teff'][nameIndex]
-    p0_obj.Tstar_err = np.mean([data['st_tefferr1'][nameIndex],
+    p0_obj['Tstar'] = data['st_teff'][nameIndex]
+    p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
                                 -data['st_tefferr2'][nameIndex]])
     
-    p0_obj.logg = data['st_logg'][nameIndex]
-    p0_obj.feh = data['st_metfe'][nameIndex]
+    p0_obj['logg'] = data['st_logg'][nameIndex]
+    p0_obj['feh'] = data['st_metfe'][nameIndex]
 
     e = data['pl_orbeccen'][nameIndex]
     argp = data['pl_orblper'][nameIndex]
@@ -105,19 +107,20 @@ def loadArchivalData(rootpath, planet, channel):
             print('Randomly generating an argument of periastron...')
             argp = np.random.uniform(0.,360.,1)
 
-        p0_obj.ecosw = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
+        p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
         if 90 < argp < 270:
-            p0_obj.ecosw*=-1
-        p0_obj.esinw = np.tan(argp*np.pi/180.)*p0_obj.ecosw
+            p0_obj['ecosw']*=-1
+        p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
         
     # Get the stellar brightness temperature to allow us to invert Plank equation later
-    p0_obj.tstar_b, p0_obj.tstar_b_err = getTstarBright(rootpath, planet, channel, p0_obj)
+    p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
     
     return p0_obj
 
+# FIX: Add a docstring for this function
 def getTstarBright(rootpath, planet, channel, p0_obj):
     # Get the phoenix file ready to compute the stellar brightness temperature
-    teffStr = p0_obj.Tstar
+    teffStr = p0_obj['Tstar']
     if teffStr <= 7000:
         teffStr = teffStr - (teffStr%100) + np.rint((teffStr%100)/100)*100
     elif teffStr > 7000:
@@ -126,12 +129,12 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
         teffStr = 12000
     teffStr = str(int(teffStr)).zfill(5)
 
-    logg = p0_obj.logg
+    logg = p0_obj['logg']
     if np.isnan(logg):
         logg = 4.5
     logg = logg - (logg%0.5) + np.rint((logg%0.5)*2)/2.
     logg = -logg
-    feh = p0_obj.feh
+    feh = p0_obj['feh']
     if np.isnan(feh):
         feh = 0.
     feh = (feh - (feh%0.5) + np.rint((feh%0.5)*2)/2.)
@@ -192,8 +195,9 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     tstar_b = temps[np.argmin(diffs)]
     
     # Assuming uncertainty on brightness temperature is close to uncertainty on effective temperature
-    return tstar_b, p0_obj.Tstar_err
+    return tstar_b, p0_obj['Tstar_err']
 
+# FIX: Add a docstring for this function
 def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAddStack=False):
     AOR_snip = ''
     with open(rootpath+planet+'/analysis/aorSnippet.txt') as f:
@@ -280,7 +284,8 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     
     return foldername, filename, filename_full, savepath, path_params, AOR_snip, aors, ignoreFrames
 
-def find_breaks(rootpath, planet, channelaors):
+# FIX: Add a docstring for this function
+def find_breaks(rootpath, planet, channel, aors):
     breaks = []
     for aor in aors:
         rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
@@ -296,23 +301,32 @@ def find_breaks(rootpath, planet, channelaors):
     # Remove the first break which is just the start of observations
     return np.sort(breaks)[1:]
 
-def get_photon_limit(path, mode, nFrames, ignoreFrames):
+# FIX: Add a docstring for this function
+def get_photon_limit(rootpath, datapath, planet, channel, mode, aors, nFrames, ignoreFrames):
+    
+    aor = aors[-1]
+    rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
+    rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
+    with fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0]) as rawImage:
+        rawHeader = rawImage[0].header
+    
     if 'pld' in mode.lower():
         if '3x3' in mode.lower():
             npix = 3
         elif '5x5' in mode.lower():
             npix = 5
-        flux = np.loadtxt(path, usecols=list(np.arange(npix**2).astype(int)), skiprows=1)     # mJr/str
+        flux = np.loadtxt(datapath, usecols=list(np.arange(npix**2).astype(int)), skiprows=1)     # mJr/str
         flux = np.sum(flux, axis=1)
     else:
         # Calculate the photon noise limit
-        flux = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
+        flux = np.loadtxt(datapath, usecols=[0], skiprows=1)     # mJr/str
     
     # FIX: Check that I'm calculating this properly!
     flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
     
     return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
+# FIX: Add a docstring for this function
 def get_detector_functions(mode):
     signalfunc = detec_models.signal
 
@@ -329,33 +343,34 @@ def get_detector_functions(mode):
         
     return signalfunc, detecfunc
 
+# FIX: Add a docstring for this function
 def setup_gpriors(gparams, p0_obj):
     priors = []
     errs = []
     if 't0' in gparams:
-        priors.append(p0_obj.t0)
-        errs.append(p0_obj.t0_err)
+        priors.append(p0_obj['t0'])
+        errs.append(p0_obj['t0_err'])
     if 'per' in gparams:
-        priors.append(p0_obj.per)
-        errs.append(p0_obj.per_err)
+        priors.append(p0_obj['per'])
+        errs.append(p0_obj['per_err'])
     if 'a' in gparams:
-        priors.append(p0_obj.a)
-        errs.append(p0_obj.a_err)
+        priors.append(p0_obj['a'])
+        errs.append(p0_obj['a_err'])
     if 'inc' in gparams:
-        priors.append(p0_obj.inc)
-        errs.append(p0_obj.inc_err)
+        priors.append(p0_obj['inc'])
+        errs.append(p0_obj['inc_err'])
         
     return priors, errs
 
+# FIX: Add a docstring for this function
 def reload_old_fit(path_params, p0_obj):
     Table_par = np.load(path_params)                  # table of best-fit params from prev. run
-    nparams   = p0_obj.params[np.logical_not(np.in1d(p0_obj.params, dparams))]   # get the name list of params to be fitted
+    nparams   = p0_obj['params'][np.logical_not(np.in1d(p0_obj['params'], dparams))]   # get the name list of params to be fitted
     for name in nparams:
-        # FIX: Switch to a dictionary to get rid of this instance of exec
-        cmd = 'p0_obj.' + name + ' = ' + 'Table_par[\'' + name + '\'][0]'
         try:
-            exec(cmd)
+            p0_obj[name]  = Table_par[name][0]
         except Exception as e:
+            # FIX: throw a more meaningful error message
             print("type error: " + str(e))            # catch errors if you use values from fun with less params
 
     return

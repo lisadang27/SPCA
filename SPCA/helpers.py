@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 
 import inspect
+from functools import partial
 
 import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
@@ -15,137 +16,41 @@ sys.path.append(lib_path)
 import SPCA
 from SPCA import astro_models, detec_models, bliss
 
-class signal_params(object):
-    # class constructor
-    def __init__(self, name='planet', t0=0., per=1., rp=0.1,
-                 a=8., inc=90., ecosw=0.0, esinw=0.0, q1=0.01, q2=0.01,
-                 fp=0.001, A=0.1, B=0.0, C=0.0, D=0.0, sigF=0.0003, mode=''):
-        self.name    = name
-        self.t0      = t0
-        self.t0_err  = 0.0
-        self.per     = per
-        self.per_err = 0.0
-        self.rp      = rp
-        self.a       = a
-        self.a_err   = 0.0
-        self.inc     = inc
-        self.inc_err = 0.0
-        self.ecosw = ecosw
-        self.esinw = esinw
-        self.q1    = q1
-        self.q2    = q2
-        self.fp    = fp
-        self.A     = A
-        self.B     = B
-        self.C     = C
-        self.D     = D
-        self.r2    = rp
-        self.r2off = 0.0
-        self.c1    = 1.0     # Poly coeff 
-        self.c2    = 0.0     # Poly coeff 
-        self.c3    = 0.0     # Poly coeff 
-        self.c4    = 0.0     # Poly coeff 
-        self.c5    = 0.0     # Poly coeff 
-        self.c6    = 0.0     # Poly coeff 
-        self.c7    = 0.0     # Poly coeff 
-        self.c8    = 0.0     # Poly coeff 
-        self.c9    = 0.0     # Poly coeff 
-        self.c10   = 0.0     # Poly coeff 
-        self.c11   = 0.0     # Poly coeff 
-        self.c12   = 0.0     # Poly coeff 
-        self.c15   = 0.0     # Poly coeff 
-        self.c13   = 0.0     # Poly coeff 
-        self.c14   = 0.0     # Poly coeff 
-        self.c16   = 0.0     # Poly coeff 
-        self.c17   = 0.0     # Poly coeff 
-        self.c18   = 0.0     # Poly coeff 
-        self.c19   = 0.0     # Poly coeff 
-        self.c20   = 0.0     # Poly coeff 
-        self.c21   = 0.0     # Poly coeff 
-        self.d1    = 1.0     # PSF width coeff 
-        self.d2    = 0.0     # PSF width coeff 
-        self.d3    = 0.0     # PSF width coeff 
-        self.s1    = 0.0     # step function coeff 
-        self.s2    = 0.0     # step function coeff
-        self.m1    = 0.0     # tslope coeff 
-        self.p1_1  = 1.0     # PLD coefficient
-        self.p2_1  = 1.0     # PLD coefficient
-        self.p3_1  = 1.0     # PLD coefficient
-        self.p4_1  = 1.0     # PLD coefficient
-        self.p5_1  = 1.0     # PLD coefficient
-        self.p6_1  = 1.0     # PLD coefficient
-        self.p7_1  = 1.0     # PLD coefficient
-        self.p8_1  = 1.0     # PLD coefficient
-        self.p9_1  = 1.0     # PLD coefficient
-        self.p10_1 = 0.0     # PLD coefficient
-        self.p11_1 = 0.0     # PLD coefficient
-        self.p12_1 = 0.0     # PLD coefficient
-        self.p13_1 = 0.0     # PLD coefficient
-        self.p14_1 = 0.0     # PLD coefficient
-        self.p15_1 = 0.0     # PLD coefficient
-        self.p16_1 = 0.0     # PLD coefficient
-        self.p17_1 = 0.0     # PLD coefficient
-        self.p18_1 = 0.0     # PLD coefficient
-        self.p19_1 = 0.0     # PLD coefficient
-        self.p20_1 = 0.0     # PLD coefficient
-        self.p21_1 = 0.0     # PLD coefficient
-        self.p22_1 = 0.0     # PLD coefficient
-        self.p23_1 = 0.0     # PLD coefficient
-        self.p24_1 = 0.0     # PLD coefficient
-        self.p25_1 = 0.0     # PLD coefficient        
-        self.p1_2  = 0.0     # PLD coefficient
-        self.p2_2  = 0.0     # PLD coefficient
-        self.p3_2  = 0.0     # PLD coefficient
-        self.p4_2  = 0.0     # PLD coefficient
-        self.p5_2  = 0.0     # PLD coefficient
-        self.p6_2  = 0.0     # PLD coefficient
-        self.p7_2  = 0.0     # PLD coefficient
-        self.p8_2  = 0.0     # PLD coefficient
-        self.p9_2  = 0.0     # PLD coefficient
-        self.p10_2 = 0.0     # PLD coefficient
-        self.p11_2 = 0.0     # PLD coefficient
-        self.p12_2 = 0.0     # PLD coefficient
-        self.p13_2 = 0.0     # PLD coefficient
-        self.p14_2 = 0.0     # PLD coefficient
-        self.p15_2 = 0.0     # PLD coefficient
-        self.p16_2 = 0.0     # PLD coefficient
-        self.p17_2 = 0.0     # PLD coefficient
-        self.p18_2 = 0.0     # PLD coefficient
-        self.p19_2 = 0.0     # PLD coefficient
-        self.p20_2 = 0.0     # PLD coefficient
-        self.p21_2 = 0.0     # PLD coefficient
-        self.p22_2 = 0.0     # PLD coefficient
-        self.p23_2 = 0.0     # PLD coefficient
-        self.p24_2 = 0.0     # PLD coefficient
-        self.p25_2 = 0.0     # PLD coefficient
-        self.gpAmp = -2.     # GP covariance amplitude
-        self.gpLx  = -2.     # GP lengthscale in x
-        self.gpLy  = -2.     # GP lengthscale in y
-        self.sigF  = sigF    # White noise
-        self.mode  = mode
-        self.Tstar = None
-        self.Tstar_err = None
-        
-        # labels for all the possible fit parameters
-        self.params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
-                             'A', 'B', 'C', 'D', 'r2', 'r2off'])
-        
-        self.params = np.append(self.params, ['c'+str(i) for i in range(1,22)])
-        self.params = np.append(self.params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
-        self.params = np.append(self.params, ['p'+str(i)+'_1' for i in range(1,26)])
-        self.params = np.append(self.params, ['p'+str(i)+'_2' for i in range(1,26)])
-        self.params = np.append(self.params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
+# FIX: Add a docstring for this function
+def signal_params():
+    
+    p0_obj = {'name': 'planet', 't0': 0.0, 't0_err': 0.0, 'per': 1.0, 'per_err': 0.0,
+              'rp': 0.1, 'a': 8.0, 'a_err': 0.0, 'inc': 90.0, 'inc_err': 0.0, 'ecosw': 0.0,
+              'esinw': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.001, 'A': 0.1, 'B': 0.0,
+              'C': 0.0, 'D': 0.0, 'r2': 0.1, 'r2off': 0.0, 'c1': 1.0}
+    
+    p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
+    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
+    p0_obj.update(dict([['p'+str(i)+'_1', 1.0] for i in range(1,10)]))
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.0] for i in range(10,26)]))
+    p0_obj.update(dict([['p'+str(i)+'_2', 0.0] for i in range(1,26)]))
+    p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0, 'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
+    
+    params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
+                            'A', 'B', 'C', 'D', 'r2', 'r2off'])
+    params = np.append(params, ['c'+str(i) for i in range(1,22)])
+    params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
+    params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
+    params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
+    params = np.append(params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
+ 
+    fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
+                            r'$e \cos(\omega)$', r'$e \sin(\omega)$', r'$q_1$', r'$q_2$', r'$f_p$', r'$A$', r'$B$',
+                            r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
+    fancyParams = np.append(fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
+    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
+    fancyParams = np.append(fancyParams, ['$p_{'+str(i)+'-1}$' for i in range(1,26)])
+    fancyParams = np.append(fancyParams, ['$p_{'+str(i)+'-2}$' for i in range(1,26)])
+    fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
+    
+    p0_obj.update({'params': params, 'fancyParams': fancyParams})
 
-        # fancy labels for plot purposed  for all possible fit parameters
-        self.fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
-                                       r'$e \cos(\omega)$', r'$e \sin(\omega)$', r'$q_1$', r'$q_2$', r'$f_p$', r'$A$', r'$B$',
-                                       r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
-        self.fancyParams = np.append(self.fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
-        self.fancyParams = np.append(self.fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
-        self.fancyParams = np.append(self.fancyParams, ['$p_{'+str(i)+'-1}$' for i in range(1,22)])
-        self.fancyParams = np.append(self.fancyParams, ['$p_{'+str(i)+'-2}$' for i in range(1,22)])
-        self.fancyParams = np.append(self.fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
-        
+    return p0_obj
 
 def get_data(path, mode='', cut=0):
     """Retrieve binned data.
@@ -255,6 +160,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         path (string): Full path to the unbinned data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
         cut (int): Number of data points to remove from the start of the arrays.
+        nFrames (int): The number of frames that were binned together in the binned data.
         ignore (ndarray): Array specifying which frames were found to be bad and should be ignored.
 
     Returns:
@@ -440,22 +346,28 @@ def get_p0(dparams, obj):
     
     """
     
-    function_params = p0_obj.params
-    fancy_names = p0_obj.fancyParams
+    function_params = obj['params']
+    fancy_names = obj['fancyParams']
     
     fit_params = np.array([sa for sa in function_params if not any(sb in sa for sb in dparams)])
-    fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not any(sb in function_params[i] for sb in dparams)])
+    fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not function_params[i] in dparams])
     p0 = np.zeros(len(fit_params),dtype=float)
     for i in range(len(fit_params)):
-        # FIX: switch to using dictionaries to cut out this instance of eval
-        p0[i] = eval('obj.'+ fit_params[i])
+        p0[i] = obj[fit_params[i]]
     return p0, fit_params, fancy_labels
 
+# FIX: Add a docstring for this function or remove it
 def get_lambdaparams(function):
-    return inspect.getargspec(function).args[1:]
+    return inspect.getfullargspec(function).args[1:]
 
+# FIX: Add a docstring for this function
 def get_fitted_params(function, dparams):
-    if function.__name__=='detec_model_GP':
+    if type(function) == partial:
+        name = function.func.__name__
+    else:
+        name = function.__name__
+    
+    if name=='detec_model_GP':
         if 'sigF' in dparams:
             params = []
         else:
@@ -496,65 +408,24 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     
     """
     
-    module   = function.__module__
-    namefunc = function.__name__
-    # get list of params you wish to fit
-    function_params  = np.asarray(inspect.getargspec(function).args)
-    index    = np.in1d(function_params, dparams)
-    fit_params  = function_params[np.where(index==False)[0]]
-    # assign value to fixed variables
-    varstr  = ''
-    for label in function_params:
-        if label in dparams and label != 'r2':
-            tmp = 'obj.' + label
-            varstr += str(eval(tmp)) + ', '
-        elif label in dparams and label == 'r2':
-            varstr += 'rp' + ', '
-        else:
-            varstr += label + ', '
-    #remove extra ', '
-    varstr = varstr[:-2]
+    full_args  = inspect.getfullargspec(function).args[1:]
+    freeze_kwargs = dict([[dparams[i], obj[dparams[i]]] for i in range(len(dparams)) if dparams[i] in full_args])
+    dynamic_funk = partial(function, **freeze_kwargs)
     
-    parmDefaults = inspect.getargspec(function).defaults
-    if parmDefaults is not None:
-        parmDefaults = np.array(parmDefaults, dtype=str)
-        nOptionalParms = len(parmDefaults)
-        if np.all(index[-nOptionalParms:]):
-            # if all optional parameters are in dparams, remove them from this list
-            nOptionalParms = 0
-        elif np.any(index[-nOptionalParms:]):
-            parmDefaults = parmDefaults[np.logical_not(index[-nOptionalParms:])]
-            nOptionalParms = len(parmDefaults)    
-    else:
-        nOptionalParms = 0
-    
-    # generate the line to execute
-    mystr = 'global dynamic_funk; dynamic_funk = lambda '
-    for i in range(len(fit_params)-nOptionalParms):
-        mystr = mystr + fit_params[i] +', '
-    # add in any optional parameters
-    for i in range(nOptionalParms):
-        mystr = mystr + fit_params[len(fit_params)-nOptionalParms+i] + '=' + parmDefaults[i] + ', '
-    #remove extra ', '
-    mystr = mystr[:-2]
-    #mystr = mystr +': '+namefunc+'(' + varstr + ')'
-    if module == 'helpers':
-        mystr = mystr +': '+namefunc+'(' + varstr + ')'
-    else: 
-        mystr = mystr +': '+module+'.'+namefunc+'(' + varstr + ')'
-    # executing the line
-    exec(mystr)
     if debug:
-        print(mystr)
+        print(inspect.getfullargspec(dynamic_funk).args[1:])
         print()
+    
     return dynamic_funk
 
+# FIX: Add a docstring for this function
 def lnprior_gaussian(p0, priorInds, priors, errs):
     prior = 0
     for i in range(len(priorInds)):
         prior -= 0.5*(((p0[priorInds[i]] - priors[i])/errs[i])**2.)
     return prior
 
+# FIX: Add a docstring for this function
 def lnprior_uniform(p0, priorInds, limits):
     if priorInds == []:
         return 0
@@ -564,6 +435,7 @@ def lnprior_uniform(p0, priorInds, limits):
     else:
         return 0
 
+# FIX: Add a docstring for this function
 def lnprior_gamma(p0, priorInd, shape, rate):
     if priorInd is not None:
         x = np.exp(p0[priorInd])
@@ -574,14 +446,15 @@ def lnprior_gamma(p0, priorInd, shape, rate):
         return 0
 
 
-# FIX - is it possible to remove the assumption that we're always fitting for sigF? What if we wrap everything with super functions that lazily evaluate freezings, rather than making a lambda function at the start?
-def lnlike(p0, signalfunc, signal_input):
+# FIX - check if sigF in p0, otherwise use a fixed value passed in through signal_input or something
+def lnlike(p0, p0_labels, signalfunc, signal_input):
     """Evaluate the ln-likelihood at the position p0.
     
     Note: We assumine that we are always fitting for the photometric scatter (sigF). 
 
     Args:
         p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        p0_labels (ndarray): An array containing the names of the fitted parameters.
         signalfunc (function): The super function to model the astrophysical and detector functions.
         signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
 
@@ -594,20 +467,21 @@ def lnlike(p0, signalfunc, signal_input):
     mode = signal_input[-1]
     
     if 'gp' in mode.lower():
-        model, gp = signalfunc(signal_input, *p0, predictGp=False, returnGp=True)
+        model, gp = signalfunc(signal_input, predictGp=False, returnGp=True, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
         
         return gp.log_likelihood(flux-model)
     else:
         # define model
-        model = signalfunc(signal_input, *p0)
+        model = signalfunc(signal_input, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
         return loglikelihood(flux, model, p0[-1])
     
 
-def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
     """Evaluate the ln-probability of the signal function at the position p0, including priors.
 
     Args:
         p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        p0_labels (ndarray): An array containing the names of the fitted parameters.
         signalfunc (function): The super function to model the astrophysical and detector functions.
         lnpriorfunc (function): The function to evaluate the default ln-prior.
         signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
@@ -621,14 +495,14 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
     """
     
     # Evalute the prior first since this is much quicker to compute
-    lp = lnpriorfunc(*p0, signal_input[-1], checkPhasePhis)
+    lp = lnpriorfunc(mode=signal_input[-1], checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
 
     if (lnpriorcustom is not None):
         lp += lnpriorcustom(p0)
     if not np.isfinite(lp):
         return -np.inf
     else:
-        lp += lnlike(p0, signalfunc, signal_input)
+        lp += lnlike(p0, p0_labels, signalfunc, signal_input)
 
     if np.isfinite(lp):
         return lp
@@ -874,15 +748,15 @@ def getIngressDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
-        rpMCMC = p0_obj.rp
+        rpMCMC = p0_obj['rp']
     if 'a' in p0_labels:
         aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
     else:
-        aMCMC = p0_obj.a
+        aMCMC = p0_obj['a']
     if 'per' in p0_labels:
         perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
     else:
-        perMCMC = p0_obj.per
+        perMCMC = p0_obj['per']
 
     return (2*rpMCMC/(2*np.pi*aMCMC/perMCMC))/intTime
 
@@ -905,14 +779,14 @@ def getOccultationDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
-        rpMCMC = p0_obj.rp
+        rpMCMC = p0_obj['rp']
     if 'a' in p0_labels:
         aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
     else:
-        aMCMC = p0_obj.a
+        aMCMC = p0_obj['a']
     if 'per' in p0_labels:
         perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
     else:
-        perMCMC = p0_obj.per
+        perMCMC = p0_obj['per']
 
     return (2/(2*np.pi*aMCMC/perMCMC))/intTime
