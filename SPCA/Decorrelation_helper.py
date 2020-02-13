@@ -48,9 +48,10 @@ def loadArchivalData(rootpath, planet, channel):
     if os.path.exists('./masterfile.ecsv'):
         data = Table.to_pandas(Table.read('./masterfile.ecsv'))
     else:
+        # Fix: throw a proper error
         print('ERROR: No previously downloaded Exoplanet Archive data - try again when you are connected to the internet.')
         print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), './masterfile.ecsv'))
-        exit()
+        return
 
     names = np.array(data['pl_hostname'])+np.array(data['pl_letter'])
     names = np.array([name.replace(' ','').replace('-', '').replace('_','') for name in names])
@@ -62,7 +63,13 @@ def loadArchivalData(rootpath, planet, channel):
     # Personalize object default object values
     p0_obj['name'] = planet
 
-    nameIndex = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0][0]
+    indices = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0]
+    if len(indices)==0:
+        # Fix: throw a proper error
+        print('ERROR: Planet', planet, 'not found in the Exoplanet Archive - please load your own prior values.')
+        return
+    
+    nameIndex = indices[0]
 
     if np.isfinite(data['pl_ratror'][nameIndex]):
         p0_obj['rp'] = data['pl_ratror'][nameIndex]
@@ -100,6 +107,44 @@ def loadArchivalData(rootpath, planet, channel):
 
     e = data['pl_orbeccen'][nameIndex]
     argp = data['pl_orblper'][nameIndex]
+
+    if e != 0:
+
+        if not np.isfinite(argp):
+            print('Randomly generating an argument of periastron...')
+            argp = np.random.uniform(0.,360.,1)
+
+        p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
+        if 90 < argp < 270:
+            p0_obj['ecosw']*=-1
+        p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
+        
+    # Get the stellar brightness temperature to allow us to invert Plank equation later
+    p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
+    
+    return p0_obj
+
+# FIX: Add a docstring for this function
+def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh, rp_err=np.inf, a_err=np.inf, t0_err=np.inf, per_err=np.inf, inc_err=np.inf, e_err=np.inf, argp_err=np.inf, Tstar_err=np.inf):
+    # make params obj
+    p0_obj  = helpers.signal_params() 
+
+    # Personalize object default object values
+    p0_obj['name'] = planet
+    p0_obj['rp'] = rp
+    p0_obj['rp_err'] = rp_err
+    p0_obj['a'] = a
+    p0_obj['a_err'] = a_err
+    p0_obj['per'] = per
+    p0_obj['per_err'] = per_err
+    p0_obj['t0'] = t0-2.4e6-0.5
+    p0_obj['t0_err'] = t0_err
+    p0_obj['inc'] = inc
+    p0_obj['inc_err'] = inc_err
+    p0_obj['Tstar'] = Tstar
+    p0_obj['Tstar_err'] = Tstar_err
+    p0_obj['logg'] = logg
+    p0_obj['feh'] = feh
 
     if e != 0:
 
@@ -373,4 +418,128 @@ def reload_old_fit(path_params, p0_obj):
             # FIX: throw a more meaningful error message
             print("type error: " + str(e))            # catch errors if you use values from fun with less params
 
+    return
+
+def print_MCMC_results(chain, lnprobchain, p0_labels, mode, channel, p0_obj, usebestfit, savepath, compFactor=0):
+    #print the results
+
+    ndim = chain.shape[-1]
+    samples = chain.reshape((-1, ndim))
+    
+    MCMC_Results = np.array(list(map(lambda v: (v[1], v[2]-v[1], v[1]-v[0]), zip(*np.percentile(samples, [16, 50, 84],axis=0)))))
+    p0_mcmc = np.median(samples, axis=0)
+
+    # taking max lnprob params instead of median bc degeneracy
+    if usebestfit: 
+        if runMCMC:
+            maxk, maxiter = np.unravel_index((lnprobchain).argmax(), (lnprobchain).shape)
+            p0_mcmc = chain[maxk, maxiter,:]
+        else:
+            maxk, maxiter = np.unravel_index((lnprobchain).argmax(), (lnprobchain).shape)
+            p0_mcmc = chain[maxk, maxiter,:]
+        for i in range(len(p0_mcmc)):
+            MCMC_Results[i] = (p0_mcmc[i], MCMC_Results[i][1], MCMC_Results[i][2])
+
+    # adjust fp, sigF, rp, r2 for dilution due to any nearby companion
+    if np.any(p0_labels == 'fp'):
+        for i in range(3):
+            MCMC_Results[np.where(p0_labels == 'fp')[0][0]][i] *= compFactor
+    if np.any(p0_labels == 'sigF'):
+        for i in range(3):
+            MCMC_Results[np.where(p0_labels == 'sigF')[0][0]][i] *= compFactor
+    if np.any(p0_labels == 'rp'):
+        for i in range(3):
+            MCMC_Results[np.where(p0_labels == 'rp')[0][0]][i] *= np.sqrt(compFactor)
+    if np.any(p0_labels == 'r2'):
+        for i in range(3):
+            MCMC_Results[np.where(p0_labels == 'r2')[0][0]][i] *= np.sqrt(compFactor)
+            
+            
+    # printing output from MCMC
+    out = "MCMC result:\n\n"
+    for i in range(len(p0_mcmc)):
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format(p0_labels[i],MCMC_Results[i][0], MCMC_Results[i][1], MCMC_Results[i][2])
+
+    # getting and printing the phase offset
+    As = samples[:,np.where(p0_labels == 'A')[0][0]][:,np.newaxis]
+    Bs = samples[:,np.where(p0_labels == 'B')[0][0]][:,np.newaxis]
+    phis = np.linspace(-np.pi,np.pi,1000)
+    offsets = []
+    # Doing this in steps to not overflow RAM
+    stepSizeOffsets = int(1e2)
+    if ('A' in p0_labels)  and ('B' in p0_labels) and (('C' not in p0_labels and 'D' not in p0_labels) or not secondOrderOffset):
+        for i in range(int(len(As)/stepSizeOffsets)):
+            offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis),axis=1)]*180/np.pi)
+        if len(As)%stepSizeOffsets != 0:
+            offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
+        offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
+        offset[1] -= offset[0]
+        offset[2] = offset[0]-offset[2]
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
+    elif ('A' in p0_labels)  and ('B' in p0_labels) and ('C' in p0_labels) and ('D' in p0_labels):
+        Cs = samples[:,np.where(p0_labels == 'C')[0][0]][:,np.newaxis]
+        Ds = samples[:,np.where(p0_labels == 'D')[0][0]][:,np.newaxis]
+        for i in range(int(len(As)/stepSizeOffsets)):
+            offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis) + Cs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(2*phis)-1) + Ds[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(2*phis),axis=1)]*180/np.pi)
+        if len(As)%stepSizeOffsets != 0:
+            offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
+        offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
+        offset[1] -= offset[0]
+        offset[2] = offset[0]-offset[2]
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offsets[0], offsets[1], offsets[2])
+
+    # print the R2/Rp ratio
+    if ('ellipse' in mode.lower()) and ('rp' in p0_labels) and ('r2' in p0_labels):
+        out += '{:>8} = {:>16}\n'.format('R2/Rp', p0_mcmc[np.where(p0_labels == 'r2')[0][0]]/p0_mcmc[np.where(p0_labels == 'rp')[0][0]])
+
+    if channel == 'ch1':
+        wav = 3.6*1e-6
+    elif channel == 'ch2':
+        wav = 4.5*1e-6
+    if 'fp' in p0_labels:
+        fp_MCMC = samples[:,np.where(p0_labels == 'fp')[0][0]]*compFactor
+    else:
+        fp_MCMC = p0_obj['fp']
+    if 'rp' in p0_labels:
+        rp_MCMC = samples[:,np.where(p0_labels == 'rp')[0][0]]*np.sqrt(compFactor)
+    else:
+        rp_MCMC = p0_obj['rp']
+
+    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'])
+
+    tday = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC/rp_MCMC**2)))**-1
+    tnight = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC*(1-2*As[:,0])/rp_MCMC**2)))**-1
+
+    out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Day: ', np.median(tday), np.percentile(tday, 84)-np.median(tday), np.median(tday)-np.percentile(tday, 16))
+    out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Night: ', np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16))
+    out += 'For T_{*,b} = '+str(p0_obj['tstar_b'])+'\n'
+
+    print(out)
+    with open(savepath+'MCMC_RESULTS_'+mode+'.txt','w') as file:
+        file.write(out) 
+        
+    return p0_mcmc, MCMC_Results
+
+def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
+    
+    ndim = chain.shape[-1]
+    samples = chain.reshape((-1, ndim))
+    
+    ind_a = len(p0_astro) # index where the astro params end
+    labels = p0_fancyLabels[:ind_a]
+
+    fname = savepath+'MCMC_'+mode+'_astroWalkers.pdf'
+    make_plots.walk_style(ind_a, chain.shape[0], chain, 10, chain.shape[1], labels, fname)
+
+    if 'bliss' not in mode.lower() or r'$\sigma_F$' in p0_fancyLabels:
+        labels = p0_fancyLabels[ind_a:]
+        fname = savepath+'MCMC_'+mode+'_detecWalkers.pdf'
+        make_plots.walk_style(len(p0_fancyLabels)-ind_a, chain.shape[0], chain[:,:,ind_a:], 10, chain.shape[1], labels, fname)
+    
+    if plotCorner:
+        fig = corner.corner(samples[:,:ind_a], labels=p0_fancyLabels, quantiles=[0.16, 0.5, 0.84], show_titles=True, 
+                            plot_datapoints=True, title_kwargs={"fontsize": 12})
+        plotname = savepath + 'MCMC_'+mode+'_corner.pdf'
+        fig.savefig(plotname, bbox_inches='tight')
+        
     return

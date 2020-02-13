@@ -211,6 +211,61 @@ def plot_init_guess(time, data, astro, detec_full, savepath=None):
     else:
         return fig
 
+def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
+    """Make a plot showing the evolution of the walkers throughout the emcee sampling.
+
+    Args:
+        ndim (int): Number of free parameters
+        nwalk (int): Number of walkers
+        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
+        interv (int): Take every 'interv' element to thin out the plot
+        subsamp (int): Only show the last 'subsamp' steps
+        labels (ndarray): The fancy labels for each dimension
+        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+
+    Returns:
+        None
+    
+    """
+    
+    # get first index
+    beg   = len(samples[0,:,0]) - subsamp
+    end   = len(samples[0,:,0]) 
+    step  = np.arange(beg,end)
+    step  = step[::interv] 
+    
+    # number of columns and rows of subplots
+    ncols = 4
+    nrows = int(np.ceil(ndim/ncols))
+    sizey = 2*nrows
+    
+    # plotting
+    plt.figure(figsize = (15, 2*nrows))
+    for ind in range(ndim):
+        plt.subplot(nrows, ncols, ind+1)
+        sig1 = (0.6827)/2.*100
+        sig2 = (0.9545)/2.*100
+        sig3 = (0.9973)/2.*100
+        percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
+        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
+        plt.plot(step, mu_param)
+        plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos1sig, neg1sig, facecolor='k', alpha = 0.1)
+        plt.title(labels[ind])
+        plt.xlim(np.min(step), np.max(step))
+        if ind < (ndim - ncols):
+            plt.xticks([])
+        else: 
+            plt.xticks(rotation=25)
+    if fname != None:
+        plt.savefig(fname, bbox_inches='tight')
+    else:
+        # FIX - return the figure instead
+        plt.show()
+    plt.close()
+    return
+    
 # FIX - add docstring for this function
 def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
     
@@ -274,7 +329,23 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
 
 def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
     maxbins = int(np.rint(residuals.size/minbins))
-    rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
+    try:
+        rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
+    except:
+        rms = []
+        for i in range(minbins,len(residuals)):
+            rms.append(helpers.binnedNoise(np.arange(len(residuals)),residuals,i))
+        rms = np.array(rms)[::-1]
+
+        binsz = len(residuals)/np.arange(minbins,len(residuals))[::-1]
+
+        #In case there is a NaN or something while binning
+        binsz = binsz[np.isfinite(rms)]
+        rms = rms[np.isfinite(rms)]
+        rmslo = np.zeros_like(rms)
+        rmshi = rmslo
+        stderr = np.std(residuals)/np.sqrt(binsz)
+    
     plt.clf()
     ax = plt.gca()
     ax.set_yscale('log')
@@ -298,6 +369,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     if showplot:
         plt.show()
         
+    plt.clf()
     plt.close()
     
     #Ingress Duration
