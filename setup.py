@@ -1,4 +1,5 @@
-import setuptools, sys
+import setuptools, sys, os
+import subprocess
 from SPCA import __version__, name
 
 with open("README.md", "r") as fh:
