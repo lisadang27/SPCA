@@ -267,7 +267,27 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     return
     
 # FIX - add docstring for this function
-def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
+def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc
+                 breaks, savepath, plotTrueAnomaly=False, nbin=None, fontsize=24):
+
+    ind_a = len(p0_astro) # index where the astro params end
+
+    # generate the models from best-fit parameters
+    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0))]))
+    mcmc_lightcurve = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    detec = mcmc_signal/mcmc_lightcurve
+
+    time2 = np.linspace(np.min(time), np.max(time), 1000)
+    
+    #for higher-rez red curve
+    astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    
+    if plotTrueAnomaly:
+        # FIX: convert time to true anomaly for significantly eccentric planets!!
+        # Use p0_mcmc if there, otherwise p0_obj
+        x = time2
+    else:
+        x = time2
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -328,7 +348,9 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     return
 
 def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
+    
     maxbins = int(np.rint(residuals.size/minbins))
+    
     try:
         rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
     except:
