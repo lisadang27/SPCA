@@ -267,7 +267,7 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
     return
     
 # FIX - add docstring for this function
-def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc
+def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc,
                  breaks, savepath, plotTrueAnomaly=False, nbin=None, fontsize=24):
 
     ind_a = len(p0_astro) # index where the astro params end
