@@ -1,6 +1,9 @@
 import setuptools, sys
 from SPCA import __version__, name
 
+install_requires = ["numpy", "scipy", "astropy", "matplotlib", "emcee", 'mc3',
+                    "batman-package", "corner", "photutils>=0.7", "pandas", "pyyaml", "threadpoolctl"]
+
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
@@ -23,7 +26,7 @@ setuptools.setup(
     ),
     include_package_data = True,
     zip_safe = True,
-    install_requires = [
-        "numpy", "scipy", "astropy", "matplotlib", "emcee", "batman-package", "corner", "photutils", "pandas", "pyyaml", "threadpoolctl"]
+    install_requires = install_requires,
+    extras_require = {'GP': ['pybind11', 'george']}
 )
 
