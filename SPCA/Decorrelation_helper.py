@@ -560,6 +560,12 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
         
         astro_full   = astrofunc(time_full, **dict([[p0_astro[i], p0_mcmc[:len(p0_astro)][i]] for i in range(len(p0_astro))]))
 
+        if 'bliss' in mode.lower():
+            flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode, blissNBin, savepath = signal_inputs_full
+            signal_inputs_full = bliss.precompute(flux_full, time_full, xdata_full, ydata_full,
+                                                  psfxw_full, psfyw_full, mode,
+                                                  astro_full, blissNBin, savepath, False)
+        
         signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
         detec_full = signal_full/astro_full
         data_full = flux_full/detec_full
