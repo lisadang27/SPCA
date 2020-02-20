@@ -260,34 +260,37 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
             plt.xticks(rotation=25)
     if fname != None:
         plt.savefig(fname, bbox_inches='tight')
+        # FIX - check if we should show the plot as well
+        plt.close()
     else:
         # FIX - return the figure instead
-        plt.show()
-    plt.close()
+        return plt.gcf()
     return
     
 # FIX - add docstring for this function
 def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc,
-                 breaks, savepath, plotTrueAnomaly=False, nbin=None, fontsize=24):
-
+                 breaks, savepath, plotTrueAnomaly=False, nbin=None, showplot=False, fontsize=24,plot_peritime=False):
+    
     ind_a = len(p0_astro) # index where the astro params end
 
     # generate the models from best-fit parameters
-    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0))]))
-    mcmc_lightcurve = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
-    detec = mcmc_signal/mcmc_lightcurve
+    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_labels))]))
+    astro = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    detec = mcmc_signal/astro
 
-    time2 = np.linspace(np.min(time), np.max(time), 1000)
+#     time2 = np.linspace(np.min(time), np.max(time), 1000)
     
-    #for higher-rez red curve
-    astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+#     #for higher-rez red curve
+#     astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
     
     if plotTrueAnomaly:
         # FIX: convert time to true anomaly for significantly eccentric planets!!
         # Use p0_mcmc if there, otherwise p0_obj
-        x = time2
+        x = time
+#         x2 = time2
     else:
-        x = time2
+        x = time
+#         x2 = time2
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -325,12 +328,16 @@ def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_
     axes[3].set_ylabel('Residuals', fontsize=fontsize)
     axes[3].set_xlabel('Time (BMJD)', fontsize=fontsize)
 
-    for i in range(len(axes)):
-        axes[i].xaxis.set_tick_params(labelsize=fontsize)
-        axes[i].yaxis.set_tick_params(labelsize=fontsize)
-        axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
-        for j in range(len(breaks)):
-            axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
+    if plot_peritime:
+        # FIX - compute peritime
+        print('Have not yet implemented this!')
+        
+        for i in range(len(axes)):
+            axes[i].xaxis.set_tick_params(labelsize=fontsize)
+            axes[i].yaxis.set_tick_params(labelsize=fontsize)
+            axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
+            for j in range(len(breaks)):
+                axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
     
     fig.align_ylabels()
     

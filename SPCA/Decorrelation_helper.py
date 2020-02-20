@@ -422,7 +422,7 @@ def reload_old_fit(path_params, p0_obj):
     return
 
 # FIX: Add a docstring for this function
-def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_obj, signal_inputs, signalfunc, astrofunc, usebestfit, savepath, nFrames, compFactor=0):
+def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels, p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full, signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm, nFrames, compFactor=0):
     #print the results
 
     ndim = chain.shape[-1]
@@ -521,8 +521,8 @@ def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_ob
         file.write(out) 
     
     
-    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0))]))
-    mcmc_lightcurve = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
+    mcmc_lightcurve = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:len(p0_astro)][i]] for i in range(len(p0_astro))]))
     mcmc_detec = mcmc_signal/mcmc_lightcurve
     residuals = flux/mcmc_detec - mcmc_lightcurve
     
@@ -557,21 +557,13 @@ def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_ob
     if 'gp' not in mode.lower() and nFrames!=1:
         #Unbinned data
         '''Get model'''
-        astro_full   = astrofunc(time_full, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
-        if 'bliss' in mode.lower():
-            signal_inputs_full = bliss.precompute(flux_full, time_full, xdata_full, ydata_full,
-                                                  psfxw_full, psfyw_full, mode,
-                                                  astro_full, blissNBin, savepath, False)
-        elif 'pld' in mode.lower():
-            signal_inputs_full = (flux_full, time_full, Pnorm_full, mode)
-            detec_inputs  = (Pnorm, mode)
-        elif 'poly' in mode.lower():# and 'psfw' in mode.lower():
-            signal_inputs_full = (flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode)
+        
+        astro_full   = astrofunc(time_full, **dict([[p0_astro[i], p0_mcmc[:len(p0_astro)][i]] for i in range(len(p0_astro))]))
 
-        signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0))]))
+        signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
         detec_full = signal_full/astro_full
         data_full = flux_full/detec_full
-
+        
         '''Get Fitted Uncertainty'''
         ferr_full = sigFMCMC*np.sqrt(nFrames)
 
@@ -631,6 +623,7 @@ Unbinned data:
 
 # FIX: Add a docstring for this function
 def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
+    # FIX - show plots if requested
     
     ndim = chain.shape[-1]
     samples = chain.reshape((-1, ndim))
@@ -651,15 +644,26 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
                             plot_datapoints=True, title_kwargs={"fontsize": 12})
         plotname = savepath + 'MCMC_'+mode+'_corner.pdf'
         fig.savefig(plotname, bbox_inches='tight')
+        plt.close()
         
     return
 
 
 # FIX: Add a docstring for this function
-def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
+def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc,
+           time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
     
     if 'gp' in mode:
-        return burnIn_GP(p0, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+        return burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs,
+                         astrofunc, detecfunc, signalfunc, lnpriorfunc,
+                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath)
+    
+    p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
+    p0_detec = helpers.get_fitted_params(detecfunc, dparams)
+    p0_psfwi  = helpers.get_fitted_params(detec_models.detec_model_PSFW, dparams)
+    p0_hside  = helpers.get_fitted_params(detec_models.hside, dparams)
+    p0_tslope  = helpers.get_fitted_params(detec_models.tslope, dparams)
+
     
     #################
     # Run optimization on just detector parameters first
@@ -718,7 +722,9 @@ def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signa
     # Run an initial MCMC burn-in and pick the best location found along the way
     #################
     
-    ndim, nwalkers = len(p0), 150
+    ndim = len(p0)
+    nwalkers = ndim*3
+    nBurnInSteps1 = 25500 # Chosen to give 500 steps per walker for Poly2v1 and 250 steps per walker for Poly5v2
     
     # get scattered starting point in parameter space 
     # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
@@ -729,6 +735,7 @@ def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signa
 
     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
+    global templnprob
     def templnprob(pars):
         return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
     
@@ -759,7 +766,8 @@ def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signa
     
     
     fname = savepath+'MCMC_'+mode+'_burnin1Walkers.pdf'
-    make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels)
+    fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels)
+    # FIX - do this within the function
     plt.savefig(fname)
     plt.show()
     plt.close()
@@ -771,9 +779,9 @@ def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signa
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
     fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
+    # FIX: do this within the function
     pathplot = savepath + '02_Initial_Guess.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
-    # FIX: Have an input boolean to turn on/off this plot
     plt.show()
     plt.close()
 
@@ -785,7 +793,14 @@ def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signa
 
 
 # FIX: Add a docstring for this function
-def burnIn_GP(p0, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
+def burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
+              time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
+    
+    p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
+    p0_detec = helpers.get_fitted_params(detecfunc, dparams)
+    p0_psfwi  = helpers.get_fitted_params(detec_models.detec_model_PSFW, dparams)
+    p0_hside  = helpers.get_fitted_params(detec_models.hside, dparams)
+    p0_tslope  = helpers.get_fitted_params(detec_models.tslope, dparams)
     
     ######################
     # Iteratively run scipy optimize
@@ -940,11 +955,6 @@ def burnIn_GP(p0, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfu
 # FIX: Add a docstring for this function
 def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
                                    p0_mcmc, p0_labels, p0_obj, mode, savepath=None):
-    if 'pld' not in mode.lower():
-    # determining in-eclipse and in-transit index
-
-    # generating transit model
-
     if 't0' in p0_labels:
         t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
     else:
@@ -1007,12 +1017,14 @@ def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, resid
     ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
 
     data1 = [xdata, ydata, psfxw, psfyw, flux, residuals]
-    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
-    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
-    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
+    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residuals[ind_ecli1]]
+    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residuals[ind_trans]]
+    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residuals[ind_ecli2]]
 
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
     else:
         plotname = None
     make_plots.triangle_colors(data1, data2, data3, data4, plotname)
+    
+    return

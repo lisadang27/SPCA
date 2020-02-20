@@ -98,12 +98,8 @@ def get_data(path, mode='', cut=0):
         # Could replace this with aperture photometry flux instead if we wanted
         flux = np.sum(stamp, axis=0)
         
-        #Normalize stamp pixel values by the sum of the stamp
-        stamp /= flux
-        
-        return stamp, flux, time
     
-    else:
+    if 'pldaper' in mode.lower() or 'pld' not in mode:
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
         time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
@@ -112,7 +108,7 @@ def get_data(path, mode='', cut=0):
         psfxw = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
         psfyw = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
 
-        factor = 1/(np.median(flux))
+        factor = 1/(np.nanmedian(flux))
         flux = factor*flux
         flux_err = factor*flux
         
@@ -150,7 +146,14 @@ def get_data(path, mode='', cut=0):
             mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
             xdata -= mid_x
             ydata -= mid_y
-    
+            
+            
+    if 'pld' in mode.lower():
+        #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
+        stamp /= flux
+        
+        return stamp, flux, time
+    else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
@@ -210,13 +213,8 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         
         # Could replace this with aperture photometry flux instead if we wanted
         flux = np.sum(stamp, axis=0)
-        
-        #Normalize stamp pixel values by the sum of the stamp
-        stamp /= flux
-        
-        return stamp, flux, time
     
-    else:
+    if 'pldaper' in mode.lower() or 'pld' not in mode:
         #Loading Data
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
@@ -226,6 +224,10 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
         psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
 
+        factor = 1/(np.nanmedian(flux))
+        flux = factor*flux
+        flux_err = factor*flux
+        
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]
         flux_err = flux_err[order][int(cut*nFrames):]
@@ -269,6 +271,12 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
             xdata -= mid_x
             ydata -= mid_y
     
+    if 'pld' in mode.lower():
+        #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
+        stamp /= flux
+        
+        return stamp, flux, time
+    else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
 def expand_dparams(dparams, mode):
