@@ -80,28 +80,28 @@ def loadArchivalData(rootpath, planet, channel):
     if np.isfinite(data['pl_ratdor'][nameIndex]):
         p0_obj['a'] = data['pl_ratdor'][nameIndex]
         p0_obj['a_err'] = np.mean([data['pl_ratdorerr1'][nameIndex],
-                                -data['pl_ratdorerr2'][nameIndex]])
+                                   np.abs(data['pl_ratdorerr2'][nameIndex])])
     else:
         p0_obj['a'] = data['pl_orbsmax'][nameIndex]*const.au.value/data['st_rad'][nameIndex]/const.R_sun.value
         p0_obj['a_err'] = np.sqrt(
-            (np.mean([data['pl_orbsmaxerr1'][nameIndex], -data['pl_orbsmaxerr2'][nameIndex]])*const.au.value
+            (np.mean([data['pl_orbsmaxerr1'][nameIndex], np.abs(data['pl_orbsmaxerr2'][nameIndex])])*const.au.value
              /data['st_rad'][nameIndex]/const.R_sun.value)**2
             + (data['pl_orbsmax'][nameIndex]*const.au.value
                /data['st_rad'][nameIndex]**2/const.R_sun.value
-               *np.mean([data['st_raderr1'][nameIndex], -data['st_raderr2'][nameIndex]]))**2
+               *np.mean([data['st_raderr1'][nameIndex], np.abs(data['st_raderr2'][nameIndex])]))**2
         )
     p0_obj['per'] = data['pl_orbper'][nameIndex]
     p0_obj['per_err'] = np.mean([data['pl_orbpererr1'][nameIndex],
-                              -data['pl_orbpererr2'][nameIndex]])
+                                 np.abs(data['pl_orbpererr2'][nameIndex])])
     p0_obj['t0'] = data['pl_tranmid'][nameIndex]-2.4e6-0.5
     p0_obj['t0_err'] = np.mean([data['pl_tranmiderr1'][nameIndex],
-                             -data['pl_tranmiderr2'][nameIndex]])
+                                np.abs(data['pl_tranmiderr2'][nameIndex])])
     p0_obj['inc'] = data['pl_orbincl'][nameIndex]
     p0_obj['inc_err'] = np.mean([data['pl_orbinclerr1'][nameIndex],
-                              -data['pl_orbinclerr2'][nameIndex]])
+                                 np.abs(data['pl_orbinclerr2'][nameIndex])])
     p0_obj['Tstar'] = data['st_teff'][nameIndex]
     p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
-                                -data['st_tefferr2'][nameIndex]])
+                                   np.abs(data['st_tefferr2'][nameIndex])])
     
     p0_obj['logg'] = data['st_logg'][nameIndex]
     p0_obj['feh'] = data['st_metfe'][nameIndex]
@@ -133,17 +133,17 @@ def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tsta
     # Personalize object default object values
     p0_obj['name'] = planet
     p0_obj['rp'] = rp
-    p0_obj['rp_err'] = rp_err
+    p0_obj['rp_err'] = np.abs(rp_err)
     p0_obj['a'] = a
-    p0_obj['a_err'] = a_err
+    p0_obj['a_err'] = np.abs(a_err)
     p0_obj['per'] = per
-    p0_obj['per_err'] = per_err
+    p0_obj['per_err'] = np.abs(per_err)
     p0_obj['t0'] = t0-2.4e6-0.5
-    p0_obj['t0_err'] = t0_err
+    p0_obj['t0_err'] = np.abs(t0_err)
     p0_obj['inc'] = inc
-    p0_obj['inc_err'] = inc_err
+    p0_obj['inc_err'] = np.abs(inc_err)
     p0_obj['Tstar'] = Tstar
-    p0_obj['Tstar_err'] = Tstar_err
+    p0_obj['Tstar_err'] = np.abs(Tstar_err)
     p0_obj['logg'] = logg
     p0_obj['feh'] = feh
 
@@ -422,7 +422,7 @@ def reload_old_fit(path_params, p0_obj):
     return
 
 # FIX: Add a docstring for this function
-def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_obj, signal_inputs, signalfunc, astrofunc, usebestfit, savepath, compFactor=0):
+def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_obj, signal_inputs, signalfunc, astrofunc, usebestfit, savepath, nFrames, compFactor=0):
     #print the results
 
     ndim = chain.shape[-1]
@@ -526,6 +526,107 @@ def print_MCMC_results(time, chain, lnprobchain, p0_labels, mode, channel, p0_ob
     mcmc_detec = mcmc_signal/mcmc_lightcurve
     residuals = flux/mcmc_detec - mcmc_lightcurve
     
+    #####################
+    # Compute the BIC for binned and unbinned data
+    #####################
+    
+    #Binned data
+    data = flux/mcmc_detec
+    astro  = mcmc_lightcurve
+    if 'sigF' in p0_labels:
+        sigFMCMC = p0_mcmc[np.where(p0_labels == 'sigF')[0][0]]
+    else:
+        sigFMCMC = p0_obj['sigF']
+    if 'bliss' in mode.lower():
+        nKnotsUsed = len(signal_inputs[-4][signal_inputs[-2]])
+        ndim_eff = ndim+nKnotsUsed
+    else:
+        ndim_eff = ndim
+    chisB = helpers.chi2(data, astro, sigFMCMC)
+    logLB = helpers.loglikelihood(data, astro, sigFMCMC)
+    EB = helpers.evidence(logLB, ndim, len(data))
+    BICB = -2*EB
+
+    out = """Binned data:
+    chi2 = {0}
+    chi2datum = {1}
+    Likelihood = {2}
+    Evidence = {3}
+    BIC = {4}""".format(chisB, chisB/len(flux), logLB, EB, BICB)
+
+    if 'gp' not in mode.lower() and nFrames!=1:
+        #Unbinned data
+        '''Get model'''
+        astro_full   = astrofunc(time_full, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+        if 'bliss' in mode.lower():
+            signal_inputs_full = bliss.precompute(flux_full, time_full, xdata_full, ydata_full,
+                                                  psfxw_full, psfyw_full, mode,
+                                                  astro_full, blissNBin, savepath, False)
+        elif 'pld' in mode.lower():
+            signal_inputs_full = (flux_full, time_full, Pnorm_full, mode)
+            detec_inputs  = (Pnorm, mode)
+        elif 'poly' in mode.lower():# and 'psfw' in mode.lower():
+            signal_inputs_full = (flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode)
+
+        signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0))]))
+        detec_full = signal_full/astro_full
+        data_full = flux_full/detec_full
+
+        '''Get Fitted Uncertainty'''
+        ferr_full = sigFMCMC*np.sqrt(nFrames)
+
+        N = len(data_full)
+        if 'bliss' in mode.lower():
+            nKnotsUsed_full = len(signal_inputs_full[-4][signal_inputs_full[-2]])
+            ndim_eff_full = ndim+nKnotsUsed_full
+        else:
+            ndim_eff_full = ndim
+
+        chis = helpers.chi2(data_full, astro_full, ferr_full)
+        logL = helpers.loglikelihood(data_full, astro_full, ferr_full)
+        E = helpers.evidence(logL, ndim_eff_full, N)
+        BIC = -2*E
+
+        out += """
+
+Unbinned data:
+    chi2 = {0}
+    chi2datum = {1}
+    Likelihood = {2}
+    Evidence = {3}
+    BIC = {4}""".format(chis, chis/len(flux_full), logL, E, BIC)
+
+    with open(savepath+'EVIDENCE_'+mode+'.txt','w') as file:
+        file.write(out)
+    print(out)
+    
+    ###########################
+    # Save computed parameters to be used later in table generation
+    ###########################
+    
+    ResultMCMC_Params = Table()
+
+    for i in range(len(p0_labels)):
+        ResultMCMC_Params[p0_labels[i]] = MCMC_Results[i]
+
+    ResultMCMC_Params['offset'] = offset
+    ResultMCMC_Params['tDay'] = [np.nanmedian(tday), np.nanpercentile(tday, 84)-np.nanmedian(tday), np.nanmedian(tday)-np.nanpercentile(tday, 16)]
+    ResultMCMC_Params['tNight'] = [np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16)]
+
+    ResultMCMC_Params['chi2B'] = [chisB]
+    ResultMCMC_Params['chi2datum'] = [chisB/len(flux)]
+    ResultMCMC_Params['logLB'] = [logLB]
+    ResultMCMC_Params['evidenceB'] = [EB]
+    ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
+
+    if 'gp' not in mode.lower():
+        ResultMCMC_Params['chi2'] = [chis]
+        ResultMCMC_Params['logL'] = [logL]
+        ResultMCMC_Params['evidence'] = [E]
+
+    pathres = savepath + 'ResultMCMC_'+mode+'_Params.npy'
+    np.save(pathres, ResultMCMC_Params)
+    
     return p0_mcmc, MCMC_Results, residuals
 
 # FIX: Add a docstring for this function
@@ -555,10 +656,67 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
 
 
 # FIX: Add a docstring for this function
-def burnIn(p0, mode, p0_labels, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
+def burnIn(p0, mode, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
     
     if 'gp' in mode:
-        return burnIn_GP(p0, p0_labels, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+        return burnIn_GP(p0, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+    
+    #################
+    # Run optimization on just detector parameters first
+    #################
+    
+    if 'bliss' not in mode:
+        # Should work for PLD and Poly
+        
+        spyFunc0 = lambda p0_temp, inputs: np.mean((resid-detecfunc(inputs, **dict([[p0_detec[i], p0_temp[i]] for i in range(len(p0_detec))])))**2)
+        spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_detec))], detec_inputs, 'Nelder-Mead')
+
+        # replace p0 with new detector coefficient values
+        p0[np.where(np.in1d(p0_labels,p0_detec))] = spyResult0.x
+        resid /= detecfunc(detec_inputs, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_detec))][i]] for i in range(len(p0_detec))]))
+
+        # 2) get initial guess for psfw model
+        if 'psfw' in mode.lower():
+            spyFunc0 = lambda p0_temp: np.mean((resid-psfwifunc([psfxw, psfyw], **dict([[p0_pfswi[i], p0_temp[i]] for i in range(len(p0_pfswi))])))**2)
+            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_psfwi))], method='Nelder-Mead')
+
+            # replace p0 with new detector coefficient values
+            if spyResult0.success:
+                p0[np.where(np.in1d(p0_labels,p0_psfwi))] = spyResult0.x
+                resid /= psfwifunc([psfxw, psfyw], **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_pfswi))][i]] for i in range(len(p0_pfswi))]))
+
+        # 3) get initial guess for hside model
+        if 'hside' in mode.lower():
+            spyFunc0 = lambda p0_temp: np.mean((resid-hsidefunc(time, **dict([[p0_hside[i], p0_temp[i]] for i in range(len(p0_hside))])))**2)
+            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_hside))], method='Nelder-Mead')
+
+            # replace p0 with new detector coefficient values
+            if spyResult0.success:
+                p0[np.where(np.in1d(p0_labels,p0_hside))] = spyResult0.x
+                resid /= hsidefunc(time, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_hside))][i]] for i in range(len(p0_hside))]))
+
+        if 'tslope' in mode.lower():
+            spyFunc0 = lambda p0_temp: np.mean((resid-tslopefunc(time, **dict([[p0_tslope[i], p0_temp[i]] for i in range(len(p0_tslope))])))**2)
+            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_tslope))], method='Nelder-Mead')
+
+            # replace p0 with new detector coefficient values
+            if spyResult0.success:
+                p0[np.where(np.in1d(p0_labels,p0_tslope))] = spyResult0.x
+                resid /= tslopefunc(time, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_tslope))][i]] for i in range(len(p0_tslope))]))
+
+
+    # initial guess
+    signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
+    #includes psfw and/or hside functions if they're being fit
+    detec_full_guess = signal_guess/astro_guess
+    
+    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
+    plt.show()
+    plt.close()    
+    
+    #################
+    # Run an initial MCMC burn-in and pick the best location found along the way
+    #################
     
     ndim, nwalkers = len(p0), 150
     
@@ -627,7 +785,7 @@ def burnIn(p0, mode, p0_labels, gparams, priors, errs, astrofunc, signalfunc, ln
 
 
 # FIX: Add a docstring for this function
-def burnIn_GP(p0, p0_labels, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
+def burnIn_GP(p0, p0_labels, dparams, gparams, priors, errs, astrofunc, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom):
     
     ######################
     # Iteratively run scipy optimize
@@ -776,3 +934,85 @@ def burnIn_GP(p0, p0_labels, gparams, priors, errs, astrofunc, signalfunc, lnpri
     plt.close()
     
     return p0
+
+
+
+# FIX: Add a docstring for this function
+def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
+                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None):
+    if 'pld' not in mode.lower():
+    # determining in-eclipse and in-transit index
+
+    # generating transit model
+
+    if 't0' in p0_labels:
+        t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
+    else:
+        t0MCMC = p0_obj['t0']
+    if 'per' in p0_labels:
+        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+    else:
+        perMCMC = p0_obj['per']
+    if 'rp' in p0_labels:
+        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+    else:
+        rpMCMC = p0_obj['rp']
+    if 'a' in p0_labels:
+        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+    else:
+        aMCMC = p0_obj['a']
+    if 'inc' in p0_labels:
+        incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
+    else:
+        incMCMC = p0_obj['inc']
+    if 'ecosw' in p0_labels:
+        ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
+    else:
+        ecoswMCMC = p0_obj['ecosw']
+    if 'esinw' in p0_labels:
+        esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
+    else:
+        esinwMCMC = p0_obj['esinw']
+    if 'q1' in p0_labels:
+        q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
+    else:
+        q1MCMC = p0_obj['q1']
+    if 'q2' in p0_labels:
+        q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
+    else:
+        q2MCMC = p0_obj['q2']
+    if 'fp'in p0_labels:
+        fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
+    else:
+        fpMCMC = p0_obj['fp']
+
+    eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
+    wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
+    u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
+    u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
+
+    trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
+                                                         aMCMC, incMCMC, eccMCMC, wMCMC,
+                                                         u1MCMC, u2MCMC)
+    # generating secondary eclipses model
+    eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
+                                 fpMCMC, t_sec)
+
+    # get in-transit indices
+    ind_trans  = np.where(trans!=1)
+    # get in-eclipse indices
+    ind_eclip  = np.where((eclip!=(1+fpMCMC)))
+    # seperating first and second eclipse
+    ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
+    ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
+
+    data1 = [xdata, ydata, psfxw, psfyw, flux, residuals]
+    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residual[ind_ecli1]]
+    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residual[ind_trans]]
+    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residual[ind_ecli2]]
+
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_7.pdf'
+    else:
+        plotname = None
+    make_plots.triangle_colors(data1, data2, data3, data4, plotname)
