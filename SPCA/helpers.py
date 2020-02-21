@@ -375,7 +375,7 @@ def get_fitted_params(function, dparams):
     else:
         name = function.__name__
     
-    if name=='detec_model_GP':
+    if name=='detec_model_bliss':
         if 'sigF' in dparams:
             params = []
         else:

@@ -659,8 +659,8 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
 def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc,
            time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
     
-    if 'gp' in mode:
-        return burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs,
+    if 'gp' in mode.lower():
+        return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs,
                          astrofunc, detecfunc, signalfunc, lnpriorfunc,
                          time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath)
     
@@ -799,7 +799,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
 
 
 # FIX: Add a docstring for this function
-def burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
+def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
               time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
     
     p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
@@ -883,11 +883,10 @@ def burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, ast
 
         checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-        #sampler
-        sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, a = 2,
-                                        args=(p0_labels, signalfunc, lnpriorfunc, 
-                                              signal_inputs, checkPhasePhis, lnprior_custom))
-
+        global templnprob
+        def templnprob(pars):
+            return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+       
         priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
         iters = 10
         while np.any(priorlnls) and iters>0:
@@ -903,7 +902,11 @@ def burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, ast
         #Second burn-in
         #Do quick burn-in to get walkers spread out
         tic = t.time()
-        pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=False)
+        with threadpool_limits(limits=1, user_api='blas'):
+            with Pool(ncpu) as pool:
+                #sampler
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=False)
         print('Mean burn-in acceptance fraction: {0:.3f}'
                         .format(np.median(sampler.acceptance_fraction)))
         # sampler.reset()
@@ -927,7 +930,6 @@ def burnIn_GP(p0, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, ast
     p0_optimized = []
     p0_temps_final = []
     print('Running second iterative scipy.optimize')
-    from tqdm import tqdm
     for p0_temp in tqdm(p0_temps_mcmc):
 
         spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom], 'Nelder-Mead')
