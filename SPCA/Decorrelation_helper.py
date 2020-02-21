@@ -765,7 +765,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     #First burn-in
     tic = t.time()
     print('Running first burn-in')
-    with threadpool_limits(limits=1, user_api='blas'):
+#     with threadpool_limits(limits=1, user_api='blas'):
+    if True:
         with Pool(ncpu) as pool:
             #sampler
             sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
@@ -905,7 +906,8 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
         #Second burn-in
         #Do quick burn-in to get walkers spread out
         tic = t.time()
-        with threadpool_limits(limits=1, user_api='blas'):
+#         with threadpool_limits(limits=1, user_api='blas'):
+        if True:
             with Pool(ncpu) as pool:
                 #sampler
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
