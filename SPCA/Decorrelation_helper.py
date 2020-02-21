@@ -779,12 +779,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     
     
     fname = savepath+'MCMC_'+mode+'_burnin1Walkers.pdf'
-    fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels)
-    # FIX - do this within the function
-    plt.savefig(fname)
-    if showPlot:
-        plt.show()
-    plt.close()
+    fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels,
+                                fname, showPlot)
     
     
     p0 = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
@@ -792,14 +788,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
-    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-    # FIX: do this within the function
-    pathplot = savepath + '02_Initial_Guess.pdf'
-    fig.savefig(pathplot, bbox_inches='tight')
-    if showPlot:
-        plt.show()
-    plt.close()
-
+    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
+    
     return p0
 
 
@@ -962,13 +952,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
     
-    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-    # FIX: do this within the function
-    pathplot = savepath + '02_Initial_Guess.pdf'
-    fig.savefig(pathplot, bbox_inches='tight')
-    if showPlot:
-        plt.show()
-    plt.close()
+    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
     
     return p0
 
