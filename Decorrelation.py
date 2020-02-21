@@ -22,8 +22,10 @@ from SPCA import Decorrelation_helper as dh
 
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
-channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
+#planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+#channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
+planets = ['HD149026b']
+channels = ['ch1']
 
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
@@ -42,18 +44,18 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+minPolys = 5*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
-tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryPLD2_5x5 = True                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryBliss = True                          # whether to try BLISS detector model
+tryPLD1_3x3 = False                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD2_3x3 = False                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD1_5x5 = False                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD2_5x5 = False                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryBliss = False                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
-ncpu = 4                                 # The number of cpu threads to be used when running MCMC
+ncpu = 24                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
@@ -77,15 +79,6 @@ cuts = np.zeros(len(planets)).astype(int)
 
 ## Download the most recent exoplanet archive data, and select the best constrained value for each parameter
 dh.downloadExoplanetArchive()
-p0_obj = dh.loadArchivalData(rootpath, planet, channel)
-
-## If you would rather load your own data (e.g. your planet isn't in the exoplanet archive),
-## you can use the function below. The error parameters are optional inputs, but are required if you want
-## to put a prior on a parameter.
-# p0_obj = loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh,
-#                         rp_err, a_err, t0_err, per_err, inc_err, e_err, argp_err, Tstar_err)
-
-
 
 
 
@@ -191,6 +184,17 @@ for iterationNumber in range(len(planets)):
         print('Beginning', planet, channel, mode)
         
         p0_obj['mode'] = mode
+
+        # makes list of parameters that won't be fitted
+        dparams = helpers.expand_dparams(dparams_input, mode)
+        # declare where heaviside break occurs
+        if 'hside' in mode.lower():
+            # FIX: This is fully broken right now
+            p0_obj['s2'] = timeaor1
+            dparams = np.append(dparams, ['s2'])
+
+        # Get detector and signal functions
+        signalfunc, detecfunc = dh.get_detector_functions(mode)
 
 
         # Figure out where data is located
