@@ -631,7 +631,7 @@ Unbinned data:
     return p0_mcmc, MCMC_Results, residuals
 
 # FIX: Add a docstring for this function
-def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
+def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner, showPlot=False):
     # FIX - show plots if requested
     
     ndim = chain.shape[-1]
@@ -646,13 +646,15 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
     if 'bliss' not in mode.lower() or r'$\sigma_F$' in p0_fancyLabels:
         labels = p0_fancyLabels[ind_a:]
         fname = savepath+'MCMC_'+mode+'_detecWalkers.pdf'
-        make_plots.walk_style(len(p0_fancyLabels)-ind_a, chain.shape[0], chain[:,:,ind_a:], 10, chain.shape[1], labels, fname)
+        make_plots.walk_style(len(p0_fancyLabels)-ind_a, chain.shape[0], chain[:,:,ind_a:], 10, chain.shape[1], labels, fname, showPlot)
     
     if plotCorner:
         fig = corner.corner(samples[:,:ind_a], labels=p0_fancyLabels, quantiles=[0.16, 0.5, 0.84], show_titles=True, 
                             plot_datapoints=True, title_kwargs={"fontsize": 12})
         plotname = savepath + 'MCMC_'+mode+'_corner.pdf'
         fig.savefig(plotname, bbox_inches='tight')
+        if showPlot:
+            plt.show()
         plt.close()
         
     return
@@ -660,12 +662,12 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner):
 
 # FIX: Add a docstring for this function
 def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc,
-           time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
+           time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False):
     
     if 'gp' in mode.lower():
         return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs,
                          astrofunc, detecfunc, signalfunc, lnpriorfunc,
-                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath)
+                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False)
     
     p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
     p0_detec = helpers.get_fitted_params(detecfunc, dparams)
@@ -723,9 +725,10 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
     
-    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-    plt.show()
-    plt.close()    
+    if showPlot:
+        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
+        plt.show()
+        plt.close()    
     
     #################
     # Run an initial MCMC burn-in and pick the best location found along the way
@@ -779,7 +782,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels)
     # FIX - do this within the function
     plt.savefig(fname)
-    plt.show()
+    if showPlot:
+        plt.show()
     plt.close()
     
     
@@ -792,7 +796,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     # FIX: do this within the function
     pathplot = savepath + '02_Initial_Guess.pdf'
     fig.savefig(pathplot, bbox_inches='tight')
-    plt.show()
+    if showPlot:
+        plt.show()
     plt.close()
 
     return p0
@@ -804,7 +809,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
 
 # FIX: Add a docstring for this function
 def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
-              time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath):
+              time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False):
     
     p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
     p0_detec = helpers.get_fitted_params(detecfunc, dparams)
@@ -861,11 +866,12 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
 
-    # plot detector initial guess
-    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-    # FIX: Have a plot boolean to turn this off/on
-    plt.show()
-    plt.close()
+    
+    if showPlot:
+        # plot detector initial guess
+        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
+        plt.show()
+        plt.close()
     
     
     ######################
@@ -956,9 +962,12 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
     
-    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-    # FIX: Have an input bool to turn this on/off
-    plt.show()
+    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
+    # FIX: do this within the function
+    pathplot = savepath + '02_Initial_Guess.pdf'
+    fig.savefig(pathplot, bbox_inches='tight')
+    if showPlot:
+        plt.show()
     plt.close()
     
     return p0
@@ -967,7 +976,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
 
 # FIX: Add a docstring for this function
 def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
-                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None):
+                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False):
     if 't0' in p0_labels:
         t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
     else:
@@ -1038,6 +1047,6 @@ def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, resid
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
     else:
         plotname = None
-    make_plots.triangle_colors(data1, data2, data3, data4, plotname)
+    make_plots.triangle_colors(data1, data2, data3, data4, plotname, showPlot)
     
     return
