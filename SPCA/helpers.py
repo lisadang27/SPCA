@@ -99,7 +99,7 @@ def get_data(path, mode='', cut=0):
         flux = np.sum(stamp, axis=0)
         
     
-    if 'pldaper' in mode.lower() or 'pld' not in mode:
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
         time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
@@ -150,6 +150,7 @@ def get_data(path, mode='', cut=0):
             
     if 'pld' in mode.lower():
         #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
+        # FIX - pldaper will break if masked stamps aren't same length as masked flux......
         stamp /= flux
         
         return stamp, flux, time
@@ -190,7 +191,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
         
         order = np.argsort(time)
-        stamp = flux[order][int(cut*nFrames):]
+        stamp = stamp[order][int(cut*nFrames):]
         time = time[order][int(cut*nFrames):]
         
         # Clip bad frames
@@ -202,7 +203,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         mask_id = np.ma.make_mask(mask_id)
 
         # Ultimate Clipping
-        MASK  = sigma_clip(flux.sum(axis=1), sigma=6).mask + mask_id
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_id
         mask = np.logical_not(MASK)
         
         #Transpose pixel stamp array for easier use
@@ -214,7 +215,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         # Could replace this with aperture photometry flux instead if we wanted
         flux = np.sum(stamp, axis=0)
     
-    if 'pldaper' in mode.lower() or 'pld' not in mode:
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         #Loading Data
         flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
         flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
@@ -273,6 +274,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
     
     if 'pld' in mode.lower():
         #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
+        # FIX - pldaper will break if masked stamps aren't same length as masked flux......
         stamp /= flux
         
         return stamp, flux, time
