@@ -565,6 +565,9 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
             signal_inputs_full = bliss.precompute(flux_full, time_full, xdata_full, ydata_full,
                                                   psfxw_full, psfyw_full, mode,
                                                   astro_full, blissNBin, savepath, False)
+        elif 'gp' in mode.lower():
+            flux_full, xdata_full, ydata_full, time_full = signal_inputs_full
+            signal_inputs_full = [flux_full, xdata_full, ydata_full, time_full, True, astro_full]
         
         signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
         detec_full = signal_full/astro_full
