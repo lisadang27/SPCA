@@ -402,10 +402,9 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
         plt.savefig(plotname, bbox_inches='tight')
-    if showplot:
+    if showPlot:
         plt.show()
         
-    plt.clf()
     plt.close()
     
     #Ingress Duration
