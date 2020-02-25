@@ -768,8 +768,8 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     #First burn-in
     tic = t.time()
     print('Running first burn-in')
-#     with threadpool_limits(limits=1, user_api='blas'):
-    if True:
+    with threadpool_limits(limits=1, user_api='blas'):
+#     if True:
         with Pool(ncpu) as pool:
             #sampler
             sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
@@ -1034,3 +1034,4 @@ def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, resid
     make_plots.triangle_colors(data1, data2, data3, data4, plotname, showPlot)
     
     return
+

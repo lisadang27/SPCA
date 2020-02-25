@@ -22,10 +22,8 @@ from SPCA import Decorrelation_helper as dh
 
 
 
-#planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
-#channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
-planets = ['HD149026b']
-channels = ['ch1']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
 
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
@@ -44,12 +42,12 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-minPolys = 5*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+minPolys = 6*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
-tryPLD1_3x3 = False                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD2_3x3 = False                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD1_5x5 = False                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryPLD2_5x5 = False                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD2_5x5 = True                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
 tryBliss = False                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
@@ -390,8 +388,8 @@ for iterationNumber in range(len(planets)):
             #Do quick burn-in to get walkers spread out
             tic = t.time()
             print('Running second burn-in')
-        #     with threadpool_limits(limits=1, user_api='blas'):
-            if True:
+            with threadpool_limits(limits=1, user_api='blas'):
+        #     if True:
                 with Pool(ncpu) as pool:
                     #sampler
                     sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
@@ -411,8 +409,8 @@ for iterationNumber in range(len(planets)):
             tic = t.time()
             # Continue from last positions and run production
             print('Running production')
-        #     with threadpool_limits(limits=1, user_api='blas'):
-            if True:
+            with threadpool_limits(limits=1, user_api='blas'):
+        #     if True:
                 with Pool(ncpu) as pool:
                     #sampler
                     sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
