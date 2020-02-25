@@ -465,7 +465,7 @@ for iterationNumber in range(len(planets)):
         p0_mcmc, MCMC_Results, residuals = dh.print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels,
                                                                  p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full,
                                                                  signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm,
-                                                                 nFrames, compFactor)
+                                                                 nFrames, secondOrderOffset, compFactor)
 
 
         # In[ ]:

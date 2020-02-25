@@ -422,7 +422,7 @@ def reload_old_fit(path_params, p0_obj):
     return
 
 # FIX: Add a docstring for this function
-def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels, p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full, signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm, nFrames, compFactor=0):
+def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels, p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full, signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm, nFrames, secondOrderOffset, compFactor=0):
     #print the results
 
     ndim = chain.shape[-1]
