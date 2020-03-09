@@ -5,3 +5,5 @@ MCcubed
 *.pyc
 .DS_Store
 WASP12b_special
+masterfile.ecsv
+docs/build
