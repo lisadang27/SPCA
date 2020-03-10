@@ -66,7 +66,7 @@ Both authors worked extensively to debug the code and simplify the user experien
 Acknowledgements
 ================
 
-We thank Joel Schwartz for his aid in writing out BLISS decorrelation method. We also thank Dylan Keating for alpha testing SPCA.
+We thank Joel Schwartz for his aid in writing out BLISS decorrelation method. We also thank Dylan Keating for alpha testing SPCA. We thank Antoine Darveau-Bernier for writing code to parse through the Exoplanet Archive data and select the best constrained value for each parameter in the database (code can be found `here <https://github.com/AntoineDarveau/masterfile>`_).
 
 License & Attribution
 =====================
