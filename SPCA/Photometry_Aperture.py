@@ -584,7 +584,10 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         binned_bg_err, binned_bg_err_std = binning_data(np.asarray(bg_err), bin_size)
 
         #sigma clip binned data to remove wildly unacceptable data
-        binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        try:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        except TypeError:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
         if np.ma.is_masked(binned_flux_mask):
             binned_time = binned_time[binned_flux_mask==binned_flux]
             binned_time_std = binned_time_std[binned_flux_mask==binned_flux]
