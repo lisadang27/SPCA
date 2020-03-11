@@ -261,15 +261,22 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     data = [np.asarray(load_data(savepath, a)) for a in AOR]
     nb_data = [len(data[i]) for i in range(len(data))]
     data = [np.where(np.isfinite(data[i]), data[i], 99999) for i in range(len(data))]
-
-    flux  = np.array([sigma_clip(data[i][0], sigma=4, maxiters=5) for i in range(len(data))])
-    bg    = np.array([sigma_clip(data[i][1], sigma=4, maxiters=5) for i in range(len(data))])
-    xdata = np.array([sigma_clip(data[i][2], sigma=4, maxiters=5) for i in range(len(data))])
-    ydata = np.array([sigma_clip(data[i][3], sigma=4, maxiters=5) for i in range(len(data))])
-    psfwx = np.array([sigma_clip(data[i][4], sigma=4, maxiters=5) for i in range(len(data))])
-    psfwy = np.array([sigma_clip(data[i][5], sigma=4, maxiters=5) for i in range(len(data))])
-    beta  = np.array([sigma_clip(data[i][6], sigma=4, maxiters=5) for i in range(len(data))])
-
+    try:
+        flux  = np.array([sigma_clip(data[i][0], sigma=4, maxiters=5) for i in range(len(data))])
+        bg    = np.array([sigma_clip(data[i][1], sigma=4, maxiters=5) for i in range(len(data))])
+        xdata = np.array([sigma_clip(data[i][2], sigma=4, maxiters=5) for i in range(len(data))])
+        ydata = np.array([sigma_clip(data[i][3], sigma=4, maxiters=5) for i in range(len(data))])
+        psfwx = np.array([sigma_clip(data[i][4], sigma=4, maxiters=5) for i in range(len(data))])
+        psfwy = np.array([sigma_clip(data[i][5], sigma=4, maxiters=5) for i in range(len(data))])
+        beta  = np.array([sigma_clip(data[i][6], sigma=4, maxiters=5) for i in range(len(data))])
+    except TypeError:
+        flux  = np.array([sigma_clip(data[i][0], sigma=4, iters=5) for i in range(len(data))])
+        bg    = np.array([sigma_clip(data[i][1], sigma=4, iters=5) for i in range(len(data))])
+        xdata = np.array([sigma_clip(data[i][2], sigma=4, iters=5) for i in range(len(data))])
+        ydata = np.array([sigma_clip(data[i][3], sigma=4, iters=5) for i in range(len(data))])
+        psfwx = np.array([sigma_clip(data[i][4], sigma=4, iters=5) for i in range(len(data))])
+        psfwy = np.array([sigma_clip(data[i][5], sigma=4, iters=5) for i in range(len(data))])
+        beta  = np.array([sigma_clip(data[i][6], sigma=4, iters=5) for i in range(len(data))])
     fluxval, bgval, xdataval, ydataval, psfwxval, psfwyval, betaval = np.empty((0,64)), np.empty((0,64)), np.empty((0,64)), \
     np.empty((0,64)), np.empty((0,64)), np.empty((0,64)), np.empty((0,64))
     fluxerr, bgerr, xdataerr, ydataerr, psfwxerr, psfwyerr, betaerr = np.empty((0,64)), np.empty((0,64)), np.empty((0,64)), \
@@ -288,38 +295,59 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     flux_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         flux_all = np.append(flux_all, flux[i], axis = 0)
-        flux_all = sigma_clip(flux_all, sigma=4, maxiters=5)
+        try:
+            flux_all = sigma_clip(flux_all, sigma=4, maxiters=5)
+        except TypeError:
+            flux_all = sigma_clip(flux_all, sigma=4, iters=5)
 
     bg_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         bg_all = np.append(bg_all, bg[i], axis = 0)
         bg_all = np.where(np.isfinite(bg_all), bg_all, 99999)
-        bg_all = sigma_clip(bg_all, sigma=4, maxiters=5)
+        try:
+            bg_all = sigma_clip(bg_all, sigma=4, maxiters=5)
+        except TypeError:
+            bg_all = sigma_clip(bg_all, sigma=4, iters=5)
 
     xdata_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         xdata_all = np.append(xdata_all, xdata[i], axis = 0)
-        xdata_all = sigma_clip(xdata_all, sigma=4, maxiters=5)
+        try:
+            xdata_all = sigma_clip(xdata_all, sigma=4, maxiters=5)
+        except TypeError:
+            xdata_all = sigma_clip(ydata_all, sigma=4, iters=5)
 
     ydata_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         ydata_all = np.append(ydata_all, ydata[i], axis = 0)
-        ydata_all = sigma_clip(ydata_all, sigma=4, maxiters=5)
+        try:
+            ydata_all = sigma_clip(ydata_all, sigma=4, maxiters=5)
+        except TypeError:
+            ydata_all = sigma_clip(ydata_all, sigma=4, iters=5)
 
     psfwx_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         psfwx_all = np.append(psfwx_all, psfwx[i], axis = 0)
-        psfwx_all = sigma_clip(psfwx_all, sigma=4, maxiters=5)
+        try:
+            psfwx_all = sigma_clip(psfwx_all, sigma=4, maxiters=5)
+        except TypeError:
+            psfwx_all = sigma_clip(psfwx_all, sigma=4, iters=5)
 
     psfwy_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         psfwy_all = np.append(psfwy_all, psfwy[i], axis = 0)
-        psfwy_all = sigma_clip(psfwy_all, sigma=4, maxiters=5)
+        try:
+            psfwy_all = sigma_clip(psfwy_all, sigma=4, maxiters=5)
+        except TypeError:
+            psfwy_all = sigma_clip(psfwy_all, sigma=4, iters=5)
 
     beta_all = np.empty((0, 64))
     for i in range(np.array(flux).shape[0]):
         beta_all = np.append(beta_all, beta[i], axis = 0)
-        beta_all = sigma_clip(beta_all, sigma=4, maxiters=5)
+        try:
+            beta_all = sigma_clip(beta_all, sigma=4, maxiters=5)
+        except TypeError:
+            beta_all = sigma_clip(beta_all, sigma=4, iters=5)
 
     flux_med = np.ma.median(flux_all, axis=0)
     bg_med = np.ma.median(bg_all, axis=0)

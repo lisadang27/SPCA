@@ -12,14 +12,14 @@ from SPCA import frameDiagnosticsBackend
 from SPCA import photometryBackend
 
 # The number of CPU threads you want to use for running photometry methods in parallel
-ncpu = 23
+ncpu =1
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+planets = ['KELT-7b']
 # WASP-103b is full-frame, 55Cnce is going to be tough
 
 #folder containing data from each planet
-basepath = '/homes/picaro/bellt/research/'
+basepath = '/Users/ldang/Desktop/Spitzer/'
 
 #####################################################################
 # Parameters to set how you want your photometry done
@@ -150,7 +150,7 @@ for planet in planets:
                                     func = partial(photometryBackend.run_photometry, photometryMethod, basepath, planet,
                                                    channel, subarray, AOR_snip,
                                                    addStack, bin_data, bin_size, ignoreFrames_temp, maskStars,
-                                                   stamp_size, shape, edge, moveCentroid)
+                                                   stamp_sizes[0], shape, edge, moveCentroid)
                                     pool.map(func, radii)
 
                         print('Selecting the best aperture photometry method from this suite...')
