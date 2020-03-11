@@ -112,7 +112,12 @@ def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0
     # make mask to mask entire bad frame
     x = np.ones((w, l))
     mask = np.ma.make_mask(x)
-    sig_clipped_data = sigma_clip(image_data2, sigma=sigma, maxiters=maxiters, cenfunc=np.ma.median, axis = 0)
+    try:
+        sig_clipped_data = sigma_clip(image_data2, sigma=sigma, maxiters=maxiters, 
+                                      cenfunc=np.ma.median, axis = 0)
+    except TypeError:
+        sig_clipped_data = sigma_clip(image_data2, sigma=sigma, iters=maxiters, 
+                                      cenfunc=np.ma.median, axis = 0)
     for i in range (h):
         if np.ma.is_masked(sig_clipped_data[i, lbx:ubx, lby:uby]):
             sig_clipped_data[i,:,:] = np.ma.masked_array(sig_clipped_data[i,:,:], mask = mask)

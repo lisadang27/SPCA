@@ -79,8 +79,12 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     Y, X    = np.mgrid[:w,:l]
     cx      = (np.sum(np.sum(X*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lbx
     cy      = (np.sum(np.sum(Y*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lby
-    cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    try:
+        cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+        cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    except TypeError:
+        cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
+        cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
     xo.extend(cx/scale)
     yo.extend(cy/scale)
     # get PSF widths
@@ -89,8 +93,12 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     X2, Y2  = (X + lbx - cx)**2, (Y + lby - cy)**2
     widx    = np.sqrt(np.sum(np.sum(X2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
     widy    = np.sqrt(np.sum(np.sum(Y2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
-    widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    try:
+        widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+        widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    except TypeError:
+        widx    = sigma_clip(widx, sigma=4, iters=2, cenfunc=np.ma.median)
+        widy    = sigma_clip(widy, sigma=4, iters=2, cenfunc=np.ma.median)
     wx.extend(widx/scale)
     wy.extend(widy/scale)
     return xo, yo, wx, wy
@@ -159,8 +167,12 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = None, ape_sum_err = N
         tmp_sum.extend(phot_table['aperture_sum']*factor)
         tmp_err.extend(phot_table['aperture_sum_err']*factor)
     # removing outliers
-    tmp_sum = sigma_clip(tmp_sum, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    tmp_err = sigma_clip(tmp_err, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    try:
+        tmp_sum = sigma_clip(tmp_sum, sigma=4, maxiters=2, cenfunc=np.ma.median)
+        tmp_err = sigma_clip(tmp_err, sigma=4, maxiters=2, cenfunc=np.ma.median)
+    except TypeError:
+        tmp_sum = sigma_clip(tmp_sum, sigma=4, iters=2, cenfunc=np.ma.median)
+        tmp_err = sigma_clip(tmp_err, sigma=4, iters=2, cenfunc=np.ma.median)
     ape_sum.extend(tmp_sum)
     ape_sum_err.extend(tmp_err)
     return ape_sum, ape_sum_err
@@ -397,7 +409,10 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         binned_bg_err, binned_bg_err_std = binning_data(np.asarray(bg_err), bin_size)
 
         #sigma clip binned data to remove wildly unacceptable data
-        binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        try:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        except TypeError:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
         if np.ma.is_masked(binned_flux_mask):
             binned_time = binned_time[binned_flux_mask==binned_flux]
             binned_time_std = binned_time_std[binned_flux_mask==binned_flux]
