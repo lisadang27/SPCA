@@ -39,7 +39,7 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 def downloadExoplanetArchive():
     #Download the most recent masterfile of the best data on each target
     try:
-        _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', '../masterfile.ecsv')
+        _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', './masterfile.ecsv')
     except:
         print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.')
     return
