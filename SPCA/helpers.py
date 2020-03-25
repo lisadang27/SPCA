@@ -122,13 +122,21 @@ def get_data(path, mode='', cut=0):
         psfyw = psfyw[order][cut:]
         
         # Sigma clip per data cube (also masks invalids)
-        FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
-        FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
-        XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
-        YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
-        PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
-        PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
-        
+        try:
+            FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+        except TypeError:
+            FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=3.5, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, iters=1)
+
         # Ultimate Clipping
         MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
         mask = np.logical_not(MASK)
@@ -280,7 +288,47 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         return stamp, flux, time
     else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+    
+def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
+    """Sort the data in time and cut off any bad data at the start of the observations (e.g. ditered AOR).
+    Args:
+        flux (ndarray): Flux extracted for each frame.
+        flux_err (ndarray): uncertainty on the flux for each frame.
+        time (ndarray): Time stamp for each frame.
+        xdata (ndarray): X-coordinate of the centroid for each frame.
+        ydata (ndarray): Y-coordinate of the centroid for each frame.
+        psfwx (ndarray): X-width of the target's PSF for each frame.
+        psfwy (ndarray): Y-width of the target's PSF for each frame.
+    Returns:
+        tuple: flux (ndarray; Flux extracted for each frame),
+            flux_err (ndarray; uncertainty on the flux for each frame),
+            time (ndarray; Time stamp for each frame),
+            xdata (ndarray; X-coordinate of the centroid for each frame),
+            ydata (ndarray; Y-coordinate of the centroid for each frame), 
+            psfwx (ndarray; X-width of the target's PSF for each frame), 
+            psfwy (ndarray; Y-width of the target's PSF for each frame).
+    """
+    
+    # sorting chronologically
+    index      = np.argsort(time)
+    time0      = time[index]
+    flux0      = flux[index]
+    flux_err0  = flux_err[index]
+    xdata0     = xdata[index]
+    ydata0     = ydata[index]
+    psfxw0     = psfxw[index]
+    psfyw0     = psfyw[index]
 
+    # chop off dithered-calibration AOR if requested
+    time       = time0[cut:]
+    flux       = flux0[cut:]
+    flux_err   = flux_err0[cut:]
+    xdata      = xdata0[cut:]
+    ydata      = ydata0[cut:]
+    psfxw      = psfxw0[cut:]
+    psfyw      = psfyw0[cut:]
+    return flux, flux_err, time, xdata, ydata, psfxw, psfyw  
+    
 def expand_dparams(dparams, mode):
     """Add any implicit dparams given the mode (e.g. GP parameters if using a Polynomial model).
 
