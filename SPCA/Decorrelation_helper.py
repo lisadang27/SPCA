@@ -10,7 +10,7 @@ from astropy import units
 
 import numpy as np
 import time as t
-import os, sys
+import os, sys, errno
 import csv
 from tqdm import tqdm
 
