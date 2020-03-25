@@ -82,7 +82,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
         plt.show()
         
     plt.close()
-    return
+    return fig
 
 def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     """Makes a multi-panel plot from photometry outputs.
@@ -166,7 +166,7 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
         plt.show()
     
     plt.close()
-    return
+    return fig
 
 def plot_init_guess(time, data, astro, detec_full, savepath=None, showPlot=False):
     """Makes a multi-panel plots for the initial light curve guesses.
