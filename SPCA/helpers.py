@@ -247,12 +247,20 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         psfyw = psfyw[order][int(cut*nFrames):]
         
         # Sigma clip per data cube (also masks invalids)
-        FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
-        FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
-        XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
-        YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
-        PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
-        PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+        try:
+            FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+        except TypeError:
+            FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=3.5, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, iters=1)
         
         # Clip bad frames
         ind = np.array([])
