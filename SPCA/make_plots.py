@@ -166,7 +166,7 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
         plt.show()
     
     plt.close()
-    return fig
+    return
 
 def plot_init_guess(time, data, astro, detec_full, savepath=None, showPlot=False):
     """Makes a multi-panel plots for the initial light curve guesses.
