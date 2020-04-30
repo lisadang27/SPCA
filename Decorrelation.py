@@ -42,20 +42,20 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 
-minPolys = 6*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
 tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
 tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
 tryPLD2_5x5 = True                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryBliss = False                          # whether to try BLISS detector model
+tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
 oldPhotometry = True                     # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 24                                # The number of cpu threads to be used when running MCMC
-runMCMC = True                           # whether to run MCMC or just load-in past results
+runMCMC = False                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
 usebestfit = False                       # used best-fit instead of most probable parameters 
@@ -443,8 +443,22 @@ for iterationNumber in range(len(planets)):
 
             pathchain = savepath + 'samplerchain_'+mode+'.npy'
             pathlnlchain = savepath + 'samplerlnlchain_'+mode+'.npy'
+
+            if not os.path.exists(pathchain):
+                print('Previous decorrelation attempt with mode', mode, 'for', planet, channel, 'not found. Skipping.')
+                continue
+
             chain = np.load(pathchain)
-            lnprobchain = np.load(pathlnlchain)
+
+            if not os.path.exists(pathlnlchain):
+                if usebestfit:
+                    print('No ln-likelihood chain was saved; cannot determine best-fit value of saved chain.')
+                    print('Resorting to the median of the chain instead.')
+                lnprobchain = None
+                usebestfit_temp = False
+            else:
+                lnprobchain = np.load(pathlnlchain)
+                usebestfit_temp = usebestfit
 
             pathlnpro = savepath + 'samplerlnpr_'+mode+'.npy'
             if os.path.exists(pathlnpro):
@@ -469,7 +483,7 @@ for iterationNumber in range(len(planets)):
         # FIX: Save this when running the MCMC, and load if re-making outputs
         p0_mcmc, MCMC_Results, residuals = dh.print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels,
                                                                  p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full,
-                                                                 signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm,
+                                                                 signalfunc, astrofunc, usebestfit_temp, savepath, sigF_photon_ppm,
                                                                  nFrames, secondOrderOffset, compFactor)
 
 
