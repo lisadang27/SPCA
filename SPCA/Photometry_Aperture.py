@@ -103,7 +103,7 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     wy.extend(widy/scale)
     return xo, yo, wx, wy
 
-def A_photometry(image_data, bg_err, factor = 1, ape_sum = None, ape_sum_err = None,
+def A_photometry(image_data, bg_err, ape_sum = None, ape_sum_err = None,
     cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5, 
     theta = 0, shape = 'Circular', method='center'):
     """Performs aperture photometry, first by creating the aperture then summing the flux within the aperture.
@@ -111,7 +111,6 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = None, ape_sum_err = N
     Args:
         image_data (3D array): Data cube of images (2D arrays of pixel values).
         bg_err (1D array): Array of uncertainties on pixel value.
-        factor (float, optional): Electron count to photon count factor. Default is 1 if none given.
         ape_sum (1D array, optional): Array of flux to append new flux values to.
             If None, the new values will be appended to an empty array
         ape_sum_err (1D array, optional): Array of flux uncertainty to append new flux uncertainty values to.
@@ -164,8 +163,8 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = None, ape_sum_err = N
                 aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
         data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
         phot_table = aperture_photometry(image_data[i,:,:], aperture, error=data_error, method=method)#, pixelwise_error=False)
-        tmp_sum.extend(phot_table['aperture_sum']*factor)
-        tmp_err.extend(phot_table['aperture_sum_err']*factor)
+        tmp_sum.extend(phot_table['aperture_sum'])
+        tmp_err.extend(phot_table['aperture_sum_err'])
     # removing outliers
     try:
         tmp_sum = sigma_clip(tmp_sum, sigma=4, maxiters=2, cenfunc=np.ma.median)
@@ -358,8 +357,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                 # Aperture Photometry
                 # get centroids & PSF width
                 xo, yo, xw, yw = centroid_FWM(image_data3, xo, yo, xw, yw, scale = 2)
-                # convert electron count to Mjy/str
-                ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
+                
                 # aperture photometry
                 if moveCentroid:
                     xo_new = np.array(xo[image_data3.shape[0]*i:])
@@ -368,18 +366,16 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                     yo_new[np.where(np.isnan(yo_new))[0]] = 15*2
                     xo_new = list(xo_new)
                     yo_new = list(yo_new)
-                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], flux, flux_err,
                                                   cx=xo, cy=yo, r=2*r, a=2*5, b=2*5, w_r=2*5, h_r=2*5,
                                                   shape=shape, method=method)
                 else:
-                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], flux, flux_err,
                                                   cx=2*15, cy=2*15, r=2*r, a=2*5, b=2*5, w_r=2*5, h_r=2*5,
                                                   shape=shape, method=method)
             else :
                 # get centroids & PSF width
                 xo, yo, xw, yw = centroid_FWM(image_data3, xo, yo, xw, yw)
-                # convert electron count to Mjy/str
-                ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
                 # aperture photometry
                 if moveCentroid:
                     xo_new = np.array(xo[image_data3.shape[0]*i:])
@@ -388,10 +384,10 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                     yo_new[np.where(np.isnan(yo_new))[0]] = 15
                     xo_new = list(xo_new)
                     yo_new = list(yo_new)
-                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], flux, flux_err,
                                                   cx=xo_new, cy=yo_new, r=r, shape=shape, method=method)
                 else:
-                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, flux, flux_err,
+                    flux, flux_err = A_photometry(image_data3, bg_err[-h:], flux, flux_err,
                                                   r=r, shape=shape, method=method)
 
     else:

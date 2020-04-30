@@ -174,9 +174,6 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
             image_data3, bg_flux, bg_err = bgsubtract(image_data2, bg_flux, bg_err)
             # get pixel peak index
             P = get_pixel_values(image_data3, P, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
-        # convert electron count to Mjy/str
-        ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact)
-        P = ecnt2Mjy*P
     else:
         # FIX: The full frame versions of the code will have to go here
         pass
