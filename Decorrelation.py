@@ -53,6 +53,7 @@ tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
+oldPhotometry = True                     # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 24                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
@@ -203,9 +204,6 @@ for iterationNumber in range(len(planets)):
         # Figure out where there are AOR breaks
         breaks = dh.find_breaks(rootpath, planet, channel, aors)
 
-        # Calculate the photon noise limit
-        sigF_photon_ppm = dh.get_photon_limit(rootpath, foldername+filename, planet, channel, mode, aors, nFrames, ignoreFrames)
-
         # For datasets where the first AOR is peak-up data
         if cutFirstAOR:
             rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aors[0]+'/'+channel+'/bcd/'))
@@ -245,6 +243,13 @@ for iterationNumber in range(len(planets)):
                 make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                                 time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath, peritime, showPlot=False)
 
+        # Calculate the photon noise limit
+        if oldPhotometry:
+            # Fix the old, unhelpful units to electrons to compute photon noise limit
+            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, planet,
+                                                          channel, mode, aors, nFrames, ignoreFrames)
+        else:
+            sigF_photon_ppm = dh.get_photon_limit(flux, nFrames, ignoreFrames)
 
         # ## Initialize the guessed parameters, and make partial functions that freeze parameters that aren't fitted
 

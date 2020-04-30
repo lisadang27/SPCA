@@ -348,8 +348,14 @@ def find_breaks(rootpath, planet, channel, aors):
     return np.sort(breaks)[1:]
 
 # FIX: Add a docstring for this function
-def get_photon_limit(rootpath, datapath, planet, channel, mode, aors, nFrames, ignoreFrames):
+def get_photon_limit(flux, nFrames, ignoreFrames):
     
+    return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
+
+# FIX: Add a docstring for this function
+def get_photon_limit_oldData(rootpath, datapath, planet, channel, mode, aors, nFrames, ignoreFrames):
+    #This function is to be used with old photometry to allow for recalculating photon noise limits given the
+    #    old data had incorrect units for making photon noise calculations
     aor = aors[-1]
     rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
     rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
@@ -367,8 +373,10 @@ def get_photon_limit(rootpath, datapath, planet, channel, mode, aors, nFrames, i
         # Calculate the photon noise limit
         flux = np.loadtxt(datapath, usecols=[0], skiprows=1)     # mJr/str
     
-    # FIX: Check that I'm calculating this properly!
-    flux *= rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
+    convfact = rawHeader['GAIN']*rawHeader['EXPTIME']/rawHeader['FLUXCONV']
+    ecnt2Mjy = - rawHeader['PXSCAL1']*rawHeader['PXSCAL2']*(1/convfact) 
+    
+    flux /= ecnt2Mjy
     
     return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
