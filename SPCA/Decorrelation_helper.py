@@ -232,7 +232,7 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     def fluxDiff(temp, fStarSummed, wavs):
         #factor of pi likely needed to account for emitting area (pi*rstar^2 where rstar=1)
         return (np.sum(planck(wavs, temp)*np.pi)-fStarSummed)**2
-    temps = np.linspace(3000, 11000, 800, endpoint=True)
+    temps = np.linspace(3000, 11000, 801, endpoint=True)
     if channel == 'ch1':
         incides = np.where(np.logical_and(wavStar < 4., wavStar > 3.))[0]
     else:
