@@ -25,6 +25,9 @@ from SPCA import Decorrelation_helper as dh
 planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
 channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
 
+planets = planets[3:]
+channels = channels[3:]
+
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
 
@@ -43,6 +46,7 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
+minPolys[0] = 6
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
 tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
@@ -179,6 +183,9 @@ for iterationNumber in range(len(planets)):
     modes = [mode+mode_appendix for mode in modes]
 
     for mode in modes:
+
+        if planet=='HD149026b' and channel=='ch1' and mode=='PLD2_3x3_v1_autoRun':
+            continue
 
         print('Beginning', planet, channel, mode)
         
