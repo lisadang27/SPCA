@@ -12,6 +12,9 @@ import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
+# Used to cut short an MCMC step if it hangs
+import timeout_decorator
+
 # SPCA libraries
 import SPCA
 from SPCA import astro_models, detec_models, bliss
@@ -154,11 +157,13 @@ def get_data(path, mode, path_aper='', cut=0):
     if 'pld' in mode.lower():
         #Transpose pixel stamp array for easier use
         stamp = stamp[mask].T
-        stamp /= np.median(np.sum(stamp, axis=0))
         
         if 'pldaper' not in mode.lower():
             time = time[mask]
             flux = np.sum(stamp, axis=0).reshape(1,-1)
+            stamp /= np.median(np.sum(stamp, axis=0))
+        else:
+            stamp /= np.median(flux[mask])
         
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux = flux[mask]
@@ -169,13 +174,13 @@ def get_data(path, mode, path_aper='', cut=0):
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
         
-        factor = 1/(np.nanmedian(flux))
+        factor = 1/(np.median(flux))
         flux = factor*flux
         flux_err = factor*flux
         
         # redefining the zero centroid position
         if 'bliss' not in mode.lower():
-            mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
             xdata -= mid_x
             ydata -= mid_y
 
@@ -303,11 +308,13 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
     if 'pld' in mode.lower():
         #Transpose pixel stamp array for easier use
         stamp = stamp[mask].T
-        stamp /= np.median(np.sum(stamp, axis=0))
         
         if 'pldaper' not in mode.lower():
             time = time[mask]
             flux = np.sum(stamp, axis=0).reshape(1,-1)
+            stamp /= np.median(np.sum(stamp, axis=0))
+        else:
+            stamp /= np.median(flux[mask])
         
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux = flux[mask]
@@ -318,13 +325,13 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
         
-        factor = 1/(np.nanmedian(flux))
+        factor = 1/(np.median(flux))
         flux = factor*flux
         flux_err = factor*flux
         
         # redefining the zero centroid position
         if 'bliss' not in mode.lower():
-            mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
             xdata -= mid_x
             ydata -= mid_y
     
@@ -552,6 +559,7 @@ def lnprior_gamma(p0, priorInd, shape, rate):
 
 
 # FIX - check if sigF in p0, otherwise use a fixed value passed in through signal_input or something
+@timeout_decorator.timeout(10)
 def lnlike(p0, p0_labels, signalfunc, signal_input):
     """Evaluate the ln-likelihood at the position p0.
     
@@ -607,7 +615,11 @@ def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis,
     if not np.isfinite(lp):
         return -np.inf
     else:
-        lp += lnlike(p0, p0_labels, signalfunc, signal_input)
+        try:
+            lp += lnlike(p0, p0_labels, signalfunc, signal_input)
+        except timeout_decorator.timeout_decorator.TimeoutError:
+            print(f'MCMC step froze for 10 seconds with p0={p0}\n',end='')
+            lp += -np.inf
 
     if np.isfinite(lp):
         return lp
