@@ -184,6 +184,23 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         binned_time, binned_time_std = binning_data(np.asarray(time), bin_size)
         binned_bg, binned_bg_std = binning_data(np.asarray(bg_flux), bin_size)
         binned_bg_err, binned_bg_err_std = binning_data(np.asarray(bg_err), bin_size)
+        
+        #sigma clip binned data to remove wildly unacceptable data
+        binned_flux = binned_P.sum(axis=1)
+        try:
+            # Need different versions for different versions of astropy...
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        except TypeError:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+        if np.ma.is_masked(binned_flux_mask):
+            binned_time = binned_time[binned_flux_mask==binned_flux]
+            binned_time_std = binned_time_std[binned_flux_mask==binned_flux]
+            binned_bg = binned_bg[binned_flux_mask==binned_flux]
+            binned_bg_std = binned_bg_std[binned_flux_mask==binned_flux]
+            binned_bg_err = binned_bg_err[binned_flux_mask==binned_flux]
+            binned_bg_err_std = binned_bg_err_std[binned_flux_mask==binned_flux]
+            binned_P_std = binned_flux_std[binned_flux_mask==binned_flux]
+            binned_P = binned_flux[binned_flux_mask==binned_flux]
 
     if plot:
         if bin_data:
