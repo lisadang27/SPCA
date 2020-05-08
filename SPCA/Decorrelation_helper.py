@@ -649,7 +649,7 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner, sh
     labels = p0_fancyLabels[:ind_a]
 
     fname = savepath+'MCMC_'+mode+'_astroWalkers.pdf'
-    make_plots.walk_style(ind_a, chain.shape[0], chain, 10, chain.shape[1], labels, fname)
+    make_plots.walk_style(ind_a, chain.shape[0], chain, 10, chain.shape[1], labels, fname, showPlot)
 
     if 'bliss' not in mode.lower() or r'$\sigma_F$' in p0_fancyLabels:
         labels = p0_fancyLabels[ind_a:]
