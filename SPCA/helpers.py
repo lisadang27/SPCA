@@ -52,13 +52,14 @@ def signal_params():
 
     return p0_obj
 
-def get_data(path, mode='', cut=0):
+def get_data(path, mode, path_aper='', cut=0):
     """Retrieve binned data.
 
     Args:
         path (string): Full path to the data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
-        cut (int): Number of data points to remove from the start of the arrays.
+        path_aper (string, optional): Full path to the data file output by aperture photometry routine.
+        cut (int, optional): Number of data points to remove from the start of the arrays.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -80,37 +81,36 @@ def get_data(path, mode='', cut=0):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
         time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
+        
+        #REMOVE LATER: Hack to allow for PLD photometry that intially didn't sigma clip bad bins
+        binned_flux = stamp.sum(axis=1)
+        try:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+        except TypeError:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+        if np.any(binned_flux_mask.mask):
+            time = time[np.logical_not(binned_flux_mask.mask)]
+            stamp = stamp[np.logical_not(binned_flux_mask.mask)]
         
         order = np.argsort(time)
         stamp = stamp[order][cut:]
-        time = time[order][cut:]
+        time_pld = time[order][cut:]
         
-        mask = np.logical_not(sigma_clip(stamp.sum(axis=1), sigma=6).mask)
-        
-        #Transpose pixel stamp array for easier use
-        stamp = stamp[mask].T
-        time = time[mask]
-        
-        stamp /= np.median(np.sum(stamp, axis=0))
-        
-        # Could replace this with aperture photometry flux instead if we wanted
-        flux = np.sum(stamp, axis=0)
+        mask_pld = np.logical_not(sigma_clip(stamp.sum(axis=1), sigma=6).mask)
         
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
-        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
-        xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
-        ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
-        psfxw = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
-        psfyw = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
-
-        factor = 1/(np.nanmedian(flux))
-        flux = factor*flux
-        flux_err = factor*flux
+        if 'pld' not in mode.lower():
+            path_aper = path
+        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
+        flux_err = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # electrons
+        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # BMJD
+        xdata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixel
+        ydata    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixel
+        psfxw = np.loadtxt(path_aper, usecols=[8], skiprows=1)     # pixel
+        psfyw = np.loadtxt(path_aper, usecols=[10], skiprows=1)    # pixel
         
         order = np.argsort(time)
         flux = flux[order][cut:]
@@ -139,8 +139,28 @@ def get_data(path, mode='', cut=0):
 
         # Ultimate Clipping
         MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
-        mask = np.logical_not(MASK)
+        mask_aper = np.logical_not(MASK)
         
+    # Combine masks in needed
+    if 'pldaper' in mode.lower():
+        mask = np.logical_and(mask_pld, mask_aper)
+    elif 'pld' in mode.lower():
+        mask = mask_pld
+    else:
+        mask = mask_aper
+        
+        
+    # Apply masks
+    if 'pld' in mode.lower():
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
+        stamp /= np.median(np.sum(stamp, axis=0))
+        
+        if 'pldaper' not in mode.lower():
+            time = time[mask]
+            flux = np.sum(stamp, axis=0).reshape(1,-1)
+        
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux = flux[mask]
         flux_err = flux_err[mask]
         time = time[mask]
@@ -148,32 +168,36 @@ def get_data(path, mode='', cut=0):
         ydata = ydata[mask]
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
-    
+        
+        factor = 1/(np.nanmedian(flux))
+        flux = factor*flux
+        flux_err = factor*flux
+        
         # redefining the zero centroid position
         if 'bliss' not in mode.lower():
             mid_x, mid_y = np.nanmean(xdata), np.nanmean(ydata)
             xdata -= mid_x
             ydata -= mid_y
-            
-            
+
+    
     if 'pld' in mode.lower():
         #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
-        # FIX - pldaper will break if masked stamps aren't same length as masked flux......
         stamp /= flux
         
         return stamp, flux, time
     else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
 
-def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
+def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([])):
     """Retrieve unbinned data.
 
     Args:
         path (string): Full path to the unbinned data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
-        cut (int): Number of data points to remove from the start of the arrays.
-        nFrames (int): The number of frames that were binned together in the binned data.
-        ignore (ndarray): Array specifying which frames were found to be bad and should be ignored.
+        path_aper (string, optional): Full path to the data file output by aperture photometry routine.
+        cut (int, optional): Number of data points to remove from the start of the arrays.
+        nFrames (int, optional): The number of frames that were binned together in the binned data.
+        ignore (ndarray, optional): Array specifying which frames were found to be bad and should be ignored.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -195,7 +219,7 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # mJr/str
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
         time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
         
         order = np.argsort(time)
@@ -210,33 +234,23 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         mask_id[ind.astype(int)] = 1
         mask_id = np.ma.make_mask(mask_id)
 
+        mask_nan = np.isnan(stamp.sum(axis=1))
+        
         # Ultimate Clipping
-        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_id
-        mask = np.logical_not(MASK)
-        
-        #Transpose pixel stamp array for easier use
-        stamp = stamp[mask].T
-        time = time[mask]
-        
-        stamp /= np.median(np.sum(stamp, axis=0))
-        
-        # Could replace this with aperture photometry flux instead if we wanted
-        flux = np.sum(stamp, axis=0)
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_id + mask_nan
+        mask_pld = np.logical_not(MASK)
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
-        #Loading Data
-        flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-        flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-        time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
-        xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
-        ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
-        psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
-        psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+        if 'pld' not in mode.lower():
+            path_aper = path
+        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
+        flux_err = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # electrons
+        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # hours
+        xdata    = np.loadtxt(path_aper, usecols=[3], skiprows=1)     # pixels
+        ydata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixels
 
-        factor = 1/(np.nanmedian(flux))
-        flux = factor*flux
-        flux_err = factor*flux
-        
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]
         flux_err = flux_err[order][int(cut*nFrames):]
@@ -269,11 +283,33 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         mask_id = np.zeros(len(flux))
         mask_id[ind.astype(int)] = 1
         mask_id = np.ma.make_mask(mask_id)
-    
+        
+        mask_nan = np.isnan(flux)
+        
         # Ultimate Clipping
-        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
-        mask = np.logical_not(MASK)
-    
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id + mask_nan
+        mask_aper = np.logical_not(MASK)
+        
+    # Combine masks in needed
+    if 'pldaper' in mode.lower():
+        mask = np.logical_and(mask_pld, mask_aper)
+    elif 'pld' in mode.lower():
+        mask = mask_pld
+    else:
+        mask = mask_aper
+        
+        
+    # Apply masks
+    if 'pld' in mode.lower():
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
+        stamp /= np.median(np.sum(stamp, axis=0))
+        
+        if 'pldaper' not in mode.lower():
+            time = time[mask]
+            flux = np.sum(stamp, axis=0).reshape(1,-1)
+        
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux = flux[mask]
         flux_err = flux_err[mask]
         time = time[mask]
@@ -281,6 +317,10 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
         ydata = ydata[mask]
         psfxw = psfxw[mask]
         psfyw = psfyw[mask]
+        
+        factor = 1/(np.nanmedian(flux))
+        flux = factor*flux
+        flux_err = factor*flux
         
         # redefining the zero centroid position
         if 'bliss' not in mode.lower():
@@ -290,7 +330,6 @@ def get_full_data(path, mode='', cut=0, nFrames=64, ignore=np.array([])):
     
     if 'pld' in mode.lower():
         #Normalize stamp pixel values by the sum of the stamp (or the aperture flux if pldaper)
-        # FIX - pldaper will break if masked stamps aren't same length as masked flux......
         stamp /= flux
         
         return stamp, flux, time

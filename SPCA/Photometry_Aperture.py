@@ -443,7 +443,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         fig.suptitle(planet, fontsize="x-large")
         
         axes[0].plot(plotx, ploty0,'k+', color='black')
-        axes[0].set_ylabel("Stellar Flux (MJy/str)")
+        axes[0].set_ylabel("Stellar Flux (electrons)")
 
         axes[1].plot(plotx, ploty1, '+', color='black')
         axes[1].set_ylabel("$x_0$")
