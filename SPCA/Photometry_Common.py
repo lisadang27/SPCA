@@ -84,6 +84,29 @@ def get_time(hdu_list, time, ignoreFrames):
     time.extend(t)
     return time
 
+def oversampling(image_data, a = 2):
+    """First, substitutes all invalid/sigma-clipped pixels by interpolating the value, then linearly oversamples the image.
+
+    Args:
+        image_data (ndarray): Data cube of images (2D arrays of pixel values).
+        a (int, optional):  Sampling factor, e.g. if a = 2, there will be twice as much data points in the x and y axis.
+            Default is 2. (Do not recommend larger than 2)
+
+    Returns:
+        ndarray: Data cube of oversampled images (2D arrays of pixel values).
+    
+    """
+    
+    l, h, w = image_data.shape
+    gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
+    image_over = np.empty((l, h*a, w*a))
+    for i in range(l):
+        image_masked = np.ma.masked_invalid(image_data[i,:,:])
+        points       = np.where(image_masked.mask == False)
+        image_compre = np.ma.compressed(image_masked)
+        image_over[i,:,:] = interpolate.griddata(points, image_compre, (gridx, gridy), method = 'linear')
+    return image_over/(a**2)
+
 def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = None, bounds = (13, 18, 13, 18), sigma=4, maxiters=2):
     """Sigma clips bad pixels and mask entire frame if the sigma clipped pixel is too close to the target.
 

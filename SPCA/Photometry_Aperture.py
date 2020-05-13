@@ -19,32 +19,7 @@ import os, sys, csv, glob, warnings
 
 from collections import Iterable
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, binning_data
-
-def oversampling(image_data, a = 2):
-    """First, substitutes all invalid/sigma-clipped pixels by interpolating the value, then oversamples the image.
-
-    Args:
-        image_data (ndarray): Data cube of images (2D arrays of pixel values).
-        a (int, optional):  Sampling factor, e.g. if a = 2, there will be twice as much data points in the x and y axis.
-            Default is 2. (Do not recommend larger than 2)
-
-    Returns:
-        ndarray: Data cube of oversampled images (2D arrays of pixel values).
-    
-    """
-    
-    l, h, w = image_data.shape
-    gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
-    image_over = np.empty((l, h*a, w*a))
-    for i in range(l):
-        image_masked = np.ma.masked_invalid(image_data[i,:,:])
-        mask         = np.ma.getmask(image_masked)
-        points       = np.where(mask == False)
-        #points       = np.ma.nonzero(image_masked)
-        image_compre = np.ma.compressed(image_masked)
-        image_over[i,:,:] = interpolate.griddata(points, image_compre, (gridx, gridy), method = 'linear')
-    return image_over/(a**2)
+from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling, sigma_clipping, bgsubtract, binning_data
 
 def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds=(14, 18, 14, 18)):
     """Gets the centroid of the target by flux weighted mean and the PSF width of the target.
@@ -202,7 +177,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         save_bin (string, optional): Filename of the full binned output data. Default is '/ch2_datacube_binned_AORs579.dat'.
         plot (bool, optional): True if you want to plot the time resolved lightcurve. Default is True.
         plot_name (string, optional): If plot and save is True, the filename of the plot to be saved as. Default is True.
-        oversamp (bool, optional): True if you want to oversample you image. Default is False.
+        oversamp (bool, optional): True if you want to oversample the image by a factor of 2. Default is False.
         save_oversamp (bool, optional): True if you want to save oversampled images. Default is True.
         reuse_oversamp (bool, optional): True if you want to reuse oversampled images that were previously saved.
             Default is False.
