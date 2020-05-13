@@ -32,7 +32,7 @@ from astropy.io import fits
 import urllib.request
 
 # SPCA libraries
-from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss
+from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss, freeze
 
 
 # FIX: Add a docstring for this function
@@ -441,12 +441,8 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
 
     # taking max lnprob params instead of median bc degeneracy
     if usebestfit: 
-        if runMCMC:
-            maxk, maxiter = np.unravel_index((lnprobchain).argmax(), (lnprobchain).shape)
-            p0_mcmc = chain[maxk, maxiter,:]
-        else:
-            maxk, maxiter = np.unravel_index((lnprobchain).argmax(), (lnprobchain).shape)
-            p0_mcmc = chain[maxk, maxiter,:]
+        maxk, maxiter = np.unravel_index((lnprobchain).argmax(), (lnprobchain).shape)
+        p0_mcmc = chain[maxk, maxiter,:]
         for i in range(len(p0_mcmc)):
             MCMC_Results[i] = (p0_mcmc[i], MCMC_Results[i][1], MCMC_Results[i][2])
 
@@ -669,19 +665,19 @@ def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner, sh
 
 
 # FIX: Add a docstring for this function
-def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc,
-           time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False):
+def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, detecfunc, signalfunc, lnpriorfunc,
+           time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False):
     
     if 'gp' in mode.lower():
-        return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs,
+        return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams,
                          astrofunc, detecfunc, signalfunc, lnpriorfunc,
-                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False)
+                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False)
     
-    p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
-    p0_detec = helpers.get_fitted_params(detecfunc, dparams)
-    p0_psfwi  = helpers.get_fitted_params(detec_models.detec_model_PSFW, dparams)
-    p0_hside  = helpers.get_fitted_params(detec_models.hside, dparams)
-    p0_tslope  = helpers.get_fitted_params(detec_models.tslope, dparams)
+    p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
+    p0_detec = freeze.get_fitted_params(detecfunc, dparams)
+    p0_psfwi  = freeze.get_fitted_params(detec_models.detec_model_PSFW, dparams)
+    p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
+    p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
 
     
     #################
@@ -734,9 +730,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
     detec_full_guess = signal_guess/astro_guess
     
     if showPlot:
-        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-        plt.show()
-        plt.close()    
+        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, showPlot=showPlot)
     
     #################
     # Run an initial MCMC burn-in and pick the best location found along the way
@@ -757,7 +751,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
 
     global templnprob
     def templnprob(pars):
-        return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+        return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
     
     priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
     iters = 10
@@ -806,14 +800,14 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, 
 
 
 # FIX: Add a docstring for this function
-def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
-              time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False):
+def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
+              time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False):
     
-    p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
-    p0_detec = helpers.get_fitted_params(detecfunc, dparams)
-    p0_psfwi  = helpers.get_fitted_params(detec_models.detec_model_PSFW, dparams)
-    p0_hside  = helpers.get_fitted_params(detec_models.hside, dparams)
-    p0_tslope  = helpers.get_fitted_params(detec_models.tslope, dparams)
+    p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
+    p0_detec = freeze.get_fitted_params(detecfunc, dparams)
+    p0_psfwi  = freeze.get_fitted_params(detec_models.detec_model_PSFW, dparams)
+    p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
+    p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
     
     ######################
     # Iteratively run scipy optimize
@@ -845,7 +839,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
         p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
         p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 
-        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom], 'Nelder-Mead')
+        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
         lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
 
         p0_temps.append(np.copy(spyResult_full.x))
@@ -893,7 +887,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, err
 
         global templnprob
         def templnprob(pars):
-            return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+            return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
        
         priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
         iters = 10
