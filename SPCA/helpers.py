@@ -222,7 +222,7 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             npix = 5
         else:
             # FIX, throw an actual error
-            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            print('Error: only 3x3 and 5x5 stamps for PLD are supported.')
             return
         stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
         time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
@@ -231,18 +231,30 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         stamp = stamp[order][int(cut*nFrames):]
         time = time[order][int(cut*nFrames):]
         
+        
+        #REMOVE LATER: Hack to allow for PLD photometry that intially didn't sigma clip bad bins
+#         binned_flux = stamp.sum(axis=1)
+#         try:
+#             binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+#         except TypeError:
+#             binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+#         if np.any(binned_flux_mask.mask):
+#             time = time[np.logical_not(binned_flux_mask.mask)]
+#             stamp = stamp[np.logical_not(binned_flux_mask.mask)]
+        
+        
         # Clip bad frames
-        ind = np.array([])
-        for i in ignore:
-            ind = np.append(ind, np.arange(i, len(stamp), nFrames))
-        mask_id = np.zeros(len(stamp))
-        mask_id[ind.astype(int)] = 1
-        mask_id = np.ma.make_mask(mask_id)
+#         ind = np.array([])
+#         for i in ignore:
+#             ind = np.append(ind, np.arange(i, len(stamp), nFrames))
+#         mask_id = np.zeros(len(stamp))
+#         mask_id[ind.astype(int)] = 1
+#         mask_id = np.ma.make_mask(mask_id)
 
         mask_nan = np.isnan(stamp.sum(axis=1))
         
         # Ultimate Clipping
-        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_id + mask_nan
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_nan
         mask_pld = np.logical_not(MASK)
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
@@ -256,6 +268,22 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         psfxw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
         psfyw    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixels
 
+        #Clip bad frames
+        ind = np.array([])
+        for i in ignore:
+            ind = np.append(ind, np.arange(i, len(flux), nFrames))
+        mask_id = np.zeros(len(flux))
+        mask_id[ind.astype(int)] = 1
+        mask_id = np.logical_not(np.ma.make_mask(mask_id))
+        
+        flux = flux[mask_id]
+        flux_err = flux_err[mask_id]
+        time = time[mask_id]
+        xdata = xdata[mask_id]
+        ydata = ydata[mask_id]
+        psfxw = psfxw[mask_id]
+        psfyw = psfyw[mask_id]
+        
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]
         flux_err = flux_err[order][int(cut*nFrames):]
@@ -281,18 +309,10 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
             PSFYW_clip = sigma_clip(psfyw, sigma=3.5, iters=1)
         
-        # Clip bad frames
-        ind = np.array([])
-        for i in ignore:
-            ind = np.append(ind, np.arange(i, len(flux), nFrames))
-        mask_id = np.zeros(len(flux))
-        mask_id[ind.astype(int)] = 1
-        mask_id = np.ma.make_mask(mask_id)
-        
         mask_nan = np.isnan(flux)
         
         # Ultimate Clipping
-        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id + mask_nan
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_nan
         mask_aper = np.logical_not(MASK)
         
     # Combine masks in needed
@@ -430,11 +450,11 @@ def expand_dparams(dparams, mode):
         dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(1,26)])
         dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
     elif 'pld' in mode.lower():
-        if 'pld1' in mode.lower():
+        if 'pld1' in mode.lower() or 'pldaper1' in mode.lower():
             if '3x3' in mode.lower():
                 dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
             dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
-        elif 'pld2' in mode.lower() and '3x3' in mode.lower():
+        elif ('pld2' in mode.lower() or 'pldaper2' in mode.lower()) and '3x3' in mode.lower():
             dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
             dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(10,26)])
         
@@ -443,7 +463,7 @@ def expand_dparams(dparams, mode):
     
     return dparams
 
-
+# FIX: Add a docstring for this function
 def get_p0(dparams, obj):
     """Initialize the p0 variable to the defaults.
 
@@ -467,68 +487,6 @@ def get_p0(dparams, obj):
     for i in range(len(fit_params)):
         p0[i] = obj[fit_params[i]]
     return p0, fit_params, fancy_labels
-
-# FIX: Add a docstring for this function or remove it
-def get_lambdaparams(function):
-    return inspect.getfullargspec(function).args[1:]
-
-# FIX: Add a docstring for this function
-def get_fitted_params(function, dparams):
-    if type(function) == partial:
-        name = function.func.__name__
-    else:
-        name = function.__name__
-    
-    if name=='detec_model_bliss':
-        if 'sigF' in dparams:
-            params = []
-        else:
-            params = ['sigF']
-    else:
-        params = get_lambdaparams(function)
-        params = [param for param in params if param not in dparams]
-    return params
-
-# FIX - this is currently empty!!!
-def load_past_params(path):
-    """Load the fitted parameters from a previous run.
-
-    Args:
-        path (string): Path to the file containing past mcmc result (must be a table saved as .npy file).
-
-    Returns:
-        ndarray: p0 (the previously fitted values)
-    
-    """
-    
-    return
-
-# FIX - keep trying to think of ways of removing any/all instances of eval...
-def make_lambdafunc(function, dparams=[], obj=[], debug=False):
-    """Create a lambda function called dynamic_funk that will fix the parameters listed in dparams with the values in obj.
-
-    Note: The module where the original function is needs to be loaded in this file.
-    
-    Args:
-        function (string): Name of the original function.
-        dparams (list, optional): List of all input parameters the user does not wish to fit (default is None.)
-        obj (string, optional): Object containing all initial and fixed parameter values (default is None.)
-        debug (bool, optional): If true, will print mystr so the user can read the command because executing it (default is False).
-
-    Returns:
-        function: dynamic_funk (the lambda function with fixed parameters.)
-    
-    """
-    
-    full_args  = inspect.getfullargspec(function).args[1:]
-    freeze_kwargs = dict([[dparams[i], obj[dparams[i]]] for i in range(len(dparams)) if dparams[i] in full_args])
-    dynamic_funk = partial(function, **freeze_kwargs)
-    
-    if debug:
-        print(inspect.getfullargspec(dynamic_funk).args[1:])
-        print()
-    
-    return dynamic_funk
 
 # FIX: Add a docstring for this function
 def lnprior_gaussian(p0, priorInds, priors, errs):
@@ -557,9 +515,15 @@ def lnprior_gamma(p0, priorInd, shape, rate):
     else:
         return 0
 
+# FIX: Add a docstring for this function
+def lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd):
+    # Combine all the different priors
+    return (lnprior_gaussian(p0, gpriorInds, priors, errs)+
+            lnprior_uniform(p0, upriorInds, uparams_limits)+
+            lnprior_gamma(p0, gammaInd, 1, 100))
+
 
 # FIX - check if sigF in p0, otherwise use a fixed value passed in through signal_input or something
-@timeout_decorator.timeout(10)
 def lnlike(p0, p0_labels, signalfunc, signal_input):
     """Evaluate the ln-likelihood at the position p0.
     
@@ -588,8 +552,7 @@ def lnlike(p0, p0_labels, signalfunc, signal_input):
         model = signalfunc(signal_input, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
         return loglikelihood(flux, model, p0[-1])
     
-
-def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd):
     """Evaluate the ln-probability of the signal function at the position p0, including priors.
 
     Args:
@@ -609,23 +572,26 @@ def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis,
     
     # Evalute the prior first since this is much quicker to compute
     lp = lnpriorfunc(mode=signal_input[-1], checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-
-    if (lnpriorcustom is not None):
-        lp += lnpriorcustom(p0)
+    if not np.isfinite(lp):
+        return -np.inf
+    
+    lp += lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
+    if not np.isfinite(lp):
+        return -np.inf
+    
+    lp += lnlike(p0, p0_labels, signalfunc, signal_input)
     if not np.isfinite(lp):
         return -np.inf
     else:
-        try:
-            lp += lnlike(p0, p0_labels, signalfunc, signal_input)
-        except timeout_decorator.timeout_decorator.TimeoutError:
-            print(f'MCMC step froze for 10 seconds with p0={p0}\n',end='')
-            lp += -np.inf
-
-    if np.isfinite(lp):
         return lp
-    else:
-        return -np.inf
 
+# def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+#     try:
+#         return _lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom)
+#     except timeout_decorator.timeout_decorator.TimeoutError:
+#         print(f'MCMC step froze for 10 seconds with p0={p0}\n',end='', flush=True)
+#         return -np.inf
+    
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
