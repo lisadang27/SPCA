@@ -748,19 +748,15 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, det
     pos0 = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
 
     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-    global templnprob
-    def templnprob(pars):
-        return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
     
-    priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+    priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
     iters = 10
     while np.any(priorlnls) and iters>0:
     #         print('Warning: Some of the initial values fail the lnprior!')
     #         print('Trying to re-draw positions...')
         p0_rel_errs /= 1.5
         pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
-        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
         iters -= 1
     if iters==0 and np.any(priorlnls):
         print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
@@ -774,7 +770,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, det
 #     if True:
         with Pool(ncpu) as pool:
             #sampler
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+            sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
             pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
     print('Mean burn-in acceptance fraction: {0:.3f}'
                 .format(np.median(sampler.acceptance_fraction)))
@@ -814,7 +810,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
     ######################
     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
 
     spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
 
@@ -840,7 +836,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
         p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 
         spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
-        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
 
         p0_temps.append(np.copy(spyResult_full.x))
 
@@ -884,19 +880,15 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
         pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
 
         checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-        global templnprob
-        def templnprob(pars):
-            return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
        
-        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
         iters = 10
         while np.any(priorlnls) and iters>0:
     #         print('Warning: Some of the initial values fail the lnprior!')
     #         print('Trying to re-draw positions...')
             p0_rel_errs /= 1.5
             pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
-            priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+            priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
             iters -= 1
         if iters==0 and np.any(priorlnls):
             print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
@@ -908,7 +900,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
         if True:
             with Pool(ncpu) as pool:
                 #sampler
-                sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
                 pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=False)
         print('Mean burn-in acceptance fraction: {0:.3f}'
                         .format(np.median(sampler.acceptance_fraction)))
@@ -925,7 +917,7 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
     
     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
 
     spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
 
@@ -935,8 +927,8 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
     print('Running second iterative scipy.optimize')
     for p0_temp in tqdm(p0_temps_mcmc):
 
-        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom], 'Nelder-Mead')
-        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
+        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
+        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
 
         p0_temps_final.append(np.copy(spyResult_full.x))
 
