@@ -39,7 +39,7 @@ class signal_params(object):
         self.B     = B
         self.C     = C
         self.D     = D
-        self.r2    = rp
+        self.r2    = None
         self.r2off = 0.0
         self.c1    = 1.0
         self.c2    = 0.0
