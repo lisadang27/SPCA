@@ -29,7 +29,7 @@ def signal_params():
     
     p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
     p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
-    p0_obj.update({'p0_0':0.5})
+#     p0_obj.update({'p0_0':0.5})
     p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(1,10)]))
     p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(10,26)]))
     p0_obj.update(dict([['p'+str(i)+'_2', 0.2] for i in range(1,26)]))
@@ -39,7 +39,7 @@ def signal_params():
                             'A', 'B', 'C', 'D', 'r2', 'r2off'])
     params = np.append(params, ['c'+str(i) for i in range(1,22)])
     params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
-    params = np.append(params, ['p0_0'])
+#     params = np.append(params, ['p0_0'])
     params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
     params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
     params = np.append(params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
@@ -49,7 +49,7 @@ def signal_params():
                             r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
     fancyParams = np.append(fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
     fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
-    fancyParams = np.append(fancyParams, [r'$p_{0-0}$'])
+#     fancyParams = np.append(fancyParams, [r'$p_{0-0}$'])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-1}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-2}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
@@ -189,10 +189,12 @@ def get_data(path, mode, path_aper='', cut=0):
 
     
     if 'pld' in mode.lower():
-        stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
+        # Add a constant offset term
+#         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
         
         if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
-            stamp2 = stamp[1:]**2
+            # Add on the 2nd order PLD pixel lightcurves
+            stamp2 = stamp**2#[1:]**2
             stamp2 /= stamp2.sum(axis=0)
             stamp = np.append(stamp, stamp, axis=0)
         
@@ -363,10 +365,12 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             ydata -= mid_y
     
     if 'pld' in mode.lower():
-        stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
+        # Add a constant offset term
+#         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
         
         if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
-            stamp2 = stamp[1:]**2
+            # Add on the 2nd order PLD pixel lightcurves
+            stamp2 = stamp**2#[1:]**2
             stamp2 /= stamp2.sum(axis=0)
             stamp = np.append(stamp, stamp, axis=0)
         
@@ -607,7 +611,7 @@ def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis,
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
-            p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+            p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
             p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
             p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
             p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
@@ -639,7 +643,6 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
-        p0_0 (float): The constant offset term for PLD decorrelation.
         p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
         p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         gpAmp (float): The natural logarithm of the GP covariance amplitude.

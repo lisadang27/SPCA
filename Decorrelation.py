@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore")
 import emcee
 
 # SPCA libraries
-from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss
+from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss, freeze
 from SPCA import Decorrelation_helper as dh
 
 
@@ -48,6 +48,7 @@ uparams_limits = [[0,-3],[0,-3]]
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 minPolys[0] = 6
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
+PLDAper = True                           # whether to use aperture photometry when doing PLD (strongly recommended as this gives much cleaner photometry than the sum of the PLD stamp)
 tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
 tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
 tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
@@ -156,18 +157,22 @@ for iterationNumber in range(len(planets)):
             modes.append('Poly'+str(polyOrder)+'_v1_ellipse')
             modes.append('Poly'+str(polyOrder)+'_v1_ellipseOffset')
 
+    if PLDAper:
+        interfix = 'Aper'
+    else:
+        interfix = ''
     if tryPLD1_3x3:
-        modes.append('PLD1_3x3_v1')
-        modes.append('PLD1_3x3_v2')
+        modes.append('PLD'+interfix+'1_3x3_v1')
+        modes.append('PLD'+interfix+'1_3x3_v2')
     if tryPLD2_3x3:
-        modes.append('PLD2_3x3_v1')
-        modes.append('PLD2_3x3_v2')
+        modes.append('PLD'+interfix+'2_3x3_v1')
+        modes.append('PLD'+interfix+'2_3x3_v2')
     if tryPLD1_5x5:
-        modes.append('PLD1_5x5_v1')
-        modes.append('PLD1_5x5_v2')
+        modes.append('PLD'+interfix+'1_5x5_v1')
+        modes.append('PLD'+interfix+'1_5x5_v2')
     if tryPLD2_5x5:
-        modes.append('PLD2_5x5_v1')
-        modes.append('PLD2_5x5_v2')
+        modes.append('PLD'+interfix+'2_5x5_v1')
+        modes.append('PLD'+interfix+'2_5x5_v2')
         
     if tryBliss:
         modes.append('BLISS_v1')
@@ -183,9 +188,6 @@ for iterationNumber in range(len(planets)):
     modes = [mode+mode_appendix for mode in modes]
 
     for mode in modes:
-
-        if planet=='HD149026b' and channel=='ch1' and mode=='PLD2_3x3_v1_autoRun':
-            continue
 
         print('Beginning', planet, channel, mode)
         
@@ -207,6 +209,13 @@ for iterationNumber in range(len(planets)):
         (foldername, filename, filename_full, savepath,
          path_params, AOR_snip, aors, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel,
                                                                         mode, pldIgnoreFrames, pldAddStack)
+        
+        if 'pldaper' in mode.lower():
+            # Get separately aperture data for when running PLDAper
+            (foldername_aper, filename_aper, filename_full_aper, _,
+             _, _, _, _) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1', pldIgnoreFrames, pldAddStack)
+        else:
+            foldername_aper, filename_aper, filename_full_aper = '', '', ''
 
         # Figure out where there are AOR breaks
         breaks = dh.find_breaks(rootpath, planet, channel, aors)
@@ -223,10 +232,13 @@ for iterationNumber in range(len(planets)):
         if 'pld' in mode.lower():
             # get data from unbinned photometry for chi2 on unbinned data calculation later
             Pnorm_full, flux_full, time_full = helpers.get_full_data(foldername+filename_full, mode,
-                                                                 cut=cut, nFrames=nFrames, ignore=ignoreFrames)
+                                                                     foldername_aper+filename_full_aper,
+                                                                     cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
-            Pnorm_0, flux0, time0 = helpers.get_data(foldername+filename, mode)
-            Pnorm, flux, time = helpers.get_data(foldername+filename, mode, cut=cut)
+            Pnorm_0, flux0, time0 = helpers.get_data(foldername+filename, mode,
+                                                                foldername_aper+filename_aper)
+            Pnorm, flux, time = helpers.get_data(foldername+filename, mode,
+                                                           foldername_aper+filename_aper, cut=cut)
 
             # FIX: Add an initial PLD plot
         else:
@@ -271,33 +283,27 @@ for iterationNumber in range(len(planets)):
         p0, p0_labels, p0_fancyLabels = helpers.get_p0(dparams, p0_obj)
 
         # make lambda functions to freeze certain inputs
-        astrofunc = helpers.make_lambdafunc(astro_models.ideal_lightcurve, dparams, p0_obj, debug=debug)
-        detecfunc = helpers.make_lambdafunc(detecfunc, dparams, p0_obj, debug=debug)
-        psfwifunc = helpers.make_lambdafunc(detec_models.detec_model_PSFW, dparams, p0_obj, debug=debug)
-        hsidefunc = helpers.make_lambdafunc(detec_models.hside, dparams, p0_obj, debug=debug)
-        tslopefunc = helpers.make_lambdafunc(detec_models.tslope, dparams, p0_obj, debug=debug)
-        lnpriorfunc = helpers.make_lambdafunc(helpers.lnprior, dparams, obj=p0_obj, debug=debug)
-        signalfunc = helpers.make_lambdafunc(signalfunc, dparams, obj=p0_obj, debug=debug)
+        astrofunc = freeze.make_lambdafunc(astro_models.ideal_lightcurve, dparams, p0_obj, debug=debug)
+        detecfunc = freeze.make_lambdafunc(detecfunc, dparams, p0_obj, debug=debug)
+        psfwifunc = freeze.make_lambdafunc(detec_models.detec_model_PSFW, dparams, p0_obj, debug=debug)
+        hsidefunc = freeze.make_lambdafunc(detec_models.hside, dparams, p0_obj, debug=debug)
+        tslopefunc = freeze.make_lambdafunc(detec_models.tslope, dparams, p0_obj, debug=debug)
+        lnpriorfunc = freeze.make_lambdafunc(helpers.lnprior, dparams, obj=p0_obj, debug=debug)
+        signalfunc = freeze.make_lambdafunc(signalfunc, dparams, obj=p0_obj, debug=debug)
 
         # detemining which params in p0 are part of which functions
-        p0_astro  = helpers.get_fitted_params(astro_models.ideal_lightcurve, dparams)
-        p0_detec = helpers.get_fitted_params(detecfunc, dparams)
-        p0_psfwi  = helpers.get_fitted_params(detec_models.detec_model_PSFW, dparams)
-        p0_hside  = helpers.get_fitted_params(detec_models.hside, dparams)
-        p0_tslope  = helpers.get_fitted_params(detec_models.tslope, dparams)
+        p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
+        p0_detec = freeze.get_fitted_params(detecfunc, dparams)
+        p0_psfwi  = freeze.get_fitted_params(detec_models.detec_model_PSFW, dparams)
+        p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
+        p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
 
-        if gparams != [] or uparams != []:
-            gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
-            upriorInds = [np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels]
-            if 'gp' in mode.lower():
-                gammaInd = np.where(p0_labels=='gpAmp')[0][0]
-            else:
-                gammaInd = None
-            lnprior_custom = lambda p0: (helpers.lnprior_gaussian(p0, gpriorInds, priors, errs)+
-                                         helpers.lnprior_uniform(p0, upriorInds, uparams_limits)+
-                                         helpers.lnprior_gamma(p0, gammaInd, 1, 100))
+        gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
+        upriorInds = [np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels]
+        if 'gp' in mode.lower():
+            gammaInd = np.where(p0_labels=='gpAmp')[0][0]
         else:
-            lnprior_custom = None
+            gammaInd = None
 
         # initial astro model
         astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
@@ -344,25 +350,9 @@ for iterationNumber in range(len(planets)):
 
 
         if runMCMC and not initializeWithOld and 'bliss' not in mode.lower():
-
-            p0 = dh.burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, priors, errs, astrofunc, detecfunc, signalfunc, lnpriorfunc,
-                           time, flux, astro_guess, resid, detec_inputs, signal_inputs, lnprior_custom, ncpu, savepath, showPlot=False)
-
-
-        # ## Check how long the MCMC is going to take
-
-        # In[ ]:
-
-
-        if runMCMC:
-            checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-            number = int(1e3)
-        #     with threadpool_limits(limits=1, user_api='blas'):
-            if True:
-                avgRuntime = timeit.timeit(lambda: helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom), number=number)/float(number)
-            estRuntime = avgRuntime*(nBurnInSteps2+nProductionSteps)/60.
-            print('Estimated total MCMC runtime: ~'+str(int(np.rint(estRuntime/ncpu)))+' mins')
+    
+            p0 = dh.burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, detecfunc, signalfunc, lnpriorfunc,
+                   time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False)
 
 
         # ## Run the MCMC
@@ -382,90 +372,87 @@ for iterationNumber in range(len(planets)):
 
             checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
 
-            def templnprob(pars):
-                return helpers.lnprob(pars, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, lnprior_custom)
-
-            priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+            priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
             iters = 10
             while np.any(priorlnls) and iters>0:
                 p0_rel_errs /= 1.5
                 pos0[priorlnls] = np.array([(p0*(1+p0_rel_errs*np.random.randn(ndim))
                                              +p0_rel_errs/10.*np.abs(np.random.randn(ndim))) for i in range(np.sum(priorlnls))])
-                priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or (lnprior_custom != 'none' and np.isinf(lnprior_custom(p_tmp)))) for p_tmp in pos0])
+                priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
                 iters -= 1
             if iters==0 and np.any(priorlnls):
                 print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
 
             #Second burn-in
             #Do quick burn-in to get walkers spread out
-            tic = t.time()
-            print('Running second burn-in')
-            with threadpool_limits(limits=1, user_api='blas'):
-        #     if True:
-                with Pool(ncpu) as pool:
-                    #sampler
-                    sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
-                    pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=True)
-            print('Mean burn-in acceptance fraction: {0:.3f}'
-                            .format(np.median(sampler.acceptance_fraction)))
-            fname = savepath+'MCMC_'+mode+'_burninWalkers.pdf'
-            make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10,
-                                  int(np.rint(nBurnInSteps2/nwalkers)), p0_fancyLabels, fname)
-            sampler.reset()
-            toc = t.time()
-            print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
+        #     tic = t.time()
+        #     print('Running second burn-in')
+        #     with threadpool_limits(limits=1, user_api='blas'):
+        # #     if True:
+        #         with Pool(ncpu) as pool:
+        #             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
+        #             pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=True)
+        #     print('Mean burn-in acceptance fraction: {0:.3f}'
+        #                     .format(np.median(sampler.acceptance_fraction)))
+        #     fname = savepath+'MCMC_'+mode+'_burninWalkers.pdf'
+        #     make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10,
+        #                           int(np.rint(nBurnInSteps2/nwalkers)), p0_fancyLabels, fname)
+        #     sampler.reset()
+        #     toc = t.time()
+        #     print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
 
+        #     pos2 = np.median(pos1, axis=0)
+        #     pos3 = np.array([pos2+np.random.normal(loc=0, scale=np.std(pos1, axis=0)) for i in range(nwalkers)])
+        #     while np.any(np.isinf([templnprob(pos) for pos in pos3])):
+        #         for i in np.where(np.isinf([templnprob(pos) for pos in pos3])):
+        #             pos3[i] = pos2+np.random.normal(loc=0, scale=np.std(pos1, axis=0))
 
             #Run production
             #Run that will be saved
-            tic = t.time()
+        #     tic = t.time()
+        #     # Continue from last positions and run production
+        #     print('Running production')
+        #     with threadpool_limits(limits=1, user_api='blas'):
+        #     #     if True:
+        #         with Pool(ncpu) as pool:
+        #             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
+        #             pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=True)
+        #     print("Mean acceptance fraction: {0:.3f}"
+        #                     .format(np.mean(sampler.acceptance_fraction)))
+        #     toc = t.time()
+        #     print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
+
+            #Run production
+            #Run that will be saved
             # Continue from last positions and run production
-            print('Running production')
+            print('Running MCMC')
             with threadpool_limits(limits=1, user_api='blas'):
-        #     if True:
+            #     if True:
                 with Pool(ncpu) as pool:
-                    #sampler
-                    sampler = emcee.EnsembleSampler(nwalkers, ndim, templnprob, a = 2, pool=pool)
-                    pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=True)
+                    sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
+                    pos2, prob, state = sampler.run_mcmc(pos0, np.rint((nBurnInSteps2+nProductionSteps)/nwalkers), progress=True)
             print("Mean acceptance fraction: {0:.3f}"
                             .format(np.mean(sampler.acceptance_fraction)))
-            toc = t.time()
-            print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
 
+            lnprobchain = sampler.get_log_prob(discard=int(np.rint((nBurnInSteps2)/nwalkers))).swapaxes(0,1)
+            chain = sampler.get_chain(discard=int(np.rint((nBurnInSteps2)/nwalkers))).swapaxes(0,1)
 
             #Saving MCMC Results
             pathchain = savepath + 'samplerchain_'+mode+'.npy'
             pathlnlchain = savepath + 'samplerlnlchain_'+mode+'.npy'
             pathposit = savepath + 'samplerposi_'+mode+'.npy'
             pathlnpro = savepath + 'samplerlnpr_'+mode+'.npy'
-            np.save(pathchain, sampler.chain)
-            np.save(pathlnlchain, sampler.lnprobability)
+            np.save(pathchain, chain)
+            np.save(pathlnlchain, lnprobchain)
             np.save(pathposit, pos2)
-            np.save(pathlnpro, prob)
-
-            lnprobchain = sampler.lnprobability
-            chain = sampler.chain
+            np.save(pathlnpro, prob)   
 
         else:
 
             pathchain = savepath + 'samplerchain_'+mode+'.npy'
             pathlnlchain = savepath + 'samplerlnlchain_'+mode+'.npy'
-
-            if not os.path.exists(pathchain):
-                print('Previous decorrelation attempt with mode', mode, 'for', planet, channel, 'not found. Skipping.')
-                continue
-
             chain = np.load(pathchain)
-
-            if not os.path.exists(pathlnlchain):
-                if usebestfit:
-                    print('No ln-likelihood chain was saved; cannot determine best-fit value of saved chain.')
-                    print('Resorting to the median of the chain instead.')
-                lnprobchain = None
-                usebestfit_temp = False
-            else:
-                lnprobchain = np.load(pathlnlchain)
-                usebestfit_temp = usebestfit
+            lnprobchain = np.load(pathlnlchain)
 
             pathlnpro = savepath + 'samplerlnpr_'+mode+'.npy'
             if os.path.exists(pathlnpro):
@@ -488,10 +475,11 @@ for iterationNumber in range(len(planets)):
 
 
         # FIX: Save this when running the MCMC, and load if re-making outputs
-        p0_mcmc, MCMC_Results, residuals = dh.print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels,
-                                                                 p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full,
-                                                                 signalfunc, astrofunc, usebestfit_temp, savepath, sigF_photon_ppm,
-                                                                 nFrames, secondOrderOffset, compFactor)
+        p0_mcmc, MCMC_Results, residuals = dh.print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, 
+                                                                 p0_labels, p0_astro, mode, channel, p0_obj, signal_inputs,
+                                                                 signal_inputs_full, signalfunc, astrofunc, usebestfit, 
+                                                                 savepath, sigF_photon_ppm, nFrames, secondOrderOffset, 
+                                                                 compFactor)
 
 
         # In[ ]:
@@ -530,7 +518,8 @@ for iterationNumber in range(len(planets)):
 
         minBins = 5
 
-        make_plots.plot_rednoise(residuals, minBins, ingrDuration, occDuration, intTime, mode, savepath, savetxt=True, showPlot=False)
+        make_plots.plot_rednoise(residuals, minBins, ingrDuration, occDuration, intTime, mode, savepath, savetxt=True,
+                                 showPlot=False)
 
 
         # ## Look for residual correlations after fit

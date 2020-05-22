@@ -17,7 +17,7 @@ from . import astro_models
 def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
            c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9, c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21, 
            d1, d2, d3, s1, s2, m1, 
-           p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+           p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
            p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
            p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
@@ -53,7 +53,6 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
-        p0_0 (float): The constant offset term for PLD decorrelation.
         p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
         p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         gpAmp (float): The natural logarithm of the GP covariance amplitude.
@@ -75,7 +74,7 @@ def signal(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C,
                            c18, c19, c20, c21, d1,  d2,  d3,  s1,  s2, m1)
     elif 'pld' in mode.lower():
         return signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-                          p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+                          p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
                           p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
                           p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
                           p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
@@ -154,7 +153,7 @@ def signal_poly(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, 
     return model
 
 def signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-               p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+               p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
                p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
                p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
                p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
@@ -179,7 +178,6 @@ def signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B
         D (float): Amplitude of the second-order sine term. Default=0.
         r2 (float): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
         r2off (float): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
-        p0_0 (float): The constant offset term for PLD decorrelation.
         p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
         p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         s1 (float): The amplitude of the heaviside step function.
@@ -200,7 +198,7 @@ def signal_PLD(signal_input, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B
     
     astroModel   = astro_models.ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, 
                                            A, B, C, D, r2, r2off)
-    detec  = detec_model_PLD((Pgroup, mode), p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
+    detec  = detec_model_PLD((Pgroup, mode), p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
                              p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1, p18_1, p19_1,
                              p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
                              p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2,
@@ -459,7 +457,7 @@ def tslope(time, m1):
     """
     return 1+(time-time[0])*m1
 
-def detec_model_PLD(input_data, p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
+def detec_model_PLD(input_data, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1,
                     p10_1=0, p11_1=0, p12_1=0, p13_1=0, p14_1=0, p15_1=0,
                     p16_1=0, p17_1=0, p18_1=0, p19_1=0, p20_1=0, p21_1=0,
                     p22_1=0, p23_1=0, p24_1=0, p25_1=0,
@@ -482,7 +480,7 @@ def detec_model_PLD(input_data, p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, 
     
     pixels, mode = input_data # Pgroup are pixel "lightcurves" 
     
-    detec = [p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1]
+    detec = [p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1]
     if '5x5' in mode.lower():
         # Add additional pixels
         detec.extend([p10_1, p11_1, p12_1, p13_1, p14_1, p15_1, p16_1, p17_1,
