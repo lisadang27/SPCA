@@ -109,7 +109,7 @@ def loadArchivalData(rootpath, planet, channel):
     e = data['pl_orbeccen'][nameIndex]
     argp = data['pl_orblper'][nameIndex]
 
-    if e != 0:
+    if e != 0 and np.isfinite(e):
 
         if not np.isfinite(argp):
             print('Randomly generating an argument of periastron...')
