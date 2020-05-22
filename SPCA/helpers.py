@@ -190,6 +190,12 @@ def get_data(path, mode, path_aper='', cut=0):
     
     if 'pld' in mode.lower():
         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
+        
+        if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
+            stamp2 = stamp[1:]**2
+            stamp2 /= stamp2.sum(axis=0)
+            stamp = np.append(stamp, stamp, axis=0)
+        
         return stamp, flux, time
     else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw
@@ -358,6 +364,12 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
     
     if 'pld' in mode.lower():
         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
+        
+        if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
+            stamp2 = stamp[1:]**2
+            stamp2 /= stamp2.sum(axis=0)
+            stamp = np.append(stamp, stamp, axis=0)
+        
         return stamp, flux, time
     else:
         return flux, flux_err, time, xdata, ydata, psfxw, psfyw

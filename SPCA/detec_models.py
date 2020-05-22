@@ -480,7 +480,7 @@ def detec_model_PLD(input_data, p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, 
 
     """
     
-    Pgroup, mode = input_data # Pgroup are pixel "lightcurves" 
+    pixels, mode = input_data # Pgroup are pixel "lightcurves" 
     
     detec = [p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1]
     if '5x5' in mode.lower():
@@ -496,13 +496,6 @@ def detec_model_PLD(input_data, p0_0, p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, 
                       p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2])
     
     detec = np.array(detec)
-        
-    pixels = Pgroup
-    if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
-        # Add the flux**2 terms for 2nd order PLD
-        pixels2 = pixels[1:]**2
-        pixels2 /= pixels2.sum(axis=0)
-        pixels = np.append(pixels, pixels2, axis=0)
     
     return np.dot(detec, pixels).reshape(-1)
 
