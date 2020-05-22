@@ -353,7 +353,7 @@ def get_photon_limit(flux, nFrames, ignoreFrames):
     return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
 # FIX: Add a docstring for this function
-def get_photon_limit_oldData(rootpath, datapath, planet, channel, mode, aors, nFrames, ignoreFrames):
+def get_photon_limit_oldData(rootpath, datapath, datapath_aper, planet, channel, mode, aors, nFrames, ignoreFrames):
     #This function is to be used with old photometry to allow for recalculating photon noise limits given the
     #    old data had incorrect units for making photon noise calculations
     aor = aors[-1]
@@ -362,7 +362,7 @@ def get_photon_limit_oldData(rootpath, datapath, planet, channel, mode, aors, nF
     with fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0]) as rawImage:
         rawHeader = rawImage[0].header
     
-    if 'pld' in mode.lower():
+    if 'pld' in mode.lower() and 'pldaper' not in mode.lower():
         if '3x3' in mode.lower():
             npix = 3
         elif '5x5' in mode.lower():
@@ -370,6 +370,8 @@ def get_photon_limit_oldData(rootpath, datapath, planet, channel, mode, aors, nF
         flux = np.loadtxt(datapath, usecols=list(np.arange(npix**2).astype(int)), skiprows=1)     # mJr/str
         flux = np.sum(flux, axis=1)
     else:
+        if 'pldaper' in mode.lower():
+            datapath = datapath_aper
         # Calculate the photon noise limit
         flux = np.loadtxt(datapath, usecols=[0], skiprows=1)     # mJr/str
     
