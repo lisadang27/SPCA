@@ -22,11 +22,11 @@ from SPCA import Decorrelation_helper as dh
 
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
-channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
+#planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+#channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
 
-planets = planets[3:]
-channels = channels[3:]
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
+channels = ['ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2']
 
 rootpath = '/homes/picaro/bellt/research/'
 # rootpath = '/home/taylor/Documents/Research/spitzer/'
@@ -46,7 +46,6 @@ uparams_limits = [[0,-3],[0,-3]]
 
 
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
-minPolys[0] = 6
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 PLDAper = True                           # whether to use aperture photometry when doing PLD (strongly recommended as this gives much cleaner photometry than the sum of the PLD stamp)
 tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
@@ -60,10 +59,10 @@ tryPSFW = False
 
 oldPhotometry = True                     # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 24                                # The number of cpu threads to be used when running MCMC
-runMCMC = False                           # whether to run MCMC or just load-in past results
-nBurnInSteps2 = 1e6                      # number of steps to use for the second mcmc burn-in
+runMCMC = True                           # whether to run MCMC or just load-in past results
+nBurnInSteps2 = 1.5e6                    # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
-usebestfit = False                       # used best-fit instead of most probable parameters 
+usebestfit = False                       # used best-fit instead of median of chain
 blissNBin = 8                            # number of knots to allow in each direction
 secondOrderOffset = False                # should you use the second order sinusoid terms when calculating offset
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
