@@ -264,7 +264,7 @@ for iterationNumber in range(len(planets)):
         # Calculate the photon noise limit
         if oldPhotometry:
             # Fix the old, unhelpful units to electrons to compute photon noise limit
-            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, planet,
+            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename_aper, planet,
                                                           channel, mode, aors, nFrames, ignoreFrames)
         else:
             sigF_photon_ppm = dh.get_photon_limit(flux, nFrames, ignoreFrames)
