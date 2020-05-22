@@ -731,64 +731,65 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, det
     #includes psfw and/or hside functions if they're being fit
     detec_full_guess = signal_guess/astro_guess
     
-    if showPlot:
-        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, showPlot=showPlot)
+    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
     
     #################
     # Run an initial MCMC burn-in and pick the best location found along the way
     #################
     
-    ndim = len(p0)
-    nwalkers = ndim*3
-    nBurnInSteps1 = 25500 # Chosen to give 500 steps per walker for Poly2v1 and 250 steps per walker for Poly5v2
+#     ndim = len(p0)
+#     nwalkers = ndim*3
+#     nBurnInSteps1 = 25500 # Chosen to give 500 steps per walker for Poly2v1 and 250 steps per walker for Poly5v2
     
-    # get scattered starting point in parameter space 
-    # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
-    p0_rel_errs = 1e-4*np.ones_like(p0)
-    gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
-    p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
-    pos0 = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
+#     # get scattered starting point in parameter space 
+#     # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
+#     p0_rel_errs = 1e-4*np.ones_like(p0)
+#     gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
+#     p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
+#     pos0 = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
 
-    checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
+#     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
     
-    priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
-    iters = 10
-    while np.any(priorlnls) and iters>0:
-    #         print('Warning: Some of the initial values fail the lnprior!')
-    #         print('Trying to re-draw positions...')
-        p0_rel_errs /= 1.5
-        pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
-        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
-        iters -= 1
-    if iters==0 and np.any(priorlnls):
-        print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
+#     priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
+#     iters = 10
+#     while np.any(priorlnls) and iters>0:
+#     #         print('Warning: Some of the initial values fail the lnprior!')
+#     #         print('Trying to re-draw positions...')
+#         p0_rel_errs /= 1.5
+#         pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
+#         priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
+#         iters -= 1
+#     if iters==0 and np.any(priorlnls):
+#         print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
 
         
         
-    #First burn-in
-    tic = t.time()
-    print('Running first burn-in')
-    with threadpool_limits(limits=1, user_api='blas'):
-#     if True:
-        with Pool(ncpu) as pool:
-            #sampler
-            sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
-            pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
-    print('Mean burn-in acceptance fraction: {0:.3f}'
-                .format(np.median(sampler.acceptance_fraction)))
+#     #First burn-in
+#     tic = t.time()
+#     print('Running first burn-in')
+#     with threadpool_limits(limits=1, user_api='blas'):
+# #     if True:
+#         with Pool(ncpu) as pool:
+#             #sampler
+#             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
+#             pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+#     print('Mean burn-in acceptance fraction: {0:.3f}'
+#                 .format(np.median(sampler.acceptance_fraction)))
+#     p0 = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
     
+#     fname = savepath+'MCMC_'+mode+'_burnin1Walkers.pdf'
+#     fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels,
+#                                 fname, showPlot)
     
-    fname = savepath+'MCMC_'+mode+'_burnin1Walkers.pdf'
-    fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels,
-                                fname, showPlot)
+#     spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
+#     spyResult_full = scipy.optimize.minimize(spyFunc_full, p0, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
     
-    
-    p0 = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
-    astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
-    signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-    #includes psfw and/or hside functions if they're being fit
-    detec_full_guess = signal_guess/astro_guess
-    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
+#     p0 = spyResult_full.x
+#     astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
+#     signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
+#     #includes psfw and/or hside functions if they're being fit
+#     detec_full_guess = signal_guess/astro_guess
+#     make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
     
     return p0
 
