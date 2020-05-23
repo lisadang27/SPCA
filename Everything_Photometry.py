@@ -15,8 +15,10 @@ from SPCA import photometryBackend
 ncpu = 23
 
 # The names of all the planets you want analyzed (without spaces)
-planets = planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+#planets = planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 # WASP-103b is full-frame, 55Cnce is going to be tough
+
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
 
 #folder containing data from each planet
 basepath = '/homes/picaro/bellt/research/'

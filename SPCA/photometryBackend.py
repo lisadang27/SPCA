@@ -204,16 +204,16 @@ def get_RMS(Run_list, channel, AOR_snip, highpassWidth, trim=False, trimStart=0,
         time = time[order]
             
         smooth = highpassflist(flux, highpassWidth)
-        smoothed = (flux - smooth)+np.mean(flux)
-        RMS_list[i] = np.sqrt(np.mean((flux-smooth)**2.))/np.mean(smoothed)
+        smoothed = (flux - smooth)+np.nanmean(flux)
+        RMS_list[i] = np.sqrt(np.nanmean((flux-smooth)**2.))/np.nanmean(smoothed)
         path = foldername + '/RMS_Scatter.pdf'
         fig, axes = plt.subplots(ncols = 1, nrows = 2, sharex = True, figsize = (10,6))
         fig.suptitle('RMS = '+ str(RMS_list[i]))
         axes[0].plot(time, flux, 'k.', alpha = 0.15, label='Measured Flux')
         axes[0].plot(time, smooth, '+', label = 'Filtered')
         axes[0].set_ylabel('Relative Flux')
-        axes[1].plot(time, (smoothed/np.mean(smoothed)-1)*1e2, 'k.', alpha =0.1)
-        axes[1].set_xlim(np.min(time), np.max(time))
+        axes[1].plot(time, (smoothed/np.nanmean(smoothed)-1)*1e2, 'k.', alpha =0.1)
+        axes[1].set_xlim(np.nanmin(time), np.nanmax(time))
         axes[1].axhline(y=0, color='b', linewidth = 1)
         axes[1].set_ylabel('Residual (%)')
         axes[1].set_xlabel('Time since IRAC turn on(days)')
@@ -299,28 +299,28 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     
     
     if np.any(exact_moving):
-        print('Exact Moving - Best RMS (ppm):', np.round(np.min(RMS[exact_moving])*1e6, decimals=2))
-        print('Exact Moving - Best Aperture Radius:', Radius[exact_moving][np.where(RMS[exact_moving]==np.min(RMS[exact_moving]))[0][0]])
+        print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
+        print('Exact Moving - Best Aperture Radius:', Radius[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
         print()
     if np.any(soft_moving):
-        print('Soft Moving - Best RMS (ppm):', np.round(np.min(RMS[soft_moving])*1e6, decimals=2))
-        print('Soft Moving - Best Aperture Radius:', Radius[soft_moving][np.where(RMS[soft_moving]==np.min(RMS[soft_moving]))[0][0]])
+        print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
+        print('Soft Moving - Best Aperture Radius:', Radius[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
         print()
     if np.any(hard_moving):
-        print('Hard Moving - Best RMS (ppm):', np.round(np.min(RMS[hard_moving])*1e6, decimals=2))
-        print('Hard Moving - Best Aperture Radius:', Radius[hard_moving][np.where(RMS[hard_moving]==np.min(RMS[hard_moving]))[0][0]])
+        print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
+        print('Hard Moving - Best Aperture Radius:', Radius[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
         print()
     if np.any(exact):
-        print('Exact - Best RMS (ppm):', np.round(np.min(RMS[exact])*1e6, decimals=2))
-        print('Exact - Best Aperture Radius:', Radius[exact][np.where(RMS[exact]==np.min(RMS[exact]))[0][0]])
+        print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
+        print('Exact - Best Aperture Radius:', Radius[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
         print()
     if np.any(soft):
-        print('Soft - Best RMS (ppm):', np.round(np.min(RMS[soft])*1e6, decimals=2))
-        print('Soft - Best Aperture Radius:', Radius[soft][np.where(RMS[soft]==np.min(RMS[soft]))[0][0]])
+        print('Soft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
+        print('Soft - Best Aperture Radius:', Radius[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
         print()
     if np.any(hard):
-        print('Hard - Best RMS (ppm):', np.round(np.min(RMS[hard])*1e6, decimals=2))
-        print('Hard - Best Aperture Radius:', Radius[hard][np.where(RMS[hard]==np.min(RMS[hard]))[0][0]])
+        print('Hard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
+        print('Hard - Best Aperture Radius:', Radius[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
         
     
     optionsSelected = np.array(['' for i in range(len(RMS))], dtype=str)
@@ -337,5 +337,5 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     with open(figpath+'best_option.txt', 'w') as file:
         file.write(Run_list[np.argmin(RMS)])
     
-    return np.min(RMS), Run_list[np.argmin(RMS)]
+    return np.nanmin(RMS), Run_list[np.argmin(RMS)]
 
