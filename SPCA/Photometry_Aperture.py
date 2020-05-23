@@ -137,7 +137,7 @@ def A_photometry(image_data, bg_err, ape_sum = None, ape_sum_err = None,
             elif (shape == 'Rectangular'):
                 aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
         data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
-        phot_table = aperture_photometry(image_data[i,:,:], aperture, error=data_error, method=method)#, pixelwise_error=False)
+        phot_table = aperture_photometry(image_data[i,:,:], aperture, error=data_error, method=method)
         tmp_sum.extend(phot_table['aperture_sum'])
         tmp_err.extend(phot_table['aperture_sum_err'])
     # removing outliers
@@ -283,7 +283,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                 image_data0 += stackHDU[0].data
             #ignore any consistently bad frames
             if ignoreFrames != []:
-                image_data0 = np.delete(image_data0, ignoreFrames, axis=0)
+                image_data0[ignoreFrames] = np.nan
             h, w, l = image_data0.shape
             # convert MJy/str to electron count
             convfact = hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']/hdu_list[0].header['FLUXCONV']
@@ -385,22 +385,22 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         except TypeError:
             binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
         if np.ma.is_masked(binned_flux_mask):
-            binned_time = binned_time[binned_flux_mask==binned_flux]
-            binned_time_std = binned_time_std[binned_flux_mask==binned_flux]
-            binned_xo = binned_xo[binned_flux_mask==binned_flux]
-            binned_xo_std = binned_xo_std[binned_flux_mask==binned_flux]
-            binned_yo = binned_yo[binned_flux_mask==binned_flux]
-            binned_yo_std = binned_yo_std[binned_flux_mask==binned_flux]
-            binned_xw = binned_xw[binned_flux_mask==binned_flux]
-            binned_xw_std = binned_xw_std[binned_flux_mask==binned_flux]
-            binned_yw = binned_yw[binned_flux_mask==binned_flux]
-            binned_yw_std = binned_yw_std[binned_flux_mask==binned_flux]
-            binned_bg = binned_bg[binned_flux_mask==binned_flux]
-            binned_bg_std = binned_bg_std[binned_flux_mask==binned_flux]
-            binned_bg_err = binned_bg_err[binned_flux_mask==binned_flux]
-            binned_bg_err_std = binned_bg_err_std[binned_flux_mask==binned_flux]
-            binned_flux_std = binned_flux_std[binned_flux_mask==binned_flux]
-            binned_flux = binned_flux[binned_flux_mask==binned_flux]
+            binned_time[binned_flux_mask==binned_flux] = np.nan
+            binned_time_std[binned_flux_mask==binned_flux] = np.nan
+            binned_xo[binned_flux_mask==binned_flux] = np.nan
+            binned_xo_std[binned_flux_mask==binned_flux] = np.nan
+            binned_yo[binned_flux_mask==binned_flux] = np.nan
+            binned_yo_std[binned_flux_mask==binned_flux] = np.nan
+            binned_xw[binned_flux_mask==binned_flux] = np.nan
+            binned_xw_std[binned_flux_mask==binned_flux] = np.nan
+            binned_yw[binned_flux_mask==binned_flux] = np.nan
+            binned_yw_std[binned_flux_mask==binned_flux] = np.nan
+            binned_bg[binned_flux_mask==binned_flux] = np.nan
+            binned_bg_std[binned_flux_mask==binned_flux] = np.nan
+            binned_bg_err[binned_flux_mask==binned_flux] = np.nan
+            binned_bg_err_std[binned_flux_mask==binned_flux] = np.nan
+            binned_flux_std[binned_flux_mask==binned_flux] = np.nan
+            binned_flux[binned_flux_mask==binned_flux] = np.nan
 
     if plot:
         if bin_data:
