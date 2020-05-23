@@ -14,12 +14,13 @@ from . import Photometry_PLD as PLDPhotometry
 
 
 # FIX - check if the folder is empty, and if it is, just overwrite it
-def create_folder(fullname, auto=False):
+def create_folder(fullname, auto=False, overwrite=False):
     """Create a folder unless it exists.
 
     Args:
         fullname (string): Full path to the folder to be created.
         auto (bool, optional): If the folder already exists, should the folder just be skipped (True) or should the user be asked whether they want to overwrite the folder or change the folder name (False, Default).
+        overwrite (bool, optional): Whether you want to overwrite the folder if it already exists
 
     Returns:
         string: The final name used for the folder.
@@ -36,7 +37,9 @@ def create_folder(fullname, auto=False):
             # Folder exists but is empty and can be safely written to
             solved = 'yes'
         else:
-            if auto:
+            if overwrite:
+                solved = 'yes'
+            elif auto:
                 fullname = None
                 solved = 'yes'
             else:
@@ -92,7 +95,7 @@ def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_sn
     print('Starting:', savepath)
     
     # create save folder
-    savepath = create_folder(savepath, rerun_photometry==False)
+    savepath = create_folder(savepath, True, rerun_photometry)
     
     if savepath == None:
         # This photometry has already been run
