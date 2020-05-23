@@ -12,14 +12,14 @@ from SPCA import frameDiagnosticsBackend
 from SPCA import photometryBackend
 
 # The number of CPU threads you want to use for running photometry methods in parallel
-ncpu =1
+ncpu = 23
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['KELT-7b']
+planets = planets = ['CoRoT-2b', 'HAT-P-7b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 # WASP-103b is full-frame, 55Cnce is going to be tough
 
 #folder containing data from each planet
-basepath = '/Users/ldang/Desktop/Spitzer/'
+basepath = '/homes/picaro/bellt/research/'
 
 #####################################################################
 # Parameters to set how you want your photometry done
@@ -28,6 +28,9 @@ basepath = '/Users/ldang/Desktop/Spitzer/'
 #################
 # General settings
 #################
+
+# Whether you want to write over past photometry if it exists
+rerun_photometry = True
 
 # Whether or not to bin data points together
 bin_data = True
@@ -140,17 +143,18 @@ for planet in planets:
                 for photometryMethod in photometryMethods:
                     if photometryMethod=='PLD':
                         for stamp_size in stamp_sizes:
-                            photometryBackend.run_photometry(photometryMethod, basepath, planet, channel, subarray,
-                                                             AOR_snip, addStack, bin_data, bin_size, ignoreFrames_temp,
+                            photometryBackend.run_photometry(photometryMethod,basepath,
+                                                             planet, channel, subarray, AOR_snip, rerun_photometry,
+                                                             addStack, bin_data, bin_size, ignoreFrames_temp,
                                                              maskStars, stamp_size)
                     elif photometryMethod=='Aperture':
                         with multiprocessing.Pool(ncpu) as pool:
                             for moveCentroid in moveCentroids:
                                 for edge in edges:
-                                    func = partial(photometryBackend.run_photometry, photometryMethod, basepath, planet,
-                                                   channel, subarray, AOR_snip,
+                                    func = partial(photometryBackend.run_photometry, photometryMethod, basepath,
+                                                   planet, channel, subarray, AOR_snip, rerun_photometry,
                                                    addStack, bin_data, bin_size, ignoreFrames_temp, maskStars,
-                                                   stamp_sizes[0], shape, edge, moveCentroid)
+                                                   None, shape, edge, moveCentroid)
                                     pool.map(func, radii)
 
                         print('Selecting the best aperture photometry method from this suite...')

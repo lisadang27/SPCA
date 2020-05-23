@@ -51,7 +51,7 @@ def create_folder(fullname, auto=False):
                     fullname = '/'.join(fullname.split('/')[0:-1])+'/'+folder
     return fullname
 
-def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_snip,
+def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_snip, rerun_photometry=False,
                    addStack=False, bin_data=True, bin_size=64, 
                    ignoreFrames=None, maskStars=None,
                    stamp_size=3,
@@ -92,7 +92,7 @@ def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_sn
     print('Starting:', savepath)
     
     # create save folder
-    savepath = create_folder(savepath, True)
+    savepath = create_folder(savepath, rerun_photometry==False)
     
     if savepath == None:
         # This photometry has already been run
