@@ -29,7 +29,6 @@ def signal_params():
     
     p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
     p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
-#     p0_obj.update({'p0_0':0.5})
     p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(1,10)]))
     p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(10,26)]))
     p0_obj.update(dict([['p'+str(i)+'_2', 0.2] for i in range(1,26)]))
@@ -39,7 +38,6 @@ def signal_params():
                             'A', 'B', 'C', 'D', 'r2', 'r2off'])
     params = np.append(params, ['c'+str(i) for i in range(1,22)])
     params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
-#     params = np.append(params, ['p0_0'])
     params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
     params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
     params = np.append(params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
@@ -49,7 +47,6 @@ def signal_params():
                             r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
     fancyParams = np.append(fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
     fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
-#     fancyParams = np.append(fancyParams, [r'$p_{0-0}$'])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-1}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-2}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
@@ -90,20 +87,12 @@ def get_data(path, mode, path_aper='', cut=0):
         stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
         time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
         
-        #REMOVE LATER: Hack to allow for PLD photometry that intially didn't sigma clip bad bins
-        binned_flux = stamp.sum(axis=1)
-        try:
-            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
-        except TypeError:
-            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
-        if np.any(binned_flux_mask.mask):
-            time = time[np.logical_not(binned_flux_mask.mask)]
-            stamp = stamp[np.logical_not(binned_flux_mask.mask)]
-        
         order = np.argsort(time)
         stamp = stamp[order][cut:]
         time_pld = time[order][cut:]
         
+        # Sigma clip per data cube (also masks invalids)
+        # Convert masks into which indices to keep
         mask_pld = np.logical_not(sigma_clip(stamp.sum(axis=1), sigma=6).mask)
         
     
@@ -132,19 +121,20 @@ def get_data(path, mode, path_aper='', cut=0):
             FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
             FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
             XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
-            YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
             PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
-            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
         except TypeError:
             FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
             FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
             XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
-            YDATA_clip = sigma_clip(ydata, sigma=3.5, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
             PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
-            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
 
-        # Ultimate Clipping
+        # Combine masks for aperture photometry
         MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
+        # Convert masks into which indices to keep
         mask_aper = np.logical_not(MASK)
         
     # Combine masks in needed
@@ -186,15 +176,11 @@ def get_data(path, mode, path_aper='', cut=0):
             mid_x, mid_y = np.mean(xdata), np.mean(ydata)
             xdata -= mid_x
             ydata -= mid_y
-
     
     if 'pld' in mode.lower():
-        # Add a constant offset term
-#         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
-        
         if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
             # Add on the 2nd order PLD pixel lightcurves
-            stamp2 = stamp**2#[1:]**2
+            stamp2 = stamp**2
             stamp2 /= stamp2.sum(axis=0)
             stamp = np.append(stamp, stamp, axis=0)
         
@@ -240,30 +226,9 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         stamp = stamp[order][int(cut*nFrames):]
         time = time[order][int(cut*nFrames):]
         
-        
-        #REMOVE LATER: Hack to allow for PLD photometry that intially didn't sigma clip bad bins
-#         binned_flux = stamp.sum(axis=1)
-#         try:
-#             binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
-#         except TypeError:
-#             binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
-#         if np.any(binned_flux_mask.mask):
-#             time = time[np.logical_not(binned_flux_mask.mask)]
-#             stamp = stamp[np.logical_not(binned_flux_mask.mask)]
-        
-        
         # Clip bad frames
-#         ind = np.array([])
-#         for i in ignore:
-#             ind = np.append(ind, np.arange(i, len(stamp), nFrames))
-#         mask_id = np.zeros(len(stamp))
-#         mask_id[ind.astype(int)] = 1
-#         mask_id = np.ma.make_mask(mask_id)
-
-        mask_nan = np.isnan(stamp.sum(axis=1))
-        
-        # Ultimate Clipping
-        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask + mask_nan
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask
+        # Convert masks into which indices to keep
         mask_pld = np.logical_not(MASK)
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
@@ -307,21 +272,22 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
             FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
             XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
-            YDATA_clip = sigma_clip(ydata, sigma=3.5, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
             PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
-            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
         except TypeError:
             FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
             FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
             XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
-            YDATA_clip = sigma_clip(ydata, sigma=3.5, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
             PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
-            PSFYW_clip = sigma_clip(psfyw, sigma=3.5, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
         
         mask_nan = np.isnan(flux)
         
-        # Ultimate Clipping
+        # Combine aperture masks
         MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_nan
+        # Convert masks into which indices to keep
         mask_aper = np.logical_not(MASK)
         
     # Combine masks in needed
@@ -365,12 +331,9 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             ydata -= mid_y
     
     if 'pld' in mode.lower():
-        # Add a constant offset term
-#         stamp = np.append(np.ones_like(stamp[:1]), stamp, axis=0)
-        
         if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
             # Add on the 2nd order PLD pixel lightcurves
-            stamp2 = stamp**2#[1:]**2
+            stamp2 = stamp**2
             stamp2 /= stamp2.sum(axis=0)
             stamp = np.append(stamp, stamp, axis=0)
         
