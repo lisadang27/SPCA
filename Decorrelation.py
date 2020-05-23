@@ -30,12 +30,11 @@ planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b
 channels = ['ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2']
 
 rootpath = '/homes/picaro/bellt/research/'
-# rootpath = '/home/taylor/Documents/Research/spitzer/'
 
 mode_appendix = '_autoRun'
 
 # parameters you do not wish to fit
-dparams_input = []#['ecosw','esinw']
+dparams_input = []
 
 # parameters you want to place a gaussian prior on
 gparams = ['t0', 'per', 'a', 'inc']
@@ -101,6 +100,8 @@ dh.downloadExoplanetArchive()
 #     elif channel=='ch2':
 #         compFactor += 0.8858*0.1196
 
+# Adding companion dilution correction factor for WASP-12b
+compFactors[-1] = 0.8858*0.1196
 
 
 
