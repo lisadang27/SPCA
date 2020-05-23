@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import time as t
 import timeit
 import os
+from sklearn.decomposition import PCA
 
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
@@ -58,7 +59,7 @@ tryEllipse = False                       # Whether to try an ellipsoidal variati
 tryPSFW = False
 
 oldPhotometry = True                     # Whether photometry was computed before May 1, 2020 when flux conversion was patched
-ncpu = 24                                # The number of cpu threads to be used when running MCMC
+ncpu = 10                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1.5e6                    # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
@@ -238,6 +239,16 @@ for iterationNumber in range(len(planets)):
                                                                 foldername_aper+filename_aper)
             Pnorm, flux, time = helpers.get_data(foldername+filename, mode,
                                                            foldername_aper+filename_aper, cut=cut)
+
+            pca = PCA(n_components=int(Pnorm_full.shape[0]-1))
+            pca.fit(Pnorm_full.T)
+            Pnorm_full = pca.transform(Pnorm_full.T).T
+            Pnorm_full = np.append(np.ones_like(Pnorm_full[:1]), Pnorm_full, axis=0)
+
+            pca = PCA(n_components=int(Pnorm.shape[0]-1))
+            pca.fit(Pnorm.T)
+            Pnorm = pca.transform(Pnorm.T).T
+            Pnorm = np.append(np.ones_like(Pnorm[:1]), Pnorm, axis=0)
 
             # FIX: Add an initial PLD plot
         else:
@@ -426,7 +437,6 @@ for iterationNumber in range(len(planets)):
             # Continue from last positions and run production
             print('Running MCMC')
             with threadpool_limits(limits=1, user_api='blas'):
-            #     if True:
                 with Pool(ncpu) as pool:
                     sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
                     pos2, prob, state = sampler.run_mcmc(pos0, np.rint((nBurnInSteps2+nProductionSteps)/nwalkers), progress=True)
