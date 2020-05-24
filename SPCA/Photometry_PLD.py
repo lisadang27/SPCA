@@ -9,6 +9,7 @@ from astropy.io import fits
 from astropy.wcs import WCS
 from astropy.wcs.utils import skycoord_to_pixel
 from astropy.coordinates import SkyCoord
+from astropy.stats import sigma_clip
 
 import os, sys, csv, glob, warnings
 
@@ -199,8 +200,8 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
             binned_bg_std[binned_flux_mask==binned_flux] = np.nan
             binned_bg_err[binned_flux_mask==binned_flux] = np.nan
             binned_bg_err_std[binned_flux_mask==binned_flux] = np.nan
-            binned_flux_std[binned_flux_mask==binned_flux] = np.nan
-            binned_flux[binned_flux_mask==binned_flux] = np.nan
+            binned_P_std[binned_flux_mask==binned_flux] = np.nan
+            binned_P[binned_flux_mask==binned_flux] = np.nan
 
     if plot:
         if bin_data:

@@ -224,7 +224,6 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         ignoreFrames = []
     if maskStars is None:
         maskStars = []
-    bin_size = bin_size - len(ignoreFrames)
     
     # Ignore warning
     warnings.filterwarnings('ignore')
@@ -283,7 +282,7 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
                 image_data0 += stackHDU[0].data
             #ignore any consistently bad frames
             if ignoreFrames != []:
-                image_data0[ignoreFrames] = np.nan
+                image_data0[ignoreFrames] *= np.nan
             h, w, l = image_data0.shape
             # convert MJy/str to electron count
             convfact = hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']/hdu_list[0].header['FLUXCONV']
