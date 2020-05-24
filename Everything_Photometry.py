@@ -133,9 +133,11 @@ for planet in planets:
                 ignoreFrames = []
 
             for allowIgnoreFrame in np.sort(allowIgnoreFrames)[::-1]:
-                if allowIgnoreFrame:
+                if allowIgnoreFrame and len(ignoreFrames)!=0:
                     print('Using ignoreFrames')
                     ignoreFrames_temp = ignoreFrames
+                elif allowIgnoreFrame and (False in allowIgnoreFrames):
+                    continue
                 else:
                     print('Overwriting ignoreFrames to []')
                     ignoreFrames_temp = []

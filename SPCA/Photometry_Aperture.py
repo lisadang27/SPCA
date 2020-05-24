@@ -384,22 +384,22 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         except TypeError:
             binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
         if np.ma.is_masked(binned_flux_mask):
-            binned_time[binned_flux_mask==binned_flux] = np.nan
-            binned_time_std[binned_flux_mask==binned_flux] = np.nan
-            binned_xo[binned_flux_mask==binned_flux] = np.nan
-            binned_xo_std[binned_flux_mask==binned_flux] = np.nan
-            binned_yo[binned_flux_mask==binned_flux] = np.nan
-            binned_yo_std[binned_flux_mask==binned_flux] = np.nan
-            binned_xw[binned_flux_mask==binned_flux] = np.nan
-            binned_xw_std[binned_flux_mask==binned_flux] = np.nan
-            binned_yw[binned_flux_mask==binned_flux] = np.nan
-            binned_yw_std[binned_flux_mask==binned_flux] = np.nan
-            binned_bg[binned_flux_mask==binned_flux] = np.nan
-            binned_bg_std[binned_flux_mask==binned_flux] = np.nan
-            binned_bg_err[binned_flux_mask==binned_flux] = np.nan
-            binned_bg_err_std[binned_flux_mask==binned_flux] = np.nan
-            binned_flux_std[binned_flux_mask==binned_flux] = np.nan
-            binned_flux[binned_flux_mask==binned_flux] = np.nan
+            binned_time[binned_flux_mask!=binned_flux] = np.nan
+            binned_time_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_xo[binned_flux_mask!=binned_flux] = np.nan
+            binned_xo_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_yo[binned_flux_mask!=binned_flux] = np.nan
+            binned_yo_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_xw[binned_flux_mask!=binned_flux] = np.nan
+            binned_xw_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_yw[binned_flux_mask!=binned_flux] = np.nan
+            binned_yw_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_bg[binned_flux_mask!=binned_flux] = np.nan
+            binned_bg_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_bg_err[binned_flux_mask!=binned_flux] = np.nan
+            binned_bg_err_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_flux_std[binned_flux_mask!=binned_flux] = np.nan
+            binned_flux[binned_flux_mask!=binned_flux] = np.nan
 
     if plot:
         if bin_data:
