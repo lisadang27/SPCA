@@ -80,7 +80,7 @@ def get_time(hdu_list, time, ignoreFrames):
     step    = hdu_list[0].header['FRAMTIME']*sec2day
     t       = np.linspace(hdu_list[0].header['BMJD_OBS'] + step/2, hdu_list[0].header['BMJD_OBS'] + (h-1)*step, h)
     if ignoreFrames != []:
-        t = np.delete(t, ignoreFrames, axis=0)
+        t[ignoreFrames] = np.nan
     time.extend(t)
     return time
 

@@ -115,7 +115,6 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         ignoreFrames = []
     if maskStars is None:
         maskStars = []
-    bin_size = bin_size - len(ignoreFrames)
 
     # Ignore warning
     warnings.filterwarnings('ignore')
