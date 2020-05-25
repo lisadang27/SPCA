@@ -68,7 +68,7 @@ secondOrderOffset = False                # should you use the second order sinus
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
 nFrames  = 64                            # number of frames per binned data point
 initializeWithOld = False                # initial with previous mcmc results using the same method
-pldIgnoreFrames = True                   # Whether or not to use the PLD photometry that ignored bad frames
+pldIgnoreFrames = True                   # Whether to use PLD data that ignored bad frames (only used for PLD, not PLDAper)
 pldAddStack = False                      # Whether or not to use the PLD photometry that used background correction stacks
 debug = False                            # True if user wants details about the lambda functions created
 
@@ -206,9 +206,9 @@ for iterationNumber in range(len(planets)):
                                                                         mode, pldIgnoreFrames, pldAddStack)
         
         if 'pldaper' in mode.lower():
-            # Get separately aperture data for when running PLDAper
+            # Get separately aperture data for when running PLDAper, and decide if ignoreFrame from aperture photometry
             (foldername_aper, filename_aper, filename_full_aper, _,
-             _, _, _, _) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1', pldIgnoreFrames, pldAddStack)
+             _, _, _, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1', pldIgnoreFrames, pldAddStack)
         else:
             foldername_aper, filename_aper, filename_full_aper = '', '', ''
 
