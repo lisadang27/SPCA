@@ -227,7 +227,7 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         time = time[order][int(cut*nFrames):]
         
         # Clip bad frames
-        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask+np.isnan(time)
         # Convert masks into which indices to keep
         mask_pld = np.logical_not(MASK)
     
@@ -241,22 +241,6 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         ydata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
         psfxw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
         psfyw    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixels
-
-        #Clip bad frames
-        ind = np.array([])
-        for i in ignore:
-            ind = np.append(ind, np.arange(i, len(flux), nFrames))
-        mask_id = np.zeros(len(flux))
-        mask_id[ind.astype(int)] = 1
-        mask_id = np.logical_not(mask_id.astype(bool))
-        
-        flux = flux[mask_id]
-        flux_err = flux_err[mask_id]
-        time = time[mask_id]
-        xdata = xdata[mask_id]
-        ydata = ydata[mask_id]
-        psfxw = psfxw[mask_id]
-        psfyw = psfyw[mask_id]
         
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]
