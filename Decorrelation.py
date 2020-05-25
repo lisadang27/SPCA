@@ -201,16 +201,21 @@ for iterationNumber in range(len(planets)):
 
 
         # Figure out where data is located
-        (foldername, filename, filename_full, savepath,
-         path_params, AOR_snip, aors, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel,
-                                                                        mode, pldIgnoreFrames, pldAddStack)
-        
         if 'pldaper' in mode.lower():
             # Get separately aperture data for when running PLDAper, and decide if ignoreFrame from aperture photometry
             (foldername_aper, filename_aper, filename_full_aper, _,
-             _, _, _, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1', pldIgnoreFrames, pldAddStack)
+             _, _, _, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1')
+            if len(ignoreFrames)==0:
+                pldIgnoreFrames_temp = False
+            else:
+                pldIgnoreFrames_temp = True
         else:
+            pldIgnoreFrames_temp = pldIgnoreFrames
             foldername_aper, filename_aper, filename_full_aper = '', '', ''
+
+        (foldername, filename, filename_full, savepath,
+        path_params, AOR_snip, aors, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel,
+                                                                       mode, pldIgnoreFrames_temp, pldAddStack)
 
         # Figure out where there are AOR breaks
         breaks = dh.find_breaks(rootpath, planet, channel, aors)
