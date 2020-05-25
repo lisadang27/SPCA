@@ -57,12 +57,12 @@ tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
 
-oldPhotometry = True                     # Whether photometry was computed before May 1, 2020 when flux conversion was patched
+oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 10                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nBurnInSteps2 = 1.5e6                    # number of steps to use for the second mcmc burn-in
 nProductionSteps = 2e5                   # number of steps to use with mcmc production run
-usebestfit = False                       # used best-fit instead of median of chain
+usebestfit = True                        # used best-fit instead of median of chain
 blissNBin = 8                            # number of knots to allow in each direction
 secondOrderOffset = False                # should you use the second order sinusoid terms when calculating offset
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
@@ -77,12 +77,6 @@ compFactors = np.ones(len(planets))
 
 # non-zero if you want to remove some initial data points
 cuts = np.zeros(len(planets)).astype(int)
-
-
-
-## Download the most recent exoplanet archive data, and select the best constrained value for each parameter
-dh.downloadExoplanetArchive()
-
 
 
 
