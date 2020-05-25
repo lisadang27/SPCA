@@ -348,9 +348,23 @@ def find_breaks(rootpath, planet, channel, aors):
     return np.sort(breaks)[1:]
 
 # FIX: Add a docstring for this function
-def get_photon_limit(flux, nFrames, ignoreFrames):
+def get_photon_limit(path, mode, nFrames, ignoreFrames):
     
-    return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
+    if 'pld' in mode.lower() and 'pldaper' not in mode.lower():
+        if '3x3' in mode.lower():
+            npix = 3
+        elif '5x5' in mode.lower():
+            npix = 5
+        else:
+            # FIX, throw an actual error
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            return np.nan
+        stamp = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1).T
+        flux = np.nansum(stamp, axis=0)
+    else:
+        flux = np.loadtxt(path, usecols=[0], skiprows=1)
+    
+    return 1/np.sqrt(np.nanmedian(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
 # FIX: Add a docstring for this function
 def get_photon_limit_oldData(rootpath, datapath, datapath_aper, planet, channel, mode, aors, nFrames, ignoreFrames):

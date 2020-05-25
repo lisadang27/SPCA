@@ -245,6 +245,13 @@ for iterationNumber in range(len(planets)):
             Pnorm = pca.transform(Pnorm.T).T
             Pnorm = np.append(np.ones_like(Pnorm[:1]), Pnorm, axis=0)
 
+            if not oldPhotometry:
+                if 'pldaper' in mode.lower():
+                    path_temp = foldername_aper+filename_aper
+                else:
+                    path_temp = foldername+filename
+                sigF_photon_ppm = dh.get_photon_limit(path_temp, mode, nFrames, ignoreFrames)
+            
             # FIX: Add an initial PLD plot
         else:
             # get data from photometry
@@ -257,6 +264,9 @@ for iterationNumber in range(len(planets)):
             (flux, flux_err, time, xdata, ydata,
              psfxw, psfyw) = helpers.get_data(foldername+filename, mode, cut=cut)
 
+            if not oldPhotometry:
+                sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)
+            
             ## FIX: peritime doesn't get made
             if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
                 # make photometry plots
@@ -270,10 +280,7 @@ for iterationNumber in range(len(planets)):
         # Calculate the photon noise limit
         if oldPhotometry:
             # Fix the old, unhelpful units to electrons to compute photon noise limit
-            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename_aper, planet,
-                                                          channel, mode, aors, nFrames, ignoreFrames)
-        else:
-            sigF_photon_ppm = dh.get_photon_limit(flux, nFrames, ignoreFrames)
+            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename_aper, planet, channel, mode, aors, nFrames, ignoreFrames)
 
         # ## Initialize the guessed parameters, and make partial functions that freeze parameters that aren't fitted
 
