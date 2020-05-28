@@ -10,3 +10,4 @@ pandas
 pyyaml
 threadpoolctl
 scikit-learn
+tqdm

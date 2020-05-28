@@ -6,6 +6,7 @@ try:
 except ImportError:
     print('Warning: george failed to import. Without this installed, you cannot run GP analyses.')
     print('For instructions on how to install george, visit https://george.readthedocs.io')
+    print('Alternatively, if installing SPCA with "pip install .", you can also specify "pip install .[GP]"')
 
 # SPCA libraries
 from . import astro_models
