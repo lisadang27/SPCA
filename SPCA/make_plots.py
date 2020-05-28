@@ -19,7 +19,7 @@ from . import helpers
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
-                    time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath=None, peritime=''):
+                    time, flux, xdata, ydata, psfxw, psfyw, breaks=[], savepath=None, peritime='', showPlot=False):
     """Makes a multi-panel plot from photometry outputs.
     
     Args:
@@ -40,7 +40,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
         pertime (float): Time of periapsis
     
     Returns:
-        None or figure if savepath is None
+        None
         
     """
     
@@ -77,12 +77,14 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     if savepath!=None:
         pathplot = savepath + '01_Raw_data.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-        plt.close()
-        return
-    else:
-        return fig
+    
+    if showPlot:
+        plt.show()
+        
+    plt.close()
+    return fig
 
-def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
+def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     """Makes a multi-panel plot from photometry outputs.
     
     Args:
@@ -93,7 +95,7 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
         savepath (string): Path to directory where the plot will be saved
     
     Returns:
-        None or figure if savepath is None
+        None
     
     """
     
@@ -112,15 +114,17 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath=''):
     if savepath is not None:
         pathplot = savepath + 'Centroids.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-        plt.close()
-        return
-    else:
-        return fig
+    
+    if showPlot:
+        plt.show()
+        
+    plt.close()
+    return
 
 
 def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
                tmask_good_knotNdata, knots_x, knots_y, 
-               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath=None):
+               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath=None, showPlot=False):
     '''Plot the Bliss map'''
     
     fB_avg = bliss.map_flux_avgQuick(flux, astroModel, knot_nrst_lin, nBin, knotNdata)
@@ -157,12 +161,14 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     if savepath!=None:
         pathplot = savepath+'BLISS_Knots.pdf'
         plt.savefig(pathplot, bbox_inches='tight')
-        plt.close()
-        return
-    else:
-        return plt.gcf()
 
-def plot_init_guess(time, data, astro, detec_full, savepath=None):
+    if showPlot:
+        plt.show()
+    
+    plt.close()
+    return
+
+def plot_init_guess(time, data, astro, detec_full, savepath=None, showPlot=False):
     """Makes a multi-panel plots for the initial light curve guesses.
     
     Args:
@@ -173,7 +179,7 @@ def plot_init_guess(time, data, astro, detec_full, savepath=None):
         savepath (str): Path to directory where the plot will be saved.
     
     Returns:
-        None or figure if savepath is None
+        None
     
     """
     
@@ -206,12 +212,93 @@ def plot_init_guess(time, data, astro, detec_full, savepath=None):
     if savepath is not None:
         pathplot = savepath + '02_Initial_Guess.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-        plt.close()
-        return
-    else:
-        return fig
+        
+    if showPlot:
+        plt.show()
+        
+    plt.close()
+    return
+
+def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPlot=False):
+    """Make a plot showing the evolution of the walkers throughout the emcee sampling.
+
+    Args:
+        ndim (int): Number of free parameters
+        nwalk (int): Number of walkers
+        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
+        interv (int): Take every 'interv' element to thin out the plot
+        subsamp (int): Only show the last 'subsamp' steps
+        labels (ndarray): The fancy labels for each dimension
+        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+
+    Returns:
+        None
     
-def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=True, peritime=-np.inf, nbin=None, fontsize=10):
+    """
+    
+    # get first index
+    beg   = len(samples[0,:,0]) - subsamp
+    end   = len(samples[0,:,0]) 
+    step  = np.arange(beg,end)
+    step  = step[::interv] 
+    
+    # number of columns and rows of subplots
+    ncols = 4
+    nrows = int(np.ceil(ndim/ncols))
+    sizey = 2*nrows
+    
+    # plotting
+    plt.figure(figsize = (15, 2*nrows))
+    for ind in range(ndim):
+        plt.subplot(nrows, ncols, ind+1)
+        sig1 = (0.6827)/2.*100
+        sig2 = (0.9545)/2.*100
+        sig3 = (0.9973)/2.*100
+        percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
+        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
+        plt.plot(step, mu_param)
+        plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
+        plt.fill_between(step, pos1sig, neg1sig, facecolor='k', alpha = 0.1)
+        plt.title(labels[ind])
+        plt.xlim(np.min(step), np.max(step))
+        if ind < (ndim - ncols):
+            plt.xticks([])
+        else: 
+            plt.xticks(rotation=25)
+    if fname != None:
+        plt.savefig(fname, bbox_inches='tight')
+    
+    if showPlot:
+        plt.show()
+    
+    plt.close()
+    return
+    
+# FIX - add docstring for this function
+def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc,
+                 breaks, savepath, plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24,plot_peritime=False):
+    
+    ind_a = len(p0_astro) # index where the astro params end
+
+    # generate the models from best-fit parameters
+    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_labels))]))
+    astro = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    detec = mcmc_signal/astro
+
+#     time2 = np.linspace(np.min(time), np.max(time), 1000)
+    
+#     #for higher-rez red curve
+#     astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    
+    if plotTrueAnomaly:
+        # FIX: convert time to true anomaly for significantly eccentric planets!!
+        # Use p0_mcmc if there, otherwise p0_obj
+        x = time
+#         x2 = time2
+    else:
+        x = time
+#         x2 = time2
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -249,12 +336,16 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     axes[3].set_ylabel('Residuals', fontsize=fontsize)
     axes[3].set_xlabel('Time (BMJD)', fontsize=fontsize)
 
-    for i in range(len(axes)):
-        axes[i].xaxis.set_tick_params(labelsize=fontsize)
-        axes[i].yaxis.set_tick_params(labelsize=fontsize)
-        axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
-        for j in range(len(breaks)):
-            axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
+    if plot_peritime:
+        # FIX - compute peritime
+        print('Have not yet implemented this!')
+        
+        for i in range(len(axes)):
+            axes[i].xaxis.set_tick_params(labelsize=fontsize)
+            axes[i].yaxis.set_tick_params(labelsize=fontsize)
+            axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
+            for j in range(len(breaks)):
+                axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
     
     fig.align_ylabels()
     
@@ -263,14 +354,34 @@ def plot_bestfit(x, flux, astro, detec, mode, breaks, savepath=None, showplot=Tr
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_2.pdf'
         fig.savefig(plotname, bbox_inches='tight')
-        plt.close(fig)
-        return
-    else:
-        return fig
+        
+    if showPlot:
+        plt.show()
+    
+    plt.close()
+    return
 
-def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showplot=True, showtxt=True, savetxt=False, fontsize=10):
+def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showPlot=True, showtxt=True, savetxt=False, fontsize=10):
+    
     maxbins = int(np.rint(residuals.size/minbins))
-    rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
+    
+    try:
+        rms, rmslo, rmshi, stderr, binsz = time_avg(residuals, maxbins)
+    except:
+        rms = []
+        for i in range(minbins,len(residuals)):
+            rms.append(helpers.binnedNoise(np.arange(len(residuals)),residuals,i))
+        rms = np.array(rms)[::-1]
+
+        binsz = len(residuals)/np.arange(minbins,len(residuals))[::-1]
+
+        #In case there is a NaN or something while binning
+        binsz = binsz[np.isfinite(rms)]
+        rms = rms[np.isfinite(rms)]
+        rmslo = np.zeros_like(rms)
+        rmshi = rmslo
+        stderr = np.std(residuals)/np.sqrt(binsz)
+    
     plt.clf()
     ax = plt.gca()
     ax.set_yscale('log')
@@ -291,7 +402,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
         plt.savefig(plotname, bbox_inches='tight')
-    if showplot:
+    if showPlot:
         plt.show()
         
     plt.close()
@@ -322,7 +433,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     
     return
 
-def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname=None):
+def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname=None, showPlot=False):
     """Make a triangle plot like figure to help look for any residual correlations in the data.
 
     Args:
@@ -333,7 +444,7 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
         fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
 
     Returns:
-        None or figure if name is None
+        None
 
     """
 
@@ -371,8 +482,10 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
 
     if fname is not None:
         fig.savefig(fname, bbox_inches='tight')
-        plt.close(fig)
-        return
-    else:
-        return fig
+    
+    if showPlot:
+        plt.show()
+    
+    plt.close()
+    return
 

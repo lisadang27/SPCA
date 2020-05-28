@@ -1,4 +1,5 @@
-import setuptools, sys
+import setuptools, sys, os
+import subprocess
 from SPCA import __version__, name
 
 install_requires = ["numpy", "scipy", "astropy", "matplotlib", "emcee", 'mc3',
@@ -6,6 +7,9 @@ install_requires = ["numpy", "scipy", "astropy", "matplotlib", "emcee", 'mc3',
 
 with open("README.md", "r") as fh:
     long_description = fh.read()
+
+install_requires = ["numpy", "scipy", "astropy", "matplotlib", "emcee>=3", 'mc3',
+                    "batman-package", "corner", "photutils>=0.7", "pandas", "pyyaml", "threadpoolctl", "sklearn"]
 
 setuptools.setup(
     name = name,

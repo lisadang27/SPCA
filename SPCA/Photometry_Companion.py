@@ -423,7 +423,7 @@ def centroid_FWM(image_data, xo = [], yo = [], wx = [], wy = [], scale = 1, boun
     wy.extend(widy/scale)
     return xo, yo, wx, wy
 
-def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
+def A_photometry(image_data, bg_err, ape_sum = [], ape_sum_err = [],
     cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5, 
     theta = 0, shape = 'Circular', method='center'):
     '''
@@ -439,9 +439,6 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
 
     bg_err   : 1D array
         Array of uncertainties on pixel value.
-
-    factor   : float (optional)
-        Electron count to photon count factor. Default is 1 if none given.
 
     ape_sum  : 1D array (optional)
         Array of flux to append new flux values to. If 'None', the new values
@@ -514,8 +511,8 @@ def A_photometry(image_data, bg_err, factor = 1, ape_sum = [], ape_sum_err = [],
         data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
         phot_table = aperture_photometry(image_data[i,:,:],aperture, error=data_error, pixelwise_error=False)
         if (phot_table['aperture_sum_err'] > 0.000001):
-            ape_sum.extend(phot_table['aperture_sum']*factor)
-            ape_sum_err.extend(phot_table['aperture_sum_err']*factor)
+            ape_sum.extend(phot_table['aperture_sum'])
+            ape_sum_err.extend(phot_table['aperture_sum_err'])
         else:
             ape_sum.extend([np.nan])
             ape_sum_err.extend([np.nan])
@@ -674,17 +671,13 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
             if (oversamp == True):
                 # get centroids & PSF width
                 xo, yo, xw, yw = centroid_FWM(image_data3, xo, yo, xw, yw, scale = 2)
-                # convert electron count to Mjy/str
-                ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
                 # aperture photometry
-                aperture_sum, aperture_sum_err = A_photometry(image_data3, bg_err[-h:], ecnt2Mjy, aperture_sum, aperture_sum_err, cx = 2*15, cy = 2*15, r = 2*2.5, a = 2*5, b = 2*5, w_r = 2*5, h_r = 2*5, **kwargs)
+                aperture_sum, aperture_sum_err = A_photometry(image_data3, bg_err[-h:], aperture_sum, aperture_sum_err, cx = 2*15, cy = 2*15, r = 2*2.5, a = 2*5, b = 2*5, w_r = 2*5, h_r = 2*5, **kwargs)
             else :
                 # get centroids & PSF width
                 xo, yo, xw, yw = centroid_FWM(image_data4, xo, yo, xw, yw)
-                # convert electron count to Mjy/str
-                ecnt2Mjy = - hdu_list[0].header['PXSCAL1']*hdu_list[0].header['PXSCAL2']*(1/convfact) 
                 # aperture photometry
-                aperture_sum, aperture_sum_err = A_photometry(image_data4, bg_err[-h:], ecnt2Mjy, aperture_sum, aperture_sum_err, **kwargs)
+                aperture_sum, aperture_sum_err = A_photometry(image_data4, bg_err[-h:], aperture_sum, aperture_sum_err, **kwargs)
             print('Status:', i, 'out of', nfiles)
 
         print(np.shape(time))

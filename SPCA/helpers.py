@@ -6,81 +6,63 @@ import matplotlib.pyplot as plt
 from astropy.stats import sigma_clip
 
 import inspect
+from functools import partial
 
 import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
+# Used to cut short an MCMC step if it hangs
+import timeout_decorator
+
 # SPCA libraries
 import SPCA
 from SPCA import astro_models, detec_models, bliss
 
-class signal_params(object):
-    # class constructor
-    def __init__(self, name='planet', t0=0., per=1., rp=0.1,
-                 a=8., inc=90., ecosw=0.0, esinw=0.0, q1=0.01, q2=0.01,
-                 fp=0.001, A=0.1, B=0.0, C=0.0, D=0.0, sigF=0.0003, mode=''):
-        self.name    = name
-        self.t0      = t0
-        self.t0_err  = 0.0
-        self.per     = per
-        self.per_err = 0.0
-        self.rp      = rp
-        self.a       = a
-        self.a_err   = 0.0
-        self.inc     = inc
-        self.inc_err = 0.0
-        self.ecosw = ecosw
-        self.esinw = esinw
-        self.q1    = q1
-        self.q2    = q2
-        self.fp    = fp
-        self.A     = A
-        self.B     = B
-        self.C     = C
-        self.D     = D
-        self.r2    = None
-        self.r2off = 0.0
-        self.c1    = 1.0
-        self.c2    = 0.0
-        self.c3    = 0.0
-        self.c4    = 0.0
-        self.c5    = 0.0
-        self.c6    = 0.0
-        self.c7    = 0.0
-        self.c8    = 0.0
-        self.c9    = 0.0
-        self.c10   = 0.0
-        self.c11   = 0.0
-        self.c12   = 0.0
-        self.c15   = 0.0
-        self.c13   = 0.0
-        self.c14   = 0.0
-        self.c16   = 0.0
-        self.c17   = 0.0
-        self.c18   = 0.0
-        self.c19   = 0.0
-        self.c20   = 0.0
-        self.c21   = 0.0
-        self.d1    = 1.0
-        self.d2    = 0.0
-        self.d3    = 0.0
-        self.s1    = 0.0
-        self.s2    = 0.0
-        self.m1    = 0.0
-        self.gpAmp = -2.
-        self.gpLx  = -2.
-        self.gpLy  = -2.
-        self.sigF  = sigF
-        self.mode  = mode
-        self.Tstar = None
-        self.Tstar_err = None
+# FIX: Add a docstring for this function
+def signal_params():
+    
+    p0_obj = {'name': 'planet', 't0': 0.0, 't0_err': 0.0, 'per': 1.0, 'per_err': 0.0,
+              'rp': 0.1, 'a': 8.0, 'a_err': 0.0, 'inc': 90.0, 'inc_err': 0.0, 'ecosw': 0.0,
+              'esinw': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.001, 'A': 0.1, 'B': 0.0,
+              'C': 0.0, 'D': 0.0, 'r2': None, 'r2off': 0.0, 'c1': 1.0}
+    
+    p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
+    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(1,10)]))
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(10,26)]))
+    p0_obj.update(dict([['p'+str(i)+'_2', 0.2] for i in range(1,26)]))
+    p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0, 'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
+    
+    params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
+                            'A', 'B', 'C', 'D', 'r2', 'r2off'])
+    params = np.append(params, ['c'+str(i) for i in range(1,22)])
+    params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
+    params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
+    params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
+    params = np.append(params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
+ 
+    fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
+                            r'$e \cos(\omega)$', r'$e \sin(\omega)$', r'$q_1$', r'$q_2$', r'$f_p$', r'$A$', r'$B$',
+                            r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
+    fancyParams = np.append(fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
+    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
+    fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-1}$' for i in range(1,26)])
+    fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-2}$' for i in range(1,26)])
+    fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
+    
+    p0_obj.update({'params': params, 'fancyParams': fancyParams})
 
-def get_data(path):
+    return p0_obj
+
+def get_data(path, mode, path_aper='', cut=0):
     """Retrieve binned data.
 
     Args:
         path (string): Full path to the data file output by photometry routine.
+        mode (string): The string specifying the detector and astrophysical model to use.
+        path_aper (string, optional): Full path to the data file output by aperture photometry routine.
+        cut (int, optional): Number of data points to remove from the start of the arrays.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -93,26 +75,129 @@ def get_data(path):
 
     """
     
-    #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # BMJD
-    xdata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixel
-    ydata    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixel
-    psfxwdat = np.loadtxt(path, usecols=[8], skiprows=1)     # pixel
-    psfywdat = np.loadtxt(path, usecols=[10], skiprows=1)    # pixel
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            npix = 3
+        elif '5x5' in mode.lower():
+            npix = 5
+        else:
+            # FIX, throw an actual error
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            return
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
+        time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
+        
+        order = np.argsort(time)
+        stamp = stamp[order][cut:]
+        time_pld = time[order][cut:]
+        
+        # Sigma clip per data cube (also masks invalids)
+        # Convert masks into which indices to keep
+        mask_pld = np.logical_not(sigma_clip(stamp.sum(axis=1), sigma=6).mask)
+        
     
-    factor = 1/(np.median(flux))
-    flux = factor*flux
-    flux_err = factor*flux
-    return flux, flux_err, time, xdata, ydata, psfxwdat, psfywdat
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
+        if 'pld' not in mode.lower():
+            path_aper = path
+        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
+        flux_err = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # electrons
+        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # BMJD
+        xdata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixel
+        ydata    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixel
+        psfxw = np.loadtxt(path_aper, usecols=[8], skiprows=1)     # pixel
+        psfyw = np.loadtxt(path_aper, usecols=[10], skiprows=1)    # pixel
+        
+        order = np.argsort(time)
+        flux = flux[order][cut:]
+        flux_err = flux_err[order][cut:]
+        time = time[order][cut:]
+        xdata = xdata[order][cut:]
+        ydata = ydata[order][cut:]
+        psfxw = psfxw[order][cut:]
+        psfyw = psfyw[order][cut:]
+        
+        # Sigma clip per data cube (also masks invalids)
+        try:
+            FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
+        except TypeError:
+            FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
 
-def get_full_data(foldername, filename):
+        # Combine masks for aperture photometry
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
+        # Convert masks into which indices to keep
+        mask_aper = np.logical_not(MASK)
+        
+    # Combine masks in needed
+    if 'pldaper' in mode.lower():
+        mask = np.logical_and(mask_pld, mask_aper)
+    elif 'pld' in mode.lower():
+        mask = mask_pld
+    else:
+        mask = mask_aper
+        
+        
+    # Apply masks
+    if 'pld' in mode.lower():
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
+        
+        if 'pldaper' not in mode.lower():
+            time = time[mask]
+            flux = np.sum(stamp, axis=0).reshape(1,-1)
+            
+        #Normalize stamp pixel values by the sum of the stamp
+        stamp /= np.sum(stamp, axis=0)
+        
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
+        flux = flux[mask]
+        flux_err = flux_err[mask]
+        time = time[mask]
+        xdata = xdata[mask]
+        ydata = ydata[mask]
+        psfxw = psfxw[mask]
+        psfyw = psfyw[mask]
+        
+        factor = 1/(np.median(flux))
+        flux = factor*flux
+        flux_err = factor*flux
+        
+        # redefining the zero centroid position
+        if 'bliss' not in mode.lower():
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
+            xdata -= mid_x
+            ydata -= mid_y
+    
+    if 'pld' in mode.lower():
+        if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
+            # Add on the 2nd order PLD pixel lightcurves
+            stamp2 = stamp**2
+            stamp2 /= stamp2.sum(axis=0)
+            stamp = np.append(stamp, stamp, axis=0)
+        
+        return stamp, flux, time
+    else:
+        return flux, flux_err, time, xdata, ydata, psfxw, psfyw
+
+def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([])):
     """Retrieve unbinned data.
 
     Args:
-        foldername (string): Full path to the data file output by photometry routine.
-        filename (string): File name of the unbinned data file output by photometry routine.
+        path (string): Full path to the unbinned data file output by photometry routine.
+        mode (string): The string specifying the detector and astrophysical model to use.
+        path_aper (string, optional): Full path to the data file output by aperture photometry routine.
+        cut (int, optional): Number of data points to remove from the start of the arrays.
+        nFrames (int, optional): The number of frames that were binned together in the binned data.
+        ignore (ndarray, optional): Array specifying which frames were found to be bad and should be ignored.
 
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
@@ -125,106 +210,123 @@ def get_full_data(foldername, filename):
 
     """
     
-    path = foldername + filename
-    #Loading Data
-    flux     = np.loadtxt(path, usecols=[0], skiprows=1)     # mJr/str
-    flux_err = np.loadtxt(path, usecols=[1], skiprows=1)     # mJr/str
-    time     = np.loadtxt(path, usecols=[2], skiprows=1)     # hours
-    xdata    = np.loadtxt(path, usecols=[3], skiprows=1)     # pixels
-    ydata    = np.loadtxt(path, usecols=[4], skiprows=1)     # pixels
-    psfxw    = np.loadtxt(path, usecols=[5], skiprows=1)     # pixels
-    psfyw    = np.loadtxt(path, usecols=[6], skiprows=1)     # pixels
+    if 'pld' in mode.lower():
+        if '3x3' in mode.lower():
+            npix = 3
+        elif '5x5' in mode.lower():
+            npix = 5
+        else:
+            # FIX, throw an actual error
+            print('Error: only 3x3 and 5x5 stamps for PLD are supported.')
+            return
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
+        time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
+        
+        order = np.argsort(time)
+        stamp = stamp[order][int(cut*nFrames):]
+        time = time[order][int(cut*nFrames):]
+        
+        # Clip bad frames
+        MASK  = sigma_clip(stamp.sum(axis=1), sigma=6).mask+np.isnan(time)
+        # Convert masks into which indices to keep
+        mask_pld = np.logical_not(MASK)
     
-    #remove bad values so that BLISS mapping will work
-    mask = np.where(np.logical_and(np.logical_and(np.logical_and(np.isfinite(flux), np.isfinite(flux_err)), 
-                                                  np.logical_and(np.isfinite(xdata), np.isfinite(ydata))),
-                                   np.logical_and(np.isfinite(psfxw), np.isfinite(psfyw))))
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
+        if 'pld' not in mode.lower():
+            path_aper = path
+        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
+        flux_err = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # electrons
+        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # hours
+        xdata    = np.loadtxt(path_aper, usecols=[3], skiprows=1)     # pixels
+        ydata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixels
+        
+        order = np.argsort(time)
+        flux = flux[order][int(cut*nFrames):]
+        flux_err = flux_err[order][int(cut*nFrames):]
+        time = time[order][int(cut*nFrames):]
+        xdata = xdata[order][int(cut*nFrames):]
+        ydata = ydata[order][int(cut*nFrames):]
+        psfxw = psfxw[order][int(cut*nFrames):]
+        psfyw = psfyw[order][int(cut*nFrames):]
+        
+        # Sigma clip per data cube (also masks invalids)
+        try:
+            FLUX_clip  = sigma_clip(flux, sigma=6, maxiters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, maxiters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
+        except TypeError:
+            FLUX_clip  = sigma_clip(flux, sigma=6, iters=1)
+            FERR_clip  = sigma_clip(flux_err, sigma=6, iters=1)
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
+        
+        mask_nan = np.isnan(flux)
+        
+        # Combine aperture masks
+        MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_nan
+        # Convert masks into which indices to keep
+        mask_aper = np.logical_not(MASK)
+        
+    # Combine masks in needed
+    if 'pldaper' in mode.lower():
+        mask = np.logical_and(mask_pld, mask_aper)
+    elif 'pld' in mode.lower():
+        mask = mask_pld
+    else:
+        mask = mask_aper
+        
+        
+    # Apply masks
+    if 'pld' in mode.lower():
+        #Transpose pixel stamp array for easier use
+        stamp = stamp[mask].T
+        
+        if 'pldaper' not in mode.lower():
+            time = time[mask]
+            flux = np.sum(stamp, axis=0).reshape(1,-1)
+        
+        #Normalize stamp pixel values by the sum of the stamp
+        stamp /= np.sum(stamp, axis=0)
+        
+    if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
+        flux = flux[mask]
+        flux_err = flux_err[mask]
+        time = time[mask]
+        xdata = xdata[mask]
+        ydata = ydata[mask]
+        psfxw = psfxw[mask]
+        psfyw = psfyw[mask]
+        
+        factor = 1/(np.median(flux))
+        flux = factor*flux
+        flux_err = factor*flux
+        
+        # redefining the zero centroid position
+        if 'bliss' not in mode.lower():
+            mid_x, mid_y = np.mean(xdata), np.mean(ydata)
+            xdata -= mid_x
+            ydata -= mid_y
     
-    return flux[mask], flux_err[mask], time[mask], xdata[mask], ydata[mask], psfxw[mask], psfyw[mask]
-
-def clip_full_data(FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW, nFrames=64, cut=0, ignore=np.array([])):
-    """Sigma cip the unbinned data.
-
-    Args:
-        flux (ndarray): Flux extracted for each frame.
-        flux_err (ndarray): uncertainty on the flux for each frame.
-        time (ndarray): Time stamp for each frame.
-        xdata (ndarray): X-coordinate of the centroid for each frame.
-        ydata (ndarray): Y-coordinate of the centroid for each frame.
-        psfwx (ndarray): X-width of the target's PSF for each frame.
-        psfwy (ndarray): Y-width of the target's PSF for each frame.
-
-    Returns:
-        tuple: flux (ndarray; Flux extracted for each frame),
-            flux_err (ndarray; uncertainty on the flux for each frame),
-            time (ndarray; Time stamp for each frame),
-            xdata (ndarray; X-coordinate of the centroid for each frame),
-            ydata (ndarray; Y-coordinate of the centroid for each frame), 
-            psfwx (ndarray; X-width of the target's PSF for each frame), 
-            psfwy (ndarray; Y-width of the target's PSF for each frame).
-
-    """
+    if 'pld' in mode.lower():
+        if 'pld2' in mode.lower() or 'pldaper2' in mode.lower():
+            # Add on the 2nd order PLD pixel lightcurves
+            stamp2 = stamp**2
+            stamp2 /= stamp2.sum(axis=0)
+            stamp = np.append(stamp, stamp, axis=0)
+        
+        return stamp, flux, time
+    else:
+        return flux, flux_err, time, xdata, ydata, psfxw, psfyw
     
-    # chronological order
-    index = np.argsort(TIME)
-    FLUX  = FLUX[index]
-    FERR  = FERR[index]
-    TIME  = TIME[index]
-    XDATA = XDATA[index]
-    YDATA = YDATA[index]
-    PSFXW = PSFXW[index]
-    PSFYW = PSFYW[index]
-
-    # crop the first AOR (if asked)
-    FLUX  = FLUX[int(cut*nFrames):]
-    FERR  = FERR[int(cut*nFrames):]
-    TIME  = TIME[int(cut*nFrames):]
-    XDATA = XDATA[int(cut*nFrames):]
-    YDATA = YDATA[int(cut*nFrames):]
-    PSFXW = PSFXW[int(cut*nFrames):]
-    PSFYW = PSFYW[int(cut*nFrames):]
-
-    # Sigma clip per data cube (also masks invalids)
-    FLUX_clip  = sigma_clip(FLUX, sigma=6, maxiters=1)
-    FERR_clip  = sigma_clip(FERR, sigma=6, maxiters=1)
-    XDATA_clip = sigma_clip(XDATA, sigma=6, maxiters=1)
-    YDATA_clip = sigma_clip(YDATA, sigma=3.5, maxiters=1)
-    PSFXW_clip = sigma_clip(PSFXW, sigma=6, maxiters=1)
-    PSFYW_clip = sigma_clip(PSFYW, sigma=3.5, maxiters=1)
-
-    # Clip bad frames
-    ind = np.array([])
-    for i in ignore:
-        ind = np.append(ind, np.arange(i, len(FLUX), nFrames))
-    mask_id = np.zeros(len(FLUX))
-    mask_id[ind.astype(int)] = 1
-    mask_id = np.ma.make_mask(mask_id)
-
-    # Ultimate Clipping
-    MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_id
-    #FLUX  = np.ma.masked_array(FLUX, mask=MASK)
-    #XDATA = np.ma.masked_array(XDATA, mask=MASK)
-    #YDATA = np.ma.masked_array(YDATA, mask=MASK)
-    #PSFXW = np.ma.masked_array(PSFXW, mask=MASK)
-    #PSFYW = np.ma.masked_array(PSFYW, mask=MASK)
-    
-    #remove bad values so that BLISS mapping will work
-    FLUX  = FLUX[np.logical_not(MASK)]
-    FERR  = FERR[np.logical_not(MASK)]
-    TIME  = TIME[np.logical_not(MASK)]
-    XDATA = XDATA[np.logical_not(MASK)]
-    YDATA = YDATA[np.logical_not(MASK)]
-    PSFXW = PSFXW[np.logical_not(MASK)]
-    PSFYW = PSFYW[np.logical_not(MASK)]
-
-    # normalizing the flux
-    FERR  = FERR/np.ma.median(FLUX)
-    FLUX  = FLUX/np.ma.median(FLUX)
-    return FLUX, FERR, TIME, XDATA, YDATA, PSFXW, PSFYW
-
 def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     """Sort the data in time and cut off any bad data at the start of the observations (e.g. ditered AOR).
-
     Args:
         flux (ndarray): Flux extracted for each frame.
         flux_err (ndarray): uncertainty on the flux for each frame.
@@ -233,7 +335,6 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
         ydata (ndarray): Y-coordinate of the centroid for each frame.
         psfwx (ndarray): X-width of the target's PSF for each frame.
         psfwy (ndarray): Y-width of the target's PSF for each frame.
-
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
             flux_err (ndarray; uncertainty on the flux for each frame),
@@ -242,7 +343,6 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
             ydata (ndarray; Y-coordinate of the centroid for each frame), 
             psfwx (ndarray; X-width of the target's PSF for each frame), 
             psfwy (ndarray; Y-width of the target's PSF for each frame).
-
     """
     
     # sorting chronologically
@@ -263,8 +363,8 @@ def time_sort_data(flux, flux_err, time, xdata, ydata, psfxw, psfyw, cut=0):
     ydata      = ydata0[cut:]
     psfxw      = psfxw0[cut:]
     psfyw      = psfyw0[cut:]
-    return flux, flux_err, time, xdata, ydata, psfxw, psfyw
-
+    return flux, flux_err, time, xdata, ydata, psfxw, psfyw  
+    
 def expand_dparams(dparams, mode):
     """Add any implicit dparams given the mode (e.g. GP parameters if using a Polynomial model).
 
@@ -308,18 +408,29 @@ def expand_dparams(dparams, mode):
     if 'tslope' not in modeLower:
         dparams = np.append(dparams, ['m1'])
         
+    if 'pld' not in mode.lower():
+        dparams = np.append(dparams, ['p0_0'])
+        dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(1,26)])
+        dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
+    elif 'pld' in mode.lower():
+        if 'pld1' in mode.lower() or 'pldaper1' in mode.lower():
+            if '3x3' in mode.lower():
+                dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
+            dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(1,26)])
+        elif '3x3' in mode.lower():
+            dparams = np.append(dparams, ['p'+str(int(i))+'_1' for i in range(10,26)])
+            dparams = np.append(dparams, ['p'+str(int(i))+'_2' for i in range(10,26)])
+        
     if 'gp' not in modeLower:
         dparams = np.append(dparams, ['gpAmp', 'gpLx', 'gpLy'])
     
     return dparams
 
-
-def get_p0(function_params, fancy_names, dparams, obj):
+# FIX: Add a docstring for this function
+def get_p0(dparams, obj):
     """Initialize the p0 variable to the defaults.
 
     Args:
-        function_params (ndarray): Array of strings listing all parameters required by a function.
-        fancy_names (ndarray): Array of fancy (LaTeX or nicely formatted) strings labelling each parameter for plots.
         dparams (ndarray): A list of strings specifying which parameters shouldn't be fit.
         obj (object): An object containing the default values for all fittable parameters. #FIX: change this to dict later
 
@@ -330,106 +441,60 @@ def get_p0(function_params, fancy_names, dparams, obj):
     
     """
     
+    function_params = obj['params']
+    fancy_names = obj['fancyParams']
+    
     fit_params = np.array([sa for sa in function_params if not any(sb in sa for sb in dparams)])
-    fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not any(sb in function_params[i] for sb in dparams)])
+    fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not function_params[i] in dparams])
     p0 = np.zeros(len(fit_params),dtype=float)
     for i in range(len(fit_params)):
-        # FIX: switch to using dictionaries to cut out this instance of eval
-        p0[i] = eval('obj.'+ fit_params[i])
+        p0[i] = obj[fit_params[i]]
     return p0, fit_params, fancy_labels
 
-# FIX - this is currently empty!!!
-def load_past_params(path):
-    """Load the fitted parameters from a previous run.
+# FIX: Add a docstring for this function
+def lnprior_gaussian(p0, priorInds, priors, errs):
+    prior = 0
+    for i in range(len(priorInds)):
+        prior -= 0.5*(((p0[priorInds[i]] - priors[i])/errs[i])**2.)
+    return prior
 
-    Args:
-        path (string): Path to the file containing past mcmc result (must be a table saved as .npy file).
-
-    Returns:
-        ndarray: p0 (the previously fitted values)
-    
-    """
-    
-    return
-
-# FIX - keep trying to think of ways of removing any/all instances of eval...
-def make_lambdafunc(function, dparams=[], obj=[], debug=False):
-    """Create a lambda function called dynamic_funk that will fix the parameters listed in dparams with the values in obj.
-
-    Note: The module where the original function is needs to be loaded in this file.
-    
-    Args:
-        function (string): Name of the original function.
-        dparams (list, optional): List of all input parameters the user does not wish to fit (default is None.)
-        obj (string, optional): Object containing all initial and fixed parameter values (default is None.)
-        debug (bool, optional): If true, will print mystr so the user can read the command because executing it (default is False).
-
-    Returns:
-        function: dynamic_funk (the lambda function with fixed parameters.)
-    
-    """
-    
-    module   = function.__module__
-    namefunc = function.__name__
-    # get list of params you wish to fit
-    function_params  = np.asarray(inspect.getargspec(function).args)
-    index    = np.in1d(function_params, dparams)
-    fit_params  = function_params[np.where(index==False)[0]]
-    # assign value to fixed variables
-    varstr  = ''
-    for label in function_params:
-        if label in dparams and label != 'r2':
-            tmp = 'obj.' + label
-            varstr += str(eval(tmp)) + ', '
-        elif label in dparams and label == 'r2':
-            varstr += 'rp' + ', '
-        else:
-            varstr += label + ', '
-    #remove extra ', '
-    varstr = varstr[:-2]
-    
-    parmDefaults = inspect.getargspec(function).defaults
-    if parmDefaults is not None:
-        parmDefaults = np.array(parmDefaults, dtype=str)
-        nOptionalParms = len(parmDefaults)
-        if np.all(index[-nOptionalParms:]):
-            # if all optional parameters are in dparams, remove them from this list
-            nOptionalParms = 0
-        elif np.any(index[-nOptionalParms:]):
-            parmDefaults = parmDefaults[np.logical_not(index[-nOptionalParms:])]
-            nOptionalParms = len(parmDefaults)    
+# FIX: Add a docstring for this function
+def lnprior_uniform(p0, priorInds, limits):
+    if priorInds == []:
+        return 0
+    elif np.any(np.logical_or(np.array(limits)[:,0] < p0[priorInds],
+                            np.array(limits)[:,1] > p0[priorInds])):
+        return -np.inf
     else:
-        nOptionalParms = 0
-    
-    # generate the line to execute
-    mystr = 'global dynamic_funk; dynamic_funk = lambda '
-    for i in range(len(fit_params)-nOptionalParms):
-        mystr = mystr + fit_params[i] +', '
-    # add in any optional parameters
-    for i in range(nOptionalParms):
-        mystr = mystr + fit_params[len(fit_params)-nOptionalParms+i] + '=' + parmDefaults[i] + ', '
-    #remove extra ', '
-    mystr = mystr[:-2]
-    #mystr = mystr +': '+namefunc+'(' + varstr + ')'
-    if module == 'helpers':
-        mystr = mystr +': '+namefunc+'(' + varstr + ')'
-    else: 
-        mystr = mystr +': '+module+'.'+namefunc+'(' + varstr + ')'
-    # executing the line
-    exec(mystr)
-    if debug:
-        print(mystr)
-    return dynamic_funk
+        return 0
+
+# FIX: Add a docstring for this function
+def lnprior_gamma(p0, priorInd, shape, rate):
+    if priorInd is not None:
+        x = np.exp(p0[priorInd])
+        alpha = shape
+        beta = rate
+        return np.log(beta**alpha * x**(alpha-1) * np.exp(-beta*x) / np.math.factorial(alpha-1))
+    else:
+        return 0
+
+# FIX: Add a docstring for this function
+def lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd):
+    # Combine all the different priors
+    return (lnprior_gaussian(p0, gpriorInds, priors, errs)+
+            lnprior_uniform(p0, upriorInds, uparams_limits)+
+            lnprior_gamma(p0, gammaInd, 1, 100))
 
 
-# FIX - is it possible to remove the assumption that we're always fitting for sigF? What if we wrap everything with super functions that lazily evaluate freezings, rather than making a lambda function at the start?
-def lnlike(p0, signalfunc, signal_input):
+# FIX - check if sigF in p0, otherwise use a fixed value passed in through signal_input or something
+def lnlike(p0, p0_labels, signalfunc, signal_input):
     """Evaluate the ln-likelihood at the position p0.
     
     Note: We assumine that we are always fitting for the photometric scatter (sigF). 
 
     Args:
         p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        p0_labels (ndarray): An array containing the names of the fitted parameters.
         signalfunc (function): The super function to model the astrophysical and detector functions.
         signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
 
@@ -442,20 +507,20 @@ def lnlike(p0, signalfunc, signal_input):
     mode = signal_input[-1]
     
     if 'gp' in mode.lower():
-        model, gp = signalfunc(signal_input, *p0, predictGp=False, returnGp=True)
+        model, gp = signalfunc(signal_input, predictGp=False, returnGp=True, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
         
         return gp.log_likelihood(flux-model)
     else:
         # define model
-        model = signalfunc(signal_input, *p0)
+        model = signalfunc(signal_input, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
         return loglikelihood(flux, model, p0[-1])
     
-
-def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd):
     """Evaluate the ln-probability of the signal function at the position p0, including priors.
 
     Args:
         p0 (ndarray): The array containing the n-D position to evaluate the log-likelihood at.
+        p0_labels (ndarray): An array containing the names of the fitted parameters.
         signalfunc (function): The super function to model the astrophysical and detector functions.
         lnpriorfunc (function): The function to evaluate the default ln-prior.
         signal_input (list): The collection of other assorted variables required for signalfunc beyond just p0.
@@ -469,23 +534,34 @@ def lnprob(p0, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcus
     """
     
     # Evalute the prior first since this is much quicker to compute
-    lp = lnpriorfunc(*p0, signal_input[-1], checkPhasePhis)
-
-    if (lnpriorcustom is not None):
-        lp += lnpriorcustom(p0)
+    lp = lnpriorfunc(mode=signal_input[-1], checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
+    if not np.isfinite(lp):
+        return -np.inf
+    
+    lp += lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
+    if not np.isfinite(lp):
+        return -np.inf
+    
+    lp += lnlike(p0, p0_labels, signalfunc, signal_input)
     if not np.isfinite(lp):
         return -np.inf
     else:
-        lp += lnlike(p0, signalfunc, signal_input)
-
-    if np.isfinite(lp):
         return lp
-    else:
-        return -np.inf
 
+# def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
+#     try:
+#         return _lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom)
+#     except timeout_decorator.timeout_decorator.TimeoutError:
+#         print(f'MCMC step froze for 10 seconds with p0={p0}\n',end='', flush=True)
+#         return -np.inf
+    
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
+            p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
+            p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
+            p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
+            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
             gpAmp, gpLx, gpLy, sigF,
             mode, checkPhasePhis):
     """Check that the parameters are physically plausible.
@@ -514,6 +590,8 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
         s1 (float): The amplitude of the heaviside step function.
         s2 (float): The location of the step in the heaviside function.
         m1 (float): The slope in sensitivity over time with respect to time[0].
+        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
+        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
         gpAmp (float): The natural logarithm of the GP covariance amplitude.
         gpLx (float): The natural logarithm of the GP covariance lengthscale in x.
         gpLy (float): The natural logarithm of the GP covariance lengthscale in y.
@@ -528,67 +606,11 @@ def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off
     
     check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
     if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and
-        (-1 < ecosw < 1) and (-1 < esinw < 1) and (check == False) and (sigF > 0)
-        and (m1 > -1)):
+        (70 < inc < 110) and (-1 < ecosw < 1) and (-1 < esinw < 1)
+        and (check == False) and (0 < sigF < 1) and (m1 > -1)):
         return 0.0
     else:
         return -np.inf
-
-# FIX - move this to make_plots.py
-def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None):
-    """Make a plot showing the evolution of the walkers throughout the emcee sampling.
-
-    Args:
-        ndim (int): Number of free parameters
-        nwalk (int): Number of walkers
-        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
-        interv (int): Take every 'interv' element to thin out the plot
-        subsamp (int): Only show the last 'subsamp' steps
-        labels (ndarray): The fancy labels for each dimension
-        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
-
-    Returns:
-        None
-    
-    """
-    
-    # get first index
-    beg   = len(samples[0,:,0]) - subsamp
-    end   = len(samples[0,:,0]) 
-    step  = np.arange(beg,end)
-    step  = step[::interv] 
-    
-    # number of columns and rows of subplots
-    ncols = 4
-    nrows = int(np.ceil(ndim/ncols))
-    sizey = 2*nrows
-    
-    # plotting
-    plt.figure(figsize = (15, 2*nrows))
-    for ind in range(ndim):
-        plt.subplot(nrows, ncols, ind+1)
-        sig1 = (0.6827)/2.*100
-        sig2 = (0.9545)/2.*100
-        sig3 = (0.9973)/2.*100
-        percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
-        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
-        plt.plot(step, mu_param)
-        plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
-        plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
-        plt.fill_between(step, pos1sig, neg1sig, facecolor='k', alpha = 0.1)
-        plt.title(labels[ind])
-        plt.xlim(np.min(step), np.max(step))
-        if ind < (ndim - ncols):
-            plt.xticks([])
-        else: 
-            plt.xticks(rotation=25)
-    if fname != None:
-        plt.savefig(fname, bbox_inches='tight')
-    else:
-        # FIX - return the figure instead
-        plt.show()
-    plt.close()
-    return    
 
 def chi2(data, fit, err):
     """Compute the chi-squared statistic.
@@ -716,15 +738,15 @@ def getIngressDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
-        rpMCMC = p0_obj.rp
+        rpMCMC = p0_obj['rp']
     if 'a' in p0_labels:
         aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
     else:
-        aMCMC = p0_obj.a
+        aMCMC = p0_obj['a']
     if 'per' in p0_labels:
         perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
     else:
-        perMCMC = p0_obj.per
+        perMCMC = p0_obj['per']
 
     return (2*rpMCMC/(2*np.pi*aMCMC/perMCMC))/intTime
 
@@ -747,14 +769,14 @@ def getOccultationDuration(p0_mcmc, p0_labels, p0_obj, intTime):
     if 'rp' in p0_labels:
         rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
     else:
-        rpMCMC = p0_obj.rp
+        rpMCMC = p0_obj['rp']
     if 'a' in p0_labels:
         aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
     else:
-        aMCMC = p0_obj.a
+        aMCMC = p0_obj['a']
     if 'per' in p0_labels:
         perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
     else:
-        perMCMC = p0_obj.per
+        perMCMC = p0_obj['per']
 
     return (2/(2*np.pi*aMCMC/perMCMC))/intTime
