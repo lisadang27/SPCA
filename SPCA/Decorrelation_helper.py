@@ -687,7 +687,7 @@ def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, det
     if 'gp' in mode.lower():
         return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams,
                          astrofunc, detecfunc, signalfunc, lnpriorfunc,
-                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False)
+                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=showPlot)
     
     p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
     p0_detec = freeze.get_fitted_params(detecfunc, dparams)
