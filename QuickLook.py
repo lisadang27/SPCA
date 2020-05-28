@@ -9,10 +9,9 @@ sys.path.append(lib_path)
 from SPCA import make_plots, helpers
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
 
 rootpath = '/homes/picaro/bellt/research/'
-#rootpath = '/home/taylor/Documents/Research/spitzer/'
 
 for planet in planets:
         
@@ -73,7 +72,7 @@ for planet in planets:
         breaks = np.sort(breaks)[1:]
         
         filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
-        data = helpers.get_data(foldername+filename)
+        data = helpers.get_data(foldername+filename, 'Poly2_v1')
         # Sort data
         flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data)
     
