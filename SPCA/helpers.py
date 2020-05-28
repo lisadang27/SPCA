@@ -12,9 +12,6 @@ import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
-# Used to cut short an MCMC step if it hangs
-import timeout_decorator
-
 # SPCA libraries
 import SPCA
 from SPCA import astro_models, detec_models, bliss
@@ -548,13 +545,6 @@ def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis,
     else:
         return lp
 
-# def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom=None):
-#     try:
-#         return _lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, lnpriorcustom)
-#     except timeout_decorator.timeout_decorator.TimeoutError:
-#         print(f'MCMC step froze for 10 seconds with p0={p0}\n',end='', flush=True)
-#         return -np.inf
-    
 def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
             c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
             d1, d2, d3, s1, s2, m1,
