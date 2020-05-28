@@ -22,10 +22,6 @@ from SPCA import Decorrelation_helper as dh
 
 
 
-
-#planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
-#channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
-
 planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
 channels = ['ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2']
 
@@ -75,27 +71,12 @@ debug = False                            # True if user wants details about the 
 #non-unity multiplicative factors if you have dilution from a nearby companion
 compFactors = np.ones(len(planets))
 
-# non-zero if you want to remove some initial data points
-cuts = np.zeros(len(planets)).astype(int)
-
-
-
-######### FIX: REMOVE THIS LATER!!!! ###############
-# compFactors[0] += 0.8858*0.1196
-###############################################
-######### FIX: REMOVE THIS LATER!!!! ###############
-# if 'WASP-12' in planet:
-#     if 'old' in planet.lower() and channel=='ch1':
-#         compFactor += 0.9332*0.1149
-#     elif 'old' in planet.lower() and channel=='ch2':
-#         compFactor += 0.8382*0.1196
-#     elif channel=='ch1':
-#         compFactor += 0.8773*0.1149
-#     elif channel=='ch2':
-#         compFactor += 0.8858*0.1196
-
 # Adding companion dilution correction factor for WASP-12b
-compFactors[-1] = 0.8858*0.1196
+compFactors[-1] += 0.8858*0.1196
+
+
+# Set this to non-zero if you want to remove some initial data points
+cuts = np.zeros(len(planets)).astype(int)
 
 
 
@@ -120,12 +101,16 @@ for iterationNumber in range(len(planets)):
     minPoly = minPolys[iterationNumber]
     maxPoly = maxPolys[iterationNumber]
 
-    # This is going to work in the planet is within the https://exoplanetarchive.ipac.caltech.edu/ database
-    p0_obj = dh.loadArchivalData(rootpath, planet, channel)
-    
+    # This is going to work if the planet is within https://exoplanetarchive.ipac.caltech.edu/ database
+    if planet!='WASP-18b':
+        p0_obj = dh.loadArchivalData(rootpath, planet, channel)
+
     ## If you would rather load your own data (e.g. your planet isn't in the exoplanet archive),
     ## you can use the function below. The error parameters are optional inputs, but are required if you want
     ## to put a prior on a parameter.
+    if planet=='WASP-18b':
+        p0_obj = dh.loadCustomData(rootpath, planet, channel, 0.09716, 3.562, 0.9414526, 2458375.169883, 84.88, 0.0091, 269, 6431, 4.47, 0.11,
+                                0.00014, 0.022, 0.000026, 0.0000016, 0.33, 0.00200, 3, 48)
     # p0_obj = loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh,
     #                         rp_err, a_err, t0_err, per_err, inc_err, e_err, argp_err, Tstar_err)
 
