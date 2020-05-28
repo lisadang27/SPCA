@@ -3,12 +3,13 @@
 
 import numpy as np
 import os
-import decimal
 
 
 mainpath   = '/home/taylor/Documents/Research/spitzer/MEGA/'
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HAT-P-7b', 'HD149026b', 'HD149026b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'Qatar1b', 'WASP-14b', 'WASP-14b', 'WASP-18b', 'WASP-18b', 'WASP-19b', 'WASP-19b', 'WASP-33b', 'WASP-33b', 'WASP-43b', 'WASP-43b']
-channels = ['ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch2', 'ch2', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2', 'ch1', 'ch2']
+
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
+channels = ['ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2']
+
 twoLimits = False
 bicThresh = 5
 

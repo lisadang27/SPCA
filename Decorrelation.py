@@ -3,8 +3,6 @@
 
 import numpy as np
 import matplotlib.pyplot as plt
-import time as t
-import timeit
 import os
 from sklearn.decomposition import PCA
 
@@ -109,6 +107,7 @@ for iterationNumber in range(len(planets)):
     ## you can use the function below. The error parameters are optional inputs, but are required if you want
     ## to put a prior on a parameter.
     if planet=='WASP-18b':
+        # The combination of parameters loaded for WASP-18b are not consistent with each other, so I need to manually load it in
         p0_obj = dh.loadCustomData(rootpath, planet, channel, 0.09716, 3.562, 0.9414526, 2458375.169883, 84.88, 0.0091, 269, 6431, 4.47, 0.11,
                                 0.00014, 0.022, 0.000026, 0.0000016, 0.33, 0.00200, 3, 48)
     # p0_obj = loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh,
@@ -385,48 +384,8 @@ for iterationNumber in range(len(planets)):
             if iters==0 and np.any(priorlnls):
                 print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
 
-            #Second burn-in
-            #Do quick burn-in to get walkers spread out
-        #     tic = t.time()
-        #     print('Running second burn-in')
-        #     with threadpool_limits(limits=1, user_api='blas'):
-        # #     if True:
-        #         with Pool(ncpu) as pool:
-        #             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
-        #             pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps2/nwalkers), progress=True)
-        #     print('Mean burn-in acceptance fraction: {0:.3f}'
-        #                     .format(np.median(sampler.acceptance_fraction)))
-        #     fname = savepath+'MCMC_'+mode+'_burninWalkers.pdf'
-        #     make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10,
-        #                           int(np.rint(nBurnInSteps2/nwalkers)), p0_fancyLabels, fname)
-        #     sampler.reset()
-        #     toc = t.time()
-        #     print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
-
-        #     pos2 = np.median(pos1, axis=0)
-        #     pos3 = np.array([pos2+np.random.normal(loc=0, scale=np.std(pos1, axis=0)) for i in range(nwalkers)])
-        #     while np.any(np.isinf([templnprob(pos) for pos in pos3])):
-        #         for i in np.where(np.isinf([templnprob(pos) for pos in pos3])):
-        #             pos3[i] = pos2+np.random.normal(loc=0, scale=np.std(pos1, axis=0))
-
             #Run production
             #Run that will be saved
-        #     tic = t.time()
-        #     # Continue from last positions and run production
-        #     print('Running production')
-        #     with threadpool_limits(limits=1, user_api='blas'):
-        #     #     if True:
-        #         with Pool(ncpu) as pool:
-        #             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
-        #             pos2, prob, state = sampler.run_mcmc(pos1, np.rint(nProductionSteps/nwalkers), progress=True)
-        #     print("Mean acceptance fraction: {0:.3f}"
-        #                     .format(np.mean(sampler.acceptance_fraction)))
-        #     toc = t.time()
-        #     print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
-
-            #Run production
-            #Run that will be saved
-            # Continue from last positions and run production
             print('Running MCMC')
             with threadpool_limits(limits=1, user_api='blas'):
                 with Pool(ncpu) as pool:

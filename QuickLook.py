@@ -2,9 +2,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from astropy.io import fits
 
-import os, sys
-lib_path = os.path.abspath(os.path.join('../'))
-sys.path.append(lib_path)
+import os
 
 from SPCA import make_plots, helpers
 
