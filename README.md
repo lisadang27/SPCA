@@ -12,6 +12,8 @@ To install SPCA, run the following in a terminal:
         git clone git@github.com:lisadang27/SPCA.git
         cd SPCA
         pip install .
+        # IF you want to install george to run GP analyses, also then run
+        pip install .[GP]
 ```
 
 Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects like PSF fitting and nearby companion removal using PSF subtraction.
