@@ -217,8 +217,11 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         print("Warning: No such method \""+edge+"\". Using hard edged aperture")
         method = 'center'
     
-    if savepath[-1]!='/':
+    if save and savepath[-1]!='/':
         savepath += '/'
+        
+    while datapath[-1]=='/':
+        datapath=datapath[:-1]
     
     if ignoreFrames is None:
         ignoreFrames = []
@@ -229,9 +232,9 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     warnings.filterwarnings('ignore')
 
     # get list of filenames and nb of files
-    fnames, lens = get_fnames(datapath, AOR_snip, channel)
+    fnames, lens = get_fnames(datapath, AOR_snip)
     if addStack:
-        stacks = get_stacks(stackPath, datapath, AOR_snip, channel)
+        stacks = get_stacks(stackPath, datapath, AOR_snip)
 
     # variables declaration 
     percent       = 0                                # to show progress while running the code
@@ -271,6 +274,11 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         for i in range(len(fnames)):
             # open fits file
             hdu_list = fits.open(fnames[i])
+            
+            if len(hdu_list[0].data.shape)==2:
+                # Reshape fullframe data so that it can still be used with most of our routines
+                hdu_list[0].data = hdu_list[0].data[np.newaxis,:,:]
+            
             image_data0 = hdu_list[0].data
             # get time
             time = get_time(hdu_list, time, ignoreFrames)

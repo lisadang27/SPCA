@@ -64,7 +64,7 @@ def get_pixel_values(image, P, cx = 15, cy = 15, nbx = 3, nby = 3):
     P = np.append(P, P_tmp, axis = 0)
     return P
 
-def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
+def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
     save = True, save_full = '/ch2_datacube_full_AORs579.dat', bin_data = True, 
     bin_size = 64, save_bin = '/ch2_datacube_binned_AORs579.dat', plot = True, 
     plot_name= 'Lightcurve.pdf', planet = 'CoRoT-2b', stamp_size = 3, addStack = False,
@@ -76,7 +76,6 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         datapath (string): Directory where the spitzer data is stored.
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
-        channel (string): Channel used for the observation eg. 'ch1' for channel 1
         subarray (bool): True if observation were taken in subarray mode. False if observation were taken in full-array mode.
         save (bool, optional): True if you want to save the outputs. Default is True.
         save_full (string, optional): Filename of the full unbinned output data. Default is '/ch2_datacube_full_AORs579.dat'.
@@ -120,9 +119,9 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
     warnings.filterwarnings('ignore')
 
     # get list of filenames and nb of files
-    fnames, lens = get_fnames(datapath, AOR_snip, channel)
+    fnames, lens = get_fnames(datapath, AOR_snip)
     if addStack:
-        stacks = get_stacks(stackPath, datapath, AOR_snip, channel)
+        stacks = get_stacks(stackPath, datapath, AOR_snip)
 
     tossed        = 0                                # Keep tracks of number of frame discarded 
     badframetable = []                               # list of filenames of the discarded frames

@@ -2,7 +2,7 @@ import os, glob
 import numpy as np
 from astropy.stats import sigma_clip
 
-def get_fnames(directory, AOR_snip, ch):
+def get_fnames(directory, AOR_snip):
     """Find paths to all the fits files.
 
     Args:
@@ -16,6 +16,10 @@ def get_fnames(directory, AOR_snip, ch):
     
     """
     
+    while directory[-1]=='/':
+        directory=directory[:-1]
+    ch = directory.split('/')[-1]
+    
     lst      = os.listdir(directory)
     AOR_list = [k for k in lst if AOR_snip in k] 
     fnames   = []
@@ -28,7 +32,7 @@ def get_fnames(directory, AOR_snip, ch):
     #fnames.sort()
     return fnames, lens
 
-def get_stacks(calDir, dataDir, AOR_snip, ch):
+def get_stacks(calDir, dataDir, AOR_snip):
     """Find paths to all the background subtraction correction stacks FITS files.
 
     Args:
@@ -41,6 +45,10 @@ def get_stacks(calDir, dataDir, AOR_snip, ch):
         list: List of paths to the relevant correction stacks
     
     """
+    
+    while dataDir[-1]=='/':
+        dataDir=dataDir[:-1]
+    ch = dataDir.split('/')[-1]
     
     stacks = np.array(os.listdir(calDir))
     locs = np.array([stacks[i].find('SPITZER_I') for i in range(len(stacks))])
@@ -60,7 +68,7 @@ def get_stacks(calDir, dataDir, AOR_snip, ch):
         loc = fname.find('SPITZER_I')+offset
         key = fname[loc:].split('_')[0]
         calFiles.append(os.path.join(calDir, stacks[list(good)][np.where(keys == key)[0][0]]))
-    return calFiles
+    return np.array(calFiles)
 
 def get_time(hdu_list, time, ignoreFrames):
     """Gets the time stamp for each image.
@@ -99,7 +107,7 @@ def oversampling(image_data, a = 2):
     
     l, h, w = image_data.shape
     gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
-    image_over = np.empty((l, h*a, w*a))
+    image_over = np.zeros((l, h*a, w*a))
     for i in range(l):
         image_masked = np.ma.masked_invalid(image_data[i,:,:])
         points       = np.where(image_masked.mask == False)
@@ -130,18 +138,22 @@ def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0
     
     lbx, ubx, lby, uby = bounds
     h, w, l = image_data.shape
+    
     # mask invalids
     image_data2 = np.ma.masked_invalid(image_data)
+    
     # make mask to mask entire bad frame
     x = np.ones((w, l))
     mask = np.ma.make_mask(x)
+    
     try:
         sig_clipped_data = sigma_clip(image_data2, sigma=sigma, maxiters=maxiters, 
                                       cenfunc=np.ma.median, axis = 0)
     except TypeError:
         sig_clipped_data = sigma_clip(image_data2, sigma=sigma, iters=maxiters, 
                                       cenfunc=np.ma.median, axis = 0)
-    for i in range (h):
+    for i in range(h):
+        # If any pixels near the target star are bad, mask the entire frame
         if np.ma.is_masked(sig_clipped_data[i, lbx:ubx, lby:uby]):
             sig_clipped_data[i,:,:] = np.ma.masked_array(sig_clipped_data[i,:,:], mask = mask)
             badframetable.append([i,filenb,fname])

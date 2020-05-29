@@ -15,39 +15,8 @@ from .Photometry_Aperture import bgsubtract
 from .Photometry_Aperture import centroid_FWM
 from .Photometry_Aperture import A_photometry
 
-def get_stacks(stackpath, datapath, AOR_snip, ch):
-    """Find paths to all the correction stack FITS files.
+from .Photometry_Common import get_stacks
 
-    Args:
-        stackpath (string): Full path to the folder containing background correction stacks.
-        datapath (string): Full path to the data folder containing the AOR folders with images to be corrected.
-        AOR_snip (string): AOR snippet used to figure out what folders contain data.
-        ch (string): String specifying which channel is being used.
-
-    Returns:
-        ndarray: The calibration FITS file that should be used for background subtraction correction.
-
-    """
-    
-    stacks = np.array(os.listdir(stackpath))
-    locs = np.array([stacks[i].find('SPITZER_I') for i in range(len(stacks))])
-    good = np.where(locs!=-1)[0] #filter out all files that don't fit the correct naming convention for correction stacks
-    offset = 11 #legth of the string "SPITZER_I#_"
-    keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
-
-    data_list = os.listdir(datapath)
-    AOR_list = [a for a in data_list if AOR_snip==a[:len(AOR_snip)]]
-    calFiles = []
-    for i in range(len(AOR_list)):
-        path = datapath + '/' + AOR_list[i] + '/' + ch +'/cal/'
-        if not os.path.isdir(path):
-            print('Error: Folder \''+path+'\' does not exist, so automatic correction stack selection cannot be performed')
-            return []
-        fname = glob.glob(path+'*sdark.fits')[0]
-        loc = fname.find('SPITZER_I')+offset
-        key = fname[loc:].split('_')[0]
-        calFiles.append(os.path.join(stackpath, stacks[list(good)][np.where(keys == key)[0][0]]))
-    return np.array(calFiles)
 
 # Noise pixel param
 def noisepixparam(image_data):
@@ -91,7 +60,7 @@ def bgnormalize(image_data):
 
     """
     
-    xmask = np.ma.make_mask(np.zeros((64,32,32)), shrink=False)
+    xmask = np.ma.make_mask(np.zeros_like(image_data), shrink=False)
     xmask[:,13:18,13:18]=True
     masked= np.ma.masked_array(image_data, mask=xmask)
     
@@ -173,7 +142,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, nsigma=3):
     stackpath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
     
     if addStack:
-        stacks = get_stacks(stackpath, datapath, AOR_snip, channel)
+        stacks = get_stacks(stackpath, datapath, AOR_snip)
         savepath += channel+'/addedStack/'
         if not os.path.exists(savepath):
             os.makedirs(savepath)
