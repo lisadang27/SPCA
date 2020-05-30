@@ -52,8 +52,8 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     h, w, l = starbox.shape
     # get centroid
     Y, X    = np.mgrid[:w,:l]
-    cx      = (np.sum(np.sum(X*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lbx
-    cy      = (np.sum(np.sum(Y*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1))) + lby
+    cx      = np.nansum(X*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lbx
+    cy      = np.nansum(Y*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lby
     try:
         cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
         cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
@@ -66,8 +66,9 @@ def centroid_FWM(image_data, xo=None, yo=None, wx=None, wy=None, scale=1, bounds
     X, Y    = np.repeat(X[np.newaxis,:,:], h, axis=0), np.repeat(Y[np.newaxis,:,:], h, axis=0)
     cx, cy  = np.reshape(cx, (h, 1, 1)), np.reshape(cy, (h, 1, 1))
     X2, Y2  = (X + lbx - cx)**2, (Y + lby - cy)**2
-    widx    = np.sqrt(np.sum(np.sum(X2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
-    widy    = np.sqrt(np.sum(np.sum(Y2*starbox, axis=1), axis=1)/(np.sum(np.sum(starbox, axis=1), axis=1)))
+    with np.errstate(invalid='ignore'):
+        widx    = np.sqrt(np.nansum(X2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
+        widy    = np.sqrt(np.nansum(Y2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
     try:
         widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
         widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
