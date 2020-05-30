@@ -75,10 +75,8 @@ for planet in planets:
         flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data)
     
         # Make the plots
-        fig = make_plots.plot_photometry(time, flux, xdata, ydata, psfxw, psfyw, 
-                                         time, flux, xdata, ydata, psfxw, psfyw, breaks)
-        fig.suptitle(planet+' '+channel)
-        plt.show()
+        make_plots.plot_photometry(time, flux, xdata, ydata, psfxw, psfyw, 
+                                   time, flux, xdata, ydata, psfxw, psfyw, breaks, showPlot=True)
         
         response = input('Would you like to cut the first AOR (y/n)? ')
     
