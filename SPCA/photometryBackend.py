@@ -61,12 +61,12 @@ def run_photometry(photometryMethod, basepath, ncpu, planet, channel, AOR_snip, 
         PLDPhotometry.get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
                                            save=True, save_full=save_full,
                                            bin_data=bin_data, bin_size=bin_size,
-                                           save_bin=save_bin, plot=False,
-                                           plot_name='', planet=planet,
+                                           save_bin=save_bin,
+                                           plot=False, plot_name='', planet=planet,
                                            stamp_size=stamp_size, 
                                            addStack=addStack, stackPath=stackPath,
                                            ignoreFrames=ignoreFrames, 
-                                           maskStars=maskStars)
+                                           maskStars=maskStars, rerun_photometry=rerun_photometry)
     else:
         print('Sorry,', photometryMethod, 'is not supported by this pipeline!')
         

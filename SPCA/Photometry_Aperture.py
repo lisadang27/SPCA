@@ -187,19 +187,32 @@ def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, bg_err, npp, bin_size):
             binned_npp, binned_npp_std)
 
 def try_aperture(image_stack, time, xo, yo, xw, yw, bg_flux, bg_err,
-                 shape='Circular', method='center', scale=1,
+                 shape='Circular', edge='exact', scale=1,
                  bin_data=True, bin_size=64, plot=False,
                  save=False, rerun_photometry=False, savepath='',
                  save_bin='', save_full='',
                  moveCentroid=True, channel='ch2', planet='',
                  r=2.5):
     
+    edge_tmp = edge.lower()
+    if edge_tmp=='hard' or edge_tmp=='center' or edge_tmp=='centre':
+        method = 'center'
+    elif edge_tmp=='soft' or edge_tmp=='subpixel':
+        method = 'subpixel'
+    elif edge_tmp=='exact':
+        method = 'exact'
+    else:
+        # FIX: Throw an actual error
+        print("Warning: No such method \""+edge+"\".",
+              "Using hard edged aperture instead.")
+        method = 'center'
+    
     if save:
         if channel=='ch1':
             folder='3um'
         else:
             folder='4um'
-        folder += method+shape+"_".join(str(np.round(r, 2)).split('.'))
+        folder += edge+shape+"_".join(str(np.round(r, 2)).split('.'))
         if moveCentroid:
             folder += '_movingCentroid'
         folder += '/'
@@ -374,21 +387,6 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel,
             print('Warning: No such aperture shape "'+shape+'". Using Circular aperture instead.')
             shapes[i]='Circular'
     
-    methods = []
-    for i in range(len(edges)):
-        edge = edges[i].lower()
-        if edge=='hard' or edge=='center' or edge=='centre':
-            methods.append('center')
-        elif edge=='soft' or edge=='subpixel':
-            methods.append('subpixel')
-        elif edge=='exact':
-            methods.append('exact')
-        else:
-            # FIX: Throw an actual error
-            print("Warning: No such method \""+edges[i]+"\".",
-                  "Using hard edged aperture instead.")
-            methods.append('center')
-    
     if save and savepath[-1]!='/':
         savepath += '/'
         
@@ -495,12 +493,12 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel,
     
     # perform aperture photometry
     for moveCentroid in moveCentroids:
-        for method in methods:
+        for edge in edges:
             for shape in shapes:
                 with Pool(ncpu) as pool:
                     func = partial(try_aperture, image_stack, time, xo, yo,
                                    xw, yw, bg_flux, bg_err,
-                                   shape, method, scale,
+                                   shape, edge, scale,
                                    bin_data, bin_size, plot,
                                    save, rerun_photometry, savepath, save_bin,
                                    save_full, moveCentroid, 

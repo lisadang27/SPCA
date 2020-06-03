@@ -13,7 +13,7 @@ from astropy.stats import sigma_clip
 
 import os, sys, csv, glob, warnings
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, bin_array
+from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, bin_array, create_folder
 
 def bin_array2D(data, size):
     """Median bin PLD stamps.
@@ -28,14 +28,22 @@ def bin_array2D(data, size):
     
     """
     
-    data = np.ma.masked_invalid(data)
     h, w = data.shape
-    reshaped_data   = data.reshape((int(h/size), size, w))
-    binned_data     = np.ma.median(reshaped_data, axis=1)
-    binned_data_std = np.ma.std(reshaped_data, axis=1)
+    
+    # Iterate pixel-by-pixel to do the binning since there is sadly no axis argument in the binning function
+    binned_data = []
+    binned_data_std = []
+    for i in range(w):
+        result = bin_array(data[:,i], size)
+        binned_data.append(result[1])
+        binned_data_std.append(result[1])
+        
+    binned_data = np.array(binned_data).T
+    binned_data_std = np.array(binned_data_std).T
+    
     return binned_data, binned_data_std
 
-def get_pixel_values(image, P, cx = 15, cy = 15, nbx = 3, nby = 3):
+def get_pixel_values(image, cx = 15, cy = 15, nbx = 3, nby = 3):
     """Median bin PLD stamps.
 
     Args:
@@ -53,22 +61,16 @@ def get_pixel_values(image, P, cx = 15, cy = 15, nbx = 3, nby = 3):
     
     image_data = np.ma.masked_invalid(image)
     h, w, l = image_data.shape
-    P_tmp = np.empty(shape=(h, nbx*nby))
     deltax = int((nbx-1)/2)
     deltay = int((nbx-1)/2)
-    for i in range(h):
-        P_tmp[i,:]   = image_data[i, (cx-deltax):(cx+deltax+1), (cy-deltay):(cy+deltay+1)].flatten()
-#         np.array([image_data[i, cx-deltax,cy-1], image_data[i, cx-deltax,cy], image_data[i, cx-deltax,cy+1],
-#             image_data[i,cx,cy-1], image_data[i,cx,cy], image_data[i, cx,cy+1],
-#             image_data[i,cx+1,cy-1], image_data[i,cx+1,cy], image_data[i,cx+1,cy+1]])
-    P = np.append(P, P_tmp, axis = 0)
+    P = image_data[:, (cx-deltax):(cx+deltax+1), (cy-deltay):(cy+deltay+1)].reshape(h, -1)
     return P
 
-def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
+def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
     save = True, save_full = '/ch2_datacube_full_AORs579.dat', bin_data = True, 
     bin_size = 64, save_bin = '/ch2_datacube_binned_AORs579.dat', plot = True, 
     plot_name= 'Lightcurve.pdf', planet = 'CoRoT-2b', stamp_size = 3, addStack = False,
-    stackPath = '', ignoreFrames = None, maskStars = None):
+    stackPath = '', ignoreFrames = None, maskStars = None, rerun_photometry=False):
     
     """Given a directory, looks for data (bcd.fits files), opens them and performs PLD "photometry".
 
@@ -76,7 +78,7 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
         datapath (string): Directory where the spitzer data is stored.
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
-        subarray (bool): True if observation were taken in subarray mode. False if observation were taken in full-array mode.
+        channel (string): Channel used for the observation eg. 'ch1' for channel 1
         save (bool, optional): True if you want to save the outputs. Default is True.
         save_full (string, optional): Filename of the full unbinned output data. Default is '/ch2_datacube_full_AORs579.dat'.
         bin_data (bool, optional): True you want to get binned data. Default is True.
@@ -93,6 +95,7 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
             frame to remove first-frame systematic).
         maskStars (list, optional): An array-like object where each element is an array-like object with the RA and DEC
             coordinates of a nearby star which should be masked out when computing background subtraction.
+        rerun_photometry (bool, optional): Whether to overwrite old photometry if it exists. Default is False.
 
     Raises: 
         Error: If Photometry method is not supported/recognized by this pipeline.
@@ -103,18 +106,32 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
     if stamp_size!=3 and stamp_size!=5:
         print('Error: Only stamp sizes of 3 and 5 are currently allowed.')
         return
-    if not subarray:
-        print('Error: Full frame photometry is not yet supported.')
-        return
     
-    if savepath[-1]!='/':
+    if save and savepath[-1]!='/':
         savepath += '/'
+    
+    if save:
+        if channel=='ch1':
+            folder='3um'
+        else:
+            folder='4um'
+        folder += f'PLD_{stamp_size}x{stamp_size}/'
+
+        # create save folder
+        savepath = create_folder(savepath+folder, True, rerun_photometry)
+        if savepath == None:
+            # This photometry has already been run and shouldn't be rerun
+            return
+        print('Starting:', savepath)
+    
+    while datapath[-1]=='/':
+        datapath=datapath[:-1]
     
     if ignoreFrames is None:
         ignoreFrames = []
     if maskStars is None:
         maskStars = []
-
+    
     # Ignore warning
     warnings.filterwarnings('ignore')
 
@@ -123,66 +140,70 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
     if addStack:
         stacks = get_stacks(stackPath, datapath, AOR_snip)
 
-    tossed        = 0                                # Keep tracks of number of frame discarded 
-    badframetable = []                               # list of filenames of the discarded frames
-    time          = []                               # time array
-    bg_flux       = []                               # background flux
-    bg_err        = []                               # background flux error 
-    P             = np.empty((0,int(stamp_size**2)))
+    time = []
+    image_stack = np.zeros((0,32,32))
+    
+    # data reduction & aperture photometry part
+    j=0 #counter to keep track of which correction stack we're using
+    for i in range(len(fnames)):
+        # open fits file
+        with fits.open(fnames[i]) as hdu_list:
+            if len(hdu_list[0].data.shape)==2:
+                # Reshape fullframe data so that it can be used with our routines
+                hdu_list[0].data = hdu_list[0].data[np.newaxis,217:249,9:41]
 
-    if subarray:
-        for i in range(len(fnames)):
-            # open fits file
-            hdu_list = fits.open(fnames[i])
-            image_data0 = hdu_list[0].data
+            image_data = hdu_list[0].data
+            header = hdu_list[0].header
             # get time
-            time = get_time(hdu_list, time, ignoreFrames)
+            time = np.append(time, get_time(hdu_list, ignoreFrames))
             #add background correcting stack if requested
             if addStack:
                 while i > np.sum(lens[:j+1]):
                     j+=1 #if we've moved onto a new AOR, increment j
                 stackHDU = fits.open(stacks[j])
-                image_data0 += stackHDU[0].data
-            #ignore any consistently bad frames
-            if ignoreFrames != []:
-                image_data0[ignoreFrames] = np.nan
-            h, w, l = image_data0.shape
+                image_data += stackHDU[0].data
+            
             # convert MJy/str to electron count
-            convfact = hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']/hdu_list[0].header['FLUXCONV']
-            image_data1 = convfact*image_data0
-            # sigma clip
-            fname = fnames[i]
-            image_data2, tossed, badframetable = sigma_clipping(image_data1, i ,fname[fname.find('ch2/bcd/')+8:],
-                                                                tossed=tossed)
-            
-            if maskStars != []:
-                # Mask any other stars in the frame to avoid them influencing the background subtraction
-                hdu_list[0].header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
-                w = WCS(hdu_list[0].header, naxis=[1,2])
-                mask = image_data2.mask
-                for st in maskStars:
-                    coord = SkyCoord(st[0], st[1])
-                    x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
-                    x = x+np.arange(-1,2)
-                    y = y+np.arange(-1,2)
-                    x,y = np.meshgrid(x,y)
-                    mask[x,y] = True
-                image_data2 = np.ma.masked_array(image_data2, mask=mask)
-            
-            # bg subtract
-            image_data3, bg_flux, bg_err = bgsubtract(image_data2, bg_flux, bg_err)
-            # get pixel peak index
-            P = get_pixel_values(image_data3, P, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
-    else:
-        # FIX: The full frame versions of the code will have to go here
-        pass
-        
+            convfact = (hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']
+                        /hdu_list[0].header['FLUXCONV'])
+            image_stack = np.append(image_stack, convfact*image_data, axis=0)
+    
+    time = np.array(time)
+    
+    #ignore any consistently bad frames in datacubes
+    for i in ignoreFrames:
+        l = image_stack.shape[0]
+        ignore_inds = (i + 64*np.arange(int(l/64)+int(l%64>i))).astype(int)
+        image_stack[l] = np.nan
+    
+    # sigma clip along full time axis
+    image_stack = sigma_clipping(image_stack)
+
+    # Mask any other stars in the frame to avoid them influencing the background subtraction
+    if maskStars != []:
+        header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
+        w = WCS(header, naxis=[1,2])
+        mask = np.ma.getmaskarray(image_stack)
+        for st in maskStars:
+            coord = SkyCoord(st[0], st[1])
+            x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
+            x = x+np.arange(-1,2)
+            y = y+np.arange(-1,2)
+            x,y = np.meshgrid(x,y)
+            mask[:,x,y] = True
+        image_stack = np.ma.masked_array(image_stack, mask=mask)
+
+    # bg subtract
+    image_stack, bg_flux, bg_err = bgsubtract(image_stack)
+    
+    # get pixel peak index
+    P = get_pixel_values(image_stack, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
     
     if bin_data:
         binned_P, binned_P_std = bin_array2D(P, bin_size)
-        binned_time, binned_time_std = bin_array(np.asarray(time), bin_size)
-        binned_bg, binned_bg_std = bin_array(np.asarray(bg_flux), bin_size)
-        binned_bg_err, binned_bg_err_std = bin_array(np.asarray(bg_err), bin_size)
+        binned_time, binned_time_std = bin_array(time, bin_size)
+        binned_bg, binned_bg_std = bin_array(bg_flux, bin_size)
+        binned_bg_err, binned_bg_err_std = bin_array(bg_err, bin_size)
         
         #sigma clip binned data to remove wildly unacceptable data
         binned_flux = binned_P.sum(axis=1)

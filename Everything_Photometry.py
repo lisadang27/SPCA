@@ -13,6 +13,8 @@ from SPCA import photometryBackend
 
 # The names of all the planets you want analyzed (without spaces)
 planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b', 'WASP-103b']
+
+# Were the data taken in subarray mode?
 subarray = [True, True, True, True, True, True, True, True, True, True, True, True, False]
 
 # The number of CPU threads you want to use for running photometry methods in parallel

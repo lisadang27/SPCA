@@ -52,7 +52,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
                                                                            shapes=['Circular'], edges=['hard'],
                                                                            addStack = False, ignoreFrames = None,
                                                                            maskStars = None, moveCentroids=[True],
-                                                                           ncpu=ncpu).T
+                                                                           ncpu=ncpu)[0].T
     
     try:
         flux  = sigma_clip(flux, sigma=5, maxiters=5).reshape(-1,64)
