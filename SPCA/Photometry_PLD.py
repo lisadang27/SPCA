@@ -13,9 +13,9 @@ from astropy.stats import sigma_clip
 
 import os, sys, csv, glob, warnings
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, binning_data
+from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, bin_array
 
-def binning_data2D(data, size):
+def bin_array2D(data, size):
     """Median bin PLD stamps.
 
     Args:
@@ -179,10 +179,10 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, subarray,
         
     
     if bin_data:
-        binned_P, binned_P_std = binning_data2D(P, bin_size)
-        binned_time, binned_time_std = binning_data(np.asarray(time), bin_size)
-        binned_bg, binned_bg_std = binning_data(np.asarray(bg_flux), bin_size)
-        binned_bg_err, binned_bg_err_std = binning_data(np.asarray(bg_err), bin_size)
+        binned_P, binned_P_std = bin_array2D(P, bin_size)
+        binned_time, binned_time_std = bin_array(np.asarray(time), bin_size)
+        binned_bg, binned_bg_std = bin_array(np.asarray(bg_flux), bin_size)
+        binned_bg_err, binned_bg_err_std = bin_array(np.asarray(bg_err), bin_size)
         
         #sigma clip binned data to remove wildly unacceptable data
         binned_flux = binned_P.sum(axis=1)

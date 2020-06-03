@@ -13,52 +13,9 @@ from . import Photometry_Companion as CPhotometry
 from . import Photometry_PLD as PLDPhotometry
 
 
-# FIX - check if the folder is empty, and if it is, just overwrite it
-def create_folder(fullname, auto=False, overwrite=False):
-    """Create a folder unless it exists.
-
-    Args:
-        fullname (string): Full path to the folder to be created.
-        auto (bool, optional): If the folder already exists, should the folder just be skipped (True) or should the user be asked whether they want to overwrite the folder or change the folder name (False, Default).
-        overwrite (bool, optional): Whether you want to overwrite the folder if it already exists
-
-    Returns:
-        string: The final name used for the folder.
-
-    """
-    
-    solved = 'no'
-    while(solved == 'no'):
-        if not os.path.exists(fullname):
-            # Folder doesn't exist yet and can be safely written to
-            os.makedirs(fullname)
-            solved = 'yes'
-        elif len(os.listdir(fullname))==0:
-            # Folder exists but is empty and can be safely written to
-            solved = 'yes'
-        else:
-            if overwrite:
-                solved = 'yes'
-            elif auto:
-                fullname = None
-                solved = 'yes'
-            else:
-                folder = fullname.split('/')[-1]
-                print('Warning:', folder, 'already exists! Are you sure you want to overwrite this folder? (y/n)')
-                answer = input()
-                if (answer=='y'):
-                    solved = 'yes'
-                else:
-                    print('What would you like the new folder name to be?')
-                    folder = input()
-                    fullname = '/'.join(fullname.split('/')[0:-1])+'/'+folder
-    return fullname
-
-def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_snip, rerun_photometry=False,
-                   addStack=False, bin_data=True, bin_size=64, 
-                   ignoreFrames=None, maskStars=None,
-                   stamp_size=3,
-                   shape='Circular', edge='Exact', moveCentroid=False, radius=3):
+def run_photometry(photometryMethod, basepath, ncpu, planet, channel, AOR_snip, rerun_photometry=False,
+                   addStack=False, bin_data=True, bin_size=64, ignoreFrames=None, maskStars=None,
+                   stamp_size=3, shapes=['Circular'], edges=['Exact'], moveCentroids=[True], radii=[3]):
     
     if ignoreFrames is None:
         ignoreFrames = []
@@ -67,17 +24,6 @@ def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_sn
     
     stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
     
-    if channel=='ch1':
-        folder='3um'
-    else:
-        folder='4um'
-    if photometryMethod=='Aperture':
-        folder += edge+shape+"_".join(str(np.round(radius, 2)).split('.'))
-        if moveCentroid:
-            folder += '_movingCentroid'
-    elif photometryMethod=='PLD':
-        folder += 'PLD_'+str(int(stamp_size))+'x'+str(int(stamp_size))
-    folder += '/'
     datapath   = basepath+planet+'/data/'+channel
     
     savepath = basepath+planet+'/analysis/'+channel+'/'
@@ -89,17 +35,6 @@ def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_sn
         savepath += 'ignore/'
     else:
         savepath += 'noIgnore/'
-    savepath   += folder
-    plot_name = 'lightcurve_'+planet+'.pdf'
-
-    print('Starting:', savepath)
-    
-    # create save folder
-    savepath = create_folder(savepath, True, rerun_photometry)
-    
-    if savepath == None:
-        # This photometry has already been run
-        return
     
     # prepare filenames for saved data
     save_full = channel+'_datacube_full_AORs'+AOR_snip[1:]+'.dat'
@@ -107,24 +42,31 @@ def run_photometry(photometryMethod, basepath, planet, channel, subarray, AOR_sn
 
     # Call requested function
     if   (photometryMethod == 'Aperture'):
-        APhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
+        APhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel,
                                    save=True, save_full=save_full,
-                                   bin_data=bin_data, bin_size=bin_size, save_bin=save_bin,
-                                   planet=planet,
-                                   r=radius, shape=shape, edge=edge, plot=False, plot_name=plot_name,
-                                   addStack=addStack, stackPath=stackPath, ignoreFrames=ignoreFrames,
-                                   moveCentroid=moveCentroid, maskStars=maskStars)
+                                   bin_data=bin_data, bin_size=bin_size,
+                                   save_bin=save_bin, planet=planet,
+                                   rs=radii, shapes=shapes, edges=edges, plot=False,
+                                   plot_name='', addStack=addStack, 
+                                   stackPath=stackPath, ignoreFrames=ignoreFrames,
+                                   moveCentroids=moveCentroids, maskStars=maskStars,
+                                   rerun_photometry=rerun_photometry, ncpu=ncpu)
+        
     elif (photometryMethod == 'PSFfit'):
-        PSFPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray)
+        PSFPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel)
     elif (photometryMethod == 'Companion'):
-        CPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel, subarray, r = radius)
+        CPhotometry.get_lightcurve(datapath, savepath, AOR_snip, channel,
+                                   r = radius)
     elif (photometryMethod == 'PLD'):
-        PLDPhotometry.get_pixel_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
+        PLDPhotometry.get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
                                            save=True, save_full=save_full,
-                                           bin_data=bin_data, bin_size=bin_size, save_bin=save_bin,
-                                           plot=False, plot_name=plot_name, planet=planet,
-                                           stamp_size=stamp_size, addStack=addStack, stackPath=stackPath,
-                                           ignoreFrames=ignoreFrames, maskStars=maskStars)
+                                           bin_data=bin_data, bin_size=bin_size,
+                                           save_bin=save_bin, plot=False,
+                                           plot_name='', planet=planet,
+                                           stamp_size=stamp_size, 
+                                           addStack=addStack, stackPath=stackPath,
+                                           ignoreFrames=ignoreFrames, 
+                                           maskStars=maskStars)
     else:
         print('Sorry,', photometryMethod, 'is not supported by this pipeline!')
         
@@ -224,7 +166,8 @@ def get_RMS(Run_list, channel, AOR_snip, highpassWidth, trim=False, trimStart=0,
 
 
 
-def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStack, highpassWidth = 5, trim=False, trimStart=None, trimEnd=False):
+def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStack,
+                      highpassWidth = 5, trim=False, trimStart=None, trimEnd=False):
     
     datapath = basepath+planet+'/analysis/'+channel+'/'
     figpath  = basepath+planet+'/analysis/photometryComparison/'+channel+'/'
@@ -300,15 +243,18 @@ def comparePhotometry(basepath, planet, channel, AOR_snip, ignoreFrames, addStac
     
     if np.any(exact_moving):
         print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
-        print('Exact Moving - Best Aperture Radius:', Radius[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
+        print('Exact Moving - Best Aperture Radius:',
+              Radius[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
         print()
     if np.any(soft_moving):
         print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
-        print('Soft Moving - Best Aperture Radius:', Radius[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
+        print('Soft Moving - Best Aperture Radius:',
+              Radius[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
         print()
     if np.any(hard_moving):
         print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
-        print('Hard Moving - Best Aperture Radius:', Radius[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
+        print('Hard Moving - Best Aperture Radius:',
+              Radius[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
         print()
     if np.any(exact):
         print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))

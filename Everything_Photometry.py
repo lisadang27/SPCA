@@ -11,11 +11,12 @@ from functools import partial
 from SPCA import frameDiagnosticsBackend
 from SPCA import photometryBackend
 
+# The names of all the planets you want analyzed (without spaces)
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b', 'WASP-103b']
+subarray = [True, True, True, True, True, True, True, True, True, True, True, True, False]
+
 # The number of CPU threads you want to use for running photometry methods in parallel
 ncpu = 23
-
-# The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b']
 
 #folder containing data from each planet
 basepath = '/homes/picaro/bellt/research/'
@@ -41,9 +42,6 @@ allowIgnoreFrames = [True, False]
 
 # The number of sigma a frame's median value must be off from the median frame in order to be added to ignore_frames
 nsigma = 4
-
-# Was the data collected in subarray mode (full frame photometry is currently not supported)
-subarray = True
 
 # An array-like object where each element is an array-like object with the RA and DEC coordinates of a nearby star which should be masked out when computing background subtraction.
 maskStars = None
@@ -72,7 +70,7 @@ addStacks = [False]
 radii = np.linspace(2.,6.,21,endpoint=True)
 
 # Aperture shape to try. Possible aperture shapes are 'Circular', 'Elliptical', 'Rectangular'
-shape = 'Circular'
+shapes = ['Circular']
 
 # Aperture edges to try. Possible options are 'Exact' (pixels are weighted by the fraction that lies within the aperture), 'Hard' (pixel is only included if its centre is in the aperture), and 'Soft' (approximates exact)
 edges = ['Exact', 'Hard']
@@ -106,7 +104,7 @@ trimEnd = 5.5544266e4
 # Everything below is automated
 #####################################################################
 
-for planet in planets:
+for planetNum, planet in enumerate(planets):
     
     #bit of AOR to pick out which folders contain AORs that should be analyzed
     with open(basepath+planet+'/analysis/aorSnippet.txt', 'r') as file:
@@ -121,11 +119,11 @@ for planet in planets:
         phoptions = []
 
         for addStack in addStacks:
-            if True in allowIgnoreFrames:
+            if subarray[planetNum] and (True in allowIgnoreFrames):
                 # Perform frame diagnostics to figure out which frames within a datacube are consistently bad
                 print('Analysing', channel, 'for systematically bad frames...')
                 ignoreFrames = frameDiagnosticsBackend.run_diagnostics(planet, channel, AOR_snip,
-                                                                       basepath, addStack, nsigma)
+                                                                       basepath, addStack, ncpu, nsigma)
             else:
                 ignoreFrames = []
 
@@ -140,23 +138,19 @@ for planet in planets:
                     ignoreFrames_temp = []
 
                 # Try all of the different photometry methods
-                print('Trying the many different photometries...')
+                print('Trying the many different photometries. This will take quite some time...')
                 for photometryMethod in photometryMethods:
                     if photometryMethod=='PLD':
                         for stamp_size in stamp_sizes:
-                            photometryBackend.run_photometry(photometryMethod,basepath,
-                                                             planet, channel, subarray, AOR_snip, rerun_photometry,
+                            photometryBackend.run_photometry(photometryMethod, basepath, ncpu,
+                                                             planet, channel, AOR_snip, rerun_photometry,
                                                              addStack, bin_data, bin_size, ignoreFrames_temp,
                                                              maskStars, stamp_size)
                     elif photometryMethod=='Aperture':
-                        with multiprocessing.Pool(ncpu) as pool:
-                            for moveCentroid in moveCentroids:
-                                for edge in edges:
-                                    func = partial(photometryBackend.run_photometry, photometryMethod, basepath,
-                                                   planet, channel, subarray, AOR_snip, rerun_photometry,
-                                                   addStack, bin_data, bin_size, ignoreFrames_temp, maskStars,
-                                                   None, shape, edge, moveCentroid)
-                                    pool.map(func, radii)
+                        photometryBackend.run_photometry(photometryMethod, basepath, ncpu,
+                                                         planet, channel, AOR_snip, rerun_photometry,
+                                                         addStack, bin_data, bin_size, ignoreFrames_temp,
+                                                         maskStars, None, shapes, edges, moveCentroids, radii)
 
                         print('Selecting the best aperture photometry method from this suite...')
                         minRMS, phoption = photometryBackend.comparePhotometry(basepath, planet, channel, AOR_snip,

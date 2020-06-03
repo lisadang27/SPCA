@@ -14,7 +14,7 @@ import os, sys, csv, glob, warnings
 
 from collections import Iterable
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling, sigma_clipping, bgsubtract, binning_data
+from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling, sigma_clipping, bgsubtract, bin_array
 
 
 def Gaussian2D(position, amp, xo, yo, sigx, sigy):
@@ -235,12 +235,12 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel, subarray,
         print('Sorry this part is undercontruction!')
     
     if (bin_data == True):
-        binned_flux, binned_flux_std = binning_data(popt[:,0], bin_size)
-        binned_time, binned_time_std = binning_data(np.asarray(time), bin_size)
-        binned_xo, binned_xo_std     = binning_data(popt[:,1], bin_size)
-        binned_yo, binned_yo_std     = binning_data(popt[:,2], bin_size)
-        binned_xw, binned_xw_std     = binning_data(popt[:,3], bin_size)
-        binned_yw, binned_yw_std     = binning_data(popt[:,4], bin_size)
+        binned_flux, binned_flux_std = bin_array(popt[:,0], bin_size)
+        binned_time, binned_time_std = bin_array(np.asarray(time), bin_size)
+        binned_xo, binned_xo_std     = bin_array(popt[:,1], bin_size)
+        binned_yo, binned_yo_std     = bin_array(popt[:,2], bin_size)
+        binned_xw, binned_xw_std     = bin_array(popt[:,3], bin_size)
+        binned_yw, binned_yw_std     = bin_array(popt[:,4], bin_size)
     
     if (plot == True):
         fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(15,5))
