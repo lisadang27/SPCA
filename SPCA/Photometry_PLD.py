@@ -174,7 +174,7 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
     for i in ignoreFrames:
         l = image_stack.shape[0]
         ignore_inds = (i + 64*np.arange(int(l/64)+int(l%64>i))).astype(int)
-        image_stack[l] = np.nan
+        image_stack[ignore_inds] = np.nan
     
     # sigma clip along full time axis
     image_stack = sigma_clipping(image_stack)
