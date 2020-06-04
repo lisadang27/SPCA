@@ -1,6 +1,7 @@
 import os, glob
 import numpy as np
 from astropy.stats import sigma_clip
+from astropy.convolution import convolve, Box1DKernel
 import scipy.interpolate
 from scipy.stats import binned_statistic
 
@@ -113,11 +114,11 @@ def get_stacks(calDir, dataDir, AOR_snip):
         calFiles.append(os.path.join(calDir, stacks[list(good)][np.where(keys == key)[0][0]]))
     return np.array(calFiles)
 
-def get_time(hdu_list, ignoreFrames):
+def get_time(header, ignoreFrames):
     """Gets the time stamp for each image.
 
     Args:
-        hdu_list (list): content of fits file.
+        header (astropy.io.fits.header.Header): Header of fits file.
         ignoreFrames (ndarray): Array of frames to ignore (consistently bad frames).
 
     Returns:
@@ -125,10 +126,13 @@ def get_time(hdu_list, ignoreFrames):
     
     """
     
-    h, w, l = hdu_list[0].data.shape
+    if header['NAXIS']==2:
+        h = 1
+    else:
+        h = header['NAXIS3']
     sec2day = 1.0/(3600.0*24.0)
-    step    = hdu_list[0].header['FRAMTIME']*sec2day
-    t       = np.linspace(hdu_list[0].header['BMJD_OBS'] + step/2, hdu_list[0].header['BMJD_OBS'] + (h-1)*step, h)
+    step    = header['FRAMTIME']*sec2day
+    t       = np.linspace(header['BMJD_OBS'] + step/2, header['BMJD_OBS'] + (h-1)*step, h)
     if ignoreFrames != []:
         t[ignoreFrames] = np.nan
     return t
@@ -221,24 +225,31 @@ def bgsubtract(img_data, bounds=(11, 19, 11, 19)):
     lbx, ubx, lby, uby = bounds
     image_data = np.ma.copy(img_data)
     h, w, l = image_data.shape
-    x = np.zeros(image_data.shape)
-    x[:, lbx:ubx,lby:uby] = 1
-    mask   = np.ma.make_mask(x)
+    
+    # Mask out the target star
+    mask = np.zeros(image_data.shape)
+    mask[:, lbx:ubx,lby:uby] = 1
+    mask   = np.ma.make_mask(mask)
     masked = np.ma.masked_array(image_data, mask = mask)
     masked = np.reshape(masked, (h, w*l))
+    
+    # Compute background and error
     bg_med = np.reshape(np.ma.median(masked, axis=1), (h, 1, 1))
+    bg_flux = bg_med.ravel()
+    bg_err = np.ma.std(masked, axis=1)
+    
+    # Subtract background
     bgsub_data = image_data - bg_med
     bgsub_data = np.ma.masked_invalid(bgsub_data)
     
-    bg_flux = bg_med.ravel()
-    bg_err = np.ma.std(masked, axis=1)
     return bgsub_data, bg_flux, bg_err
 
-def noisepixparam(image_data, bounds=(13, 18, 13, 18)):
+def noisepixparam(image_data, npp=[], bounds=(13, 18, 13, 18)):
     """Compute the noise pixel parameter.
 
     Args:
         image_data (ndarray): FITS images stack.
+        npp (list, optional): Previously computed noise pixel parameters for other frames that will be appended to.
 
     Returns:
         list: The noise pixel parameter for each image in the stack.
@@ -250,7 +261,7 @@ def noisepixparam(image_data, bounds=(13, 18, 13, 18)):
     #To find noise pixel parameter for each frame. For eqn, refer Knutson et al. 2012
     numer = np.ma.sum(image_data[:, lbx:ubx, lby:uby], axis=(1,2))**2
     denom = np.ma.sum(image_data[:, lbx:ubx, lby:uby]**2, axis=(1,2))
-    npp = numer/denom
+    npp.extend(numer/denom)
     
     return npp
 
@@ -276,3 +287,123 @@ def bin_array(data, size):
     binned_data_std = binned_statistic(x, data, statistic=np.nanstd, bins=bins)[0]
     
     return binned_data, binned_data_std
+
+def highpassflist(signal, highpassWidth):
+    g = Box1DKernel(highpassWidth)
+    smooth = convolve(signal, g, boundary='extend')
+    return smooth
+
+def compare_RMS(Run_list, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
+            onlyBest=False, showPlots=False, savePlots=True):
+    RMS_list_full = np.empty(len(Run_list))
+    
+    for i, foldername in enumerate(Run_list):
+        flux = fluxes[:,i]
+        smooth = highpassflist(flux_tmp, highpassWidth)
+        smoothed = (flux_tmp - smooth)+np.nanmean(flux_tmp)
+        RMS_list_full[i] = np.sqrt(np.nanmean((flux_tmp-smooth)**2.))/np.nanmean(smoothed)
+       
+    bestInd = np.nanargmin(RMS_list_full[i])
+    
+    if onlyBest:
+        # If the user only wants to save the best photomtery, get rid of the rest of the data
+        Run_list = Run_list[bestInd:bestInd+1]
+        RMS_list = RMS_list_full[bestInd:bestInd+1]
+        fluxes = fluxes[bestInd:bestInd+1]
+    else:
+        RMS_list = RMS_list_full
+    
+    figpath  = basepath+planet+'/analysis/photometryComparison/'+channel+'/'
+    if addStack:
+        figpath += 'addedStack/'
+    else:
+        figpath += 'addedBlank/'
+    if not os.path.exists(figpath):
+        os.makedirs(figpath)
+
+    if ignoreFrames != []:
+        figpath += 'ignore/'
+    else:
+        figpath += 'noIgnore/'
+    if not os.path.exists(figpath):
+        os.makedirs(figpath)
+    
+    exact_moving = np.array(['exact' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    soft_moving =  np.array(['soft' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    hard_moving =  np.array(['hard' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+
+    exact = np.array(['exact' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    soft =  np.array(['soft' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    hard =  np.array(['hard' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    
+    if showPlots or savePlots:
+        for i in range(len(Run_list)):
+            plt.figure(figsize = (10,4))
+            
+            if np.any(exact_moving):
+                plt.plot(r[exact_moving],  RMS[exact_moving]*1e6, 'o-', label = 'Circle: Exact Edge, Moving')
+            if np.any(soft_moving):
+                plt.plot(r[soft_moving],  RMS[soft_moving]*1e6, 'o-', label = 'Circle: Soft Edge, Moving')
+            if np.any(hard_moving):
+                plt.plot(r[hard_moving],  RMS[hard_moving]*1e6, 'o-', label = 'Circle: Hard Edge, Moving')
+
+            if np.any(exact):
+                plt.plot(r[exact],  RMS[exact]*1e6, 'o-', label = 'Circle: Exact Edge')
+            if np.any(soft):
+                plt.plot(r[soft],  RMS[soft]*1e6, 'o-', label = 'Circle: Soft Edge')
+            if np.any(hard):
+                plt.plot(r[hard],  RMS[hard]*1e6, 'o-', label = 'Circle: Hard Edge')
+
+            plt.xlabel('Aperture Radius')
+            plt.ylabel('RMS Scatter (ppm)')
+            plt.legend(loc='best')
+
+            if channel=='ch2':
+                fname = figpath + '4um'
+            else:
+                fname = figpath + '3um'
+            fname += '_Photometry_Comparison.pdf'
+            if savePlots:
+                plt.savefig(fname)
+            if showPlots:
+                plt.show()
+            plt.close()
+        
+    if np.any(exact_moving):
+        print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
+        print('Exact Moving - Best Aperture Radius:',
+              r[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
+        print()
+    if np.any(soft_moving):
+        print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
+        print('Soft Moving - Best Aperture Radius:',
+              r[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
+        print()
+    if np.any(hard_moving):
+        print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
+        print('Hard Moving - Best Aperture Radius:',
+              r[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
+        print()
+    if np.any(exact):
+        print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
+        print('Exact - Best Aperture Radius:', r[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
+        print()
+    if np.any(soft):
+        print('Soft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
+        print('Soft - Best Aperture Radius:', r[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
+        print()
+    if np.any(hard):
+        print('Hard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
+        print('Hard - Best Aperture Radius:', r[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
+
+    print('Best photometry of this batch:', Run_list[np.argmin(RMS)])
+
+    with open(figpath+'best_option.txt', 'w') as file:
+        file.write(Run_list[np.argmin(RMS)])
+        
+    return RMS_list_full
+
+
+
+
+

@@ -22,10 +22,11 @@ from functools import partial
 
 from collections import Iterable
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling
+from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling, compare_RMS
 from .Photometry_Common import sigma_clipping, bgsubtract, noisepixparam, bin_array, create_folder
 
-def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18)):
+def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=['median','median'],
+                 defaultPSFW=['median','median']):
     """Gets the centroid of the target by flux weighted mean and the PSF width of the target.
 
     Args:
@@ -33,6 +34,10 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18)):
         scale (int, optional): If the image is oversampled, scaling factor for centroid and bounds,
             i.e, give centroid in terms of the pixel value of the initial image.
         bounds (tuple, optional): Bounds of box around the target to exclude background . Default is (14, 18, 14, 18).
+        defaultCentroid (list, optional): Default location for sigma clipped centroids.
+            Default is median centroid position.
+        defaultPSFW (list, optional): Default width for sigma clipped PSF widths.
+            Default is median of widths.
     
     Returns:
         tuple: xo, yo, wx, wy (list, list, list, list). The updated lists of x-centroid, y-centroid,
@@ -42,18 +47,32 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18)):
     lbx, ubx, lby, uby = np.array(bounds)*scale
     starbox = image_data[:, lbx:ubx, lby:uby]
     h, w, l = starbox.shape
+    
     # get centroid
     Y, X    = np.mgrid[:w,:l]
     cx      = np.nansum(X*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lbx
     cy      = np.nansum(Y*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lby
-    try:
-        cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
-        cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    except TypeError:
-        cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
-        cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
+    
+    if h > 1:
+        # If not using full-frame photometry, sigma clip any really bad outlier centroids
+        try:
+            cx      = sigma_clip(cx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+            cy      = sigma_clip(cy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+        except TypeError:
+            cx      = sigma_clip(cx, sigma=4, iters=2, cenfunc=np.ma.median)
+            cy      = sigma_clip(cy, sigma=4, iters=2, cenfunc=np.ma.median)
+    
+    # Set masked centroids to default position
+    if defaultCentroid[0]=='median':
+        defaultCentroid[0] = np.ma.median(cx)
+    if defaultCentroid[1]=='median':
+        defaultCentroid[1] = np.ma.median(cy)
+    cx[np.ma.getmaskarray(cx)] = defaultCentroid[0]
+    cy[np.ma.getmaskarray(cy)] = defaultCentroid[1]
+    
     xo = cx/scale
     yo = cy/scale
+    
     # get PSF widths
     X, Y    = np.repeat(X[np.newaxis,:,:], h, axis=0), np.repeat(Y[np.newaxis,:,:], h, axis=0)
     cx, cy  = np.reshape(cx, (h, 1, 1)), np.reshape(cy, (h, 1, 1))
@@ -61,87 +80,100 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18)):
     with np.errstate(invalid='ignore'):
         widx    = np.sqrt(np.nansum(X2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
         widy    = np.sqrt(np.nansum(Y2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
-    try:
-        widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
-        widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    except TypeError:
-        widx    = sigma_clip(widx, sigma=4, iters=2, cenfunc=np.ma.median)
-        widy    = sigma_clip(widy, sigma=4, iters=2, cenfunc=np.ma.median)
+    if h > 1:
+        # If not using full-frame photometry, sigma clip any really bad outlier psf widths
+        try:
+            widx    = sigma_clip(widx, sigma=4, maxiters=2, cenfunc=np.ma.median)
+            widy    = sigma_clip(widy, sigma=4, maxiters=2, cenfunc=np.ma.median)
+        except TypeError:
+            widx    = sigma_clip(widx, sigma=4, iters=2, cenfunc=np.ma.median)
+            widy    = sigma_clip(widy, sigma=4, iters=2, cenfunc=np.ma.median)
+    
+    # Set masked PSF widths to default width
+    if defaultPSFW[0]=='median':
+        defaultPSFW[0] = np.ma.median(widx)
+    if defaultPSFW[1]=='median':
+        defaultPSFW[1] = np.ma.median(widy)
+    widx[np.ma.getmaskarray(widx)] = defaultPSFW[0]
+    widx[np.ma.getmaskarray(widx)] = defaultPSFW[1]
+    
     wx = widx/scale
     wy = widy/scale
+    
     return xo, yo, wx, wy
 
-def A_photometry(image_data, bg_err, 
-                 cx = 15, cy = 15, r = 2.5, a = 5, b = 5, w_r = 5, h_r = 5,
-                 theta = 0, scale = 1, shape = 'Circular', method='center'):
+def A_photometry(bg_err, cx = 15, cy = 15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[5], theta=[0],
+                 scale = 1, shape='Circular', methods=['center', 'exact'], i=0):
     """Performs aperture photometry, first by creating the aperture then summing the flux within the aperture.
 
+    Note that this will implicitly use the global variable image_stack (3D array) to allow for parallel computing
+        with large (many GB) datasets.
+
     Args:
-        image_data (3D array): Data cube of images (2D arrays of pixel values).
         bg_err (1D array): Array of uncertainties on pixel value.
         cx (int/array, optional): x-coordinate(s) of the center of the aperture. Default is 15.
         cy (int/array, optional): y-coordinate(s) of the center of the aperture. Default is 15.
-        r (int, optional): If shape is 'Circular', r is the radius for the circular aperture. Default is 2.5.
-        a (int, optional): If shape is 'Elliptical', a is the semi-major axis for elliptical aperture (x-axis). Default is 5.
-        b (int, optional): If shape is 'Elliptical', b is the semi-major axis for elliptical aperture (y-axis). Default is 5.
-        w_r (int, optional): If shape is 'Rectangular', w_r is the full width for rectangular aperture (x-axis). Default is 5.
-        h_r (int, optional): If shape is 'Rectangular', h_r is the full height for rectangular aperture (y-axis). Default is 5.
-        theta (int, optional): If shape is 'Elliptical' or 'Rectangular', theta is the angle of the rotation angle in radians
+        r (iterable, optional): If shape is 'Circular', the radii to try for aperture photometry
+            in units of pixels. Default is just 2.5 pixels.
+        a (iterable, optional): If shape is 'Elliptical', the semi-major axes to try for elliptical aperture
+            in units of pixels. Default is 5.
+        b (iterable, optional): If shape is 'Elliptical', the semi-minor axes to try for elliptical aperture
+            in units of pixels. Default is 5.
+        w_r (iterable, optional): If shape is 'Rectangular', the full widths to try for rectangular aperture (x-axis).
+            Default is 5.
+        h_r (iterable, optional): If shape is 'Rectangular', the full heights to try for rectangular aperture (y-axis).
+            Default is 5.
+        theta (iterable, optional): If shape is 'Elliptical' or 'Rectangular', the rotation angles in radians
             of the semimajor axis from the positive x axis. The rotation angle increases counterclockwise. Default is 0.
         scale (int, optional): If the image is oversampled, scaling factor for centroid and bounds,
             i.e, give centroid in terms of the pixel value of the initial image.
         shape (string, optional): shape is the shape of the aperture. Possible aperture shapes are 'Circular',
             'Elliptical', 'Rectangular'. Default is 'Circular'.
-        method (string, optional): The method used to determine the overlap of the aperture on the pixel grid. Possible 
-            methods are 'exact', 'subpixel', 'center'. Default is 'center'.
+        methods (iterable, optional): The methods used to determine the overlap of the aperture on the pixel grid. Possible 
+            methods are 'exact', 'subpixel', 'center'. Default is ['center', 'exact'].
 
     Returns:
-        tuple: ape_sum (1D array) Array of flux with new flux appended.
-            ape_sum_err (1D array) Array of flux uncertainties with new flux uncertainties appended.
+        tuple: results (2D array) Array of flux and flux errors, of shape (nMethods*nSizes, 2), where nSizes loop
+            is nested inside nMethods loop.
 
     """
     
-    # The following are all single values
-    r, a, b, w_r, h_r = np.array([r, a, b, w_r, h_r])*scale
-    
     # The following could be arrays
-    cx *= scale
-    cy *= scale
+    cx = np.array(cx)*scale
+    cy = np.array(cy)*scale
+    r = np.array(r)*scale
+    a = np.array(a)*scale
+    b = np.array(b)*scale
+    w_r = np.array(w_r)*scale
+    h_r = np.array(h_r)*scale
     
-    l, h, w  = image_data.shape
-    tmp_sum  = []
-    tmp_err  = []
+    # Set up aperture(s)
+    apertures = []
     movingCentroid = (isinstance(cx, Iterable) and isinstance(cy, Iterable))
     if not movingCentroid:
         position = [cx, cy]
-        if   (shape == 'Circular'):
-            aperture = CircularAperture(position, r=r)
-        elif (shape == 'Elliptical'):
-            aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
-        elif (shape == 'Rectangular'):
-            aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
-    for i in range(l):
-        if movingCentroid:
-            position = [cx[i], cy[i]]
-            if   (shape == 'Circular'):
-                aperture = CircularAperture(position, r=r)
-            elif (shape == 'Elliptical'):
-                aperture = EllipticalAperture(position, a=a, b=b, theta=theta)
-            elif (shape == 'Rectangular'):
-                aperture = RectangularAperture(position, w=w_r, h=h_r, theta=theta)
-        data_error = calc_total_error(image_data[i,:,:], bg_err[i], effective_gain=1)
-        phot_table = aperture_photometry(image_data[i,:,:], aperture, error=data_error, method=method)
-        tmp_sum.extend(phot_table['aperture_sum'])
-        tmp_err.extend(phot_table['aperture_sum_err'])
-    # removing outliers
-    try:
-        ape_sum = sigma_clip(tmp_sum, sigma=4, maxiters=2, cenfunc=np.ma.median)
-        ape_err = sigma_clip(tmp_err, sigma=4, maxiters=2, cenfunc=np.ma.median)
-    except TypeError:
-        ape_sum = sigma_clip(tmp_sum, sigma=4, iters=2, cenfunc=np.ma.median)
-        ape_err = sigma_clip(tmp_err, sigma=4, iters=2, cenfunc=np.ma.median)
+    else:
+        position = [cx[i], cy[i]]
+    if   (shape == 'Circular'):
+        for j in range(len(r)):
+            apertures.append(CircularAperture(position, r=r[j]))
+    elif (shape == 'Elliptical'):
+        for j in range(len(a)):
+            apertures.append(EllipticalAperture(position, a=a[j], b=b[j], theta=theta[j]))
+    elif (shape == 'Rectangular'):
+        for j in range(len(w_r)):
+            apertures.append(RectangularAperture(position, w=w_r[j], h=h_r[j], theta=theta[j]))
+    
+    data_error = calc_total_error(image_stack[i,:,:], bg_err[i], effective_gain=1)
+    
+    results = np.zeros((0,2))
+    for method in methods:
+        phot_table = aperture_photometry(image_stack[i,:,:], apertures, error=data_error, method=method)
+        results = np.append(results, np.array([np.array([phot_table[f'aperture_sum_{j}'],
+                                                         phot_table[f'aperture_sum_err_{j}']]).flatten()
+                                               for j in range(len(apertures))]), axis=0)
         
-    return ape_sum, ape_err
+    return results
 
 def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, bg_err, npp, bin_size):
     binned_flux, binned_flux_std = bin_array(flux, bin_size)
@@ -180,154 +212,18 @@ def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, bg_err, npp, bin_size):
         binned_flux_std[mask_pos] = np.nan
         binned_flux[mask_pos] = np.nan
         
-    return (binned_flux, binned_flux_std, binned_time, binned_time_std,
-            binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-            binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-            binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std,
-            binned_npp, binned_npp_std)
+    return np.array([binned_flux, binned_flux_std, binned_time, binned_time_std,
+                     binned_xo, binned_xo_std, binned_yo, binned_yo_std,
+                     binned_xw, binned_xw_std, binned_yw, binned_yw_std,
+                     binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std,
+                     binned_npp, binned_npp_std])
 
-def try_aperture(image_stack, time, xo, yo, xw, yw, bg_flux, bg_err,
-                 shape='Circular', edge='exact', scale=1,
-                 bin_data=True, bin_size=64, plot=False,
-                 save=False, rerun_photometry=False, savepath='',
-                 save_bin='', save_full='',
-                 moveCentroid=True, channel='ch2', planet='',
-                 r=2.5):
-    
-    edge_tmp = edge.lower()
-    if edge_tmp=='hard' or edge_tmp=='center' or edge_tmp=='centre':
-        method = 'center'
-    elif edge_tmp=='soft' or edge_tmp=='subpixel':
-        method = 'subpixel'
-    elif edge_tmp=='exact':
-        method = 'exact'
-    else:
-        # FIX: Throw an actual error
-        print("Warning: No such method \""+edge+"\".",
-              "Using hard edged aperture instead.")
-        method = 'center'
-    
-    if save:
-        if channel=='ch1':
-            folder='3um'
-        else:
-            folder='4um'
-        folder += edge+shape+"_".join(str(np.round(r, 2)).split('.'))
-        if moveCentroid:
-            folder += '_movingCentroid'
-        folder += '/'
-
-        # create save folder
-        savepath = create_folder(savepath+folder, True, rerun_photometry)
-        if savepath == None:
-            # This photometry has already been run and shouldn't be rerun
-            return
-        print('Starting:', savepath)
-    
-    # aperture photometry
-    if moveCentroid:
-        flux, flux_err = A_photometry(image_stack, bg_err, 
-                                      cx=xo, cy=yo,
-                                      r=r, shape=shape, method=method, scale=scale)
-    else:
-        flux, flux_err = A_photometry(image_stack, bg_err,
-                                      cx=15, cy=15,
-                                      r=r, shape=shape, method=method, scale=scale)
-
-    npp = noisepixparam(image_stack)
-        
-    order = np.argsort(time)
-    flux = flux[order]
-    flux_err = flux_err[order]
-    time = time[order]
-    xo = xo[order]
-    yo = yo[order]
-    xw = xw[order]
-    yw = yw[order]
-    bg_flux = bg_flux[order]
-    bg_err = bg_err[order]
-    npp = npp[order]
-        
-    if bin_data:
-        (binned_flux, binned_flux_std, binned_time, binned_time_std,
-         binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-         binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-         binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std,
-         binned_npp, binned_npp_std) = bin_all_data(flux, time, xo, yo,
-                                                    xw, yw, bg_flux, bg_err,
-                                                    npp, bin_size)
-
-    if plot:
-        if bin_data:
-            plotx = binned_time
-            ploty0 = binned_flux
-            ploty1 = binned_xo
-            ploty2 = binned_yo
-        else:
-            plotx = time
-            ploty0 = flux
-            ploty1 = xo
-            ploty2 = yo
-            
-        fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(15,5))
-        fig.suptitle(planet, fontsize="x-large")
-        
-        axes[0].plot(plotx, ploty0,'k+', color='black')
-        axes[0].set_ylabel("Stellar Flux (electrons)")
-
-        axes[1].plot(plotx, ploty1, '+', color='black')
-        axes[1].set_ylabel("$x_0$")
-
-        axes[2].plot(plotx, ploty2, 'r+', color='black')
-        axes[2].set_xlabel("Time (BMJD))")
-        axes[2].set_ylabel("$y_0$")
-        fig.subplots_adjust(hspace=0)
-        axes[2].ticklabel_format(useOffset=False)
-        
-        if save:
-            pathplot = savepath + plot_name
-            fig.savefig(pathplot)
-        
-        plt.show()
-        plt.close()
-
-    FULL_data = np.c_[flux, flux_err, time, xo, yo, xw, yw, bg_flux, bg_err, npp]
-
-    if bin_data:
-        BIN_data = np.c_[binned_flux, binned_flux_std,
-                         binned_time, binned_time_std,
-                         binned_xo, binned_xo_std,
-                         binned_yo, binned_yo_std, binned_xw, binned_xw_std,
-                         binned_yw, binned_yw_std,  binned_bg, binned_bg_std,
-                         binned_bg_err, binned_bg_err_std]
-    
-    if save:
-        FULL_head = 'Flux, Flux Uncertainty, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux, bg flux err'
-        FULL_head += ', Noise Pixel Parameter'
-        pathFULL  = savepath + save_full
-        np.savetxt(pathFULL, FULL_data, header = FULL_head)
-        if bin_data:
-            BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
-            BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
-            BIN_head += ', bg flux err, bg flux err std, Noise Pixel Parameter, Noise Pixel Parameter std'
-            pathBIN  = savepath + save_bin
-            np.savetxt(pathBIN, BIN_data, header = BIN_head)
-    else:
-        if bin_data:
-            return FULL_data, BIN_data
-        else:
-            return FULL_data
-
-def get_lightcurve(datapath, savepath, AOR_snip, channel,
-                   save = True, save_full = '/ch2_datacube_full_AORs579.dat',
-                   bin_data = True, bin_size = 64,
-                   save_bin = '/ch2_datacube_binned_AORs579.dat',
-                   plot = True, plot_name= 'Lightcurve.pdf',
-                   oversamp = False, saveoversamp = True, reuse_oversamp = False,
-                   planet = 'CoRoT-2b',
-                   rs = [2.5], shapes=['Circular'], edges=['hard'],
-                   addStack = False, stackPath = '', ignoreFrames = None,
-                   maskStars = None, moveCentroids=[True], rerun_photometry=False,
+def get_lightcurve(basepath, AOR_snip, channel, planet,
+                   save=True, onlyBest=True, highpassWidth=5*64, bin_data=True, bin_size=64,
+                   showPlots=False, savePlots=True,
+                   oversamp=False, saveoversamp=True, reuse_oversamp=True,
+                   r = [2.5], edges=['hard'], addStack = False, ignoreFrames = None,
+                   maskStars = None, moveCentroids=[True],
                    ncpu=4):
     """Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
 
@@ -336,9 +232,8 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel,
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
         channel (string): Channel used for the observation eg. 'ch1' for channel 1
-        shapes (iterable, optional): The aperture shapes to try. Possible
-            aperture shapes are 'Circular', 'Elliptical', 'Rectangular'.
-            Default is just ['Circular'].
+        shape (string, optional): The aperture shape to try. Possible aperture shapes are 'Circular',
+            'Elliptical', 'Rectangular'. Default is 'Circular'.
         edges (iterable, optional): The aperture edges to try. Options are 'hard',
             'soft', and 'exact' which correspond to the 'center', 'subpixel',
             and 'exact' methods in astropy. Default is just ['hard'].
@@ -371,21 +266,51 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel,
     
     """
     
+    # Currently only circular apertures are supported!
+    shape='Circular'
+    
+    stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
+    datapath   = basepath+planet+'/data/'+channel
+    
+    savepath = basepath+planet+'/analysis/'+channel+'/'
+    if addStack:
+        savepath += 'addedStack/'
+    else:
+        savepath += 'addedBlank/'
+    if ignoreFrames != []:
+        savepath += 'ignore/'
+    else:
+        savepath += 'noIgnore/'
+    
+    # prepare filenames for saved data
+    save_full = channel+'_datacube_full_AORs'+AOR_snip[1:]+'.dat'
+    save_bin = channel+'_datacube_binned_AORs'+AOR_snip[1:]+'.dat'
+    
     if not isinstance(rs, Iterable):
         rs = [rs]
-    if not isinstance(shapes, Iterable):
-        shapes = [shapes]
     if not isinstance(edges, Iterable):
         edges = [edges]
     if not isinstance(moveCentroids, Iterable):
         moveCentroids = [moveCentroids]
     
-    for i in range(len(shapes)):
-        shape = shapes[i]
-        if shape!='Circular' and shape!='Elliptical' and shape!='Rectangular':
+    if shape!='Circular' and shape!='Elliptical' and shape!='Rectangular':
+        # FIX: Throw an actual error
+        print('Warning: No such aperture shape "'+shape+'". Using Circular aperture instead.')
+        shape = 'Circular'
+    
+    methods = []
+    for edge_tmp in edges:
+        if edge_tmp=='hard' or edge_tmp=='center' or edge_tmp=='centre':
+            methods.append('center')
+        elif edge_tmp=='soft' or edge_tmp=='subpixel':
+            methods.append('subpixel')
+        elif edge_tmp=='exact':
+            methods.append('exact')
+        else:
             # FIX: Throw an actual error
-            print('Warning: No such aperture shape "'+shape+'". Using Circular aperture instead.')
-            shapes[i]='Circular'
+            print("Warning: No such method \""+edge_tmp+"\".",
+                  "Using hard edged aperture instead.")
+            methods.append('center')
     
     if save and savepath[-1]!='/':
         savepath += '/'
@@ -405,110 +330,251 @@ def get_lightcurve(datapath, savepath, AOR_snip, channel,
     fnames, lens = get_fnames(datapath, AOR_snip)
     if addStack:
         stacks = get_stacks(stackPath, datapath, AOR_snip)
-
-    time = []
+    
     image_stack = np.zeros((0,32,32))
+    time = []
     
     # data reduction & aperture photometry part
     j=0 #counter to keep track of which correction stack we're using
     for i in range(len(fnames)):
         # open fits file
         with fits.open(fnames[i]) as hdu_list:
+            header = hdu_list[0].header
+            time = np.append(time, get_time(header, ignoreFrames))
+            
             if len(hdu_list[0].data.shape)==2:
                 # Reshape fullframe data so that it can be used with our routines
-                hdu_list[0].data = hdu_list[0].data[np.newaxis,217:249,9:41]
+                image = hdu_list[0].data[np.newaxis,217:249,9:41]
+            else:
+                image = hdu_list[0].data
+                #ignore any consistently bad frames in datacubes
+                image[ignoreFrames] = np.nan
+        
+        #add background correcting stack if requested
+        if addStack:
+            while i > np.sum(lens[:j+1]):
+                j+=1 #if we've moved onto a new AOR, increment j
+            stackHDU = fits.open(stacks[j])
+            image += stackHDU[0].data
 
-            image_data = hdu_list[0].data
-            header = hdu_list[0].header
-            # get time
-            time = np.append(time, get_time(hdu_list, ignoreFrames))
-            #add background correcting stack if requested
-            if addStack:
-                while i > np.sum(lens[:j+1]):
-                    j+=1 #if we've moved onto a new AOR, increment j
-                stackHDU = fits.open(stacks[j])
-                image_data += stackHDU[0].data
+        # convert MJy/str to electron count
+        convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
+        image = convfact*image
+        
+        # Mask any other stars in the frame to avoid them influencing the background subtraction
+        if maskStars != []:
+            header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
+            w = WCS(header, naxis=[1,2])
+            mask = np.ma.getmaskarray(image)
+            for st in maskStars:
+                coord = SkyCoord(st[0], st[1])
+                x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
+                x = x+np.arange(-1,2)
+                y = y+np.arange(-1,2)
+                x,y = np.meshgrid(x,y)
+                mask[:,x,y] = True
+            image = np.ma.masked_array(image, mask=mask)
+        
+        # oversampling
+        if oversamp:
+            if reuse_oversamp:
+                savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+                if os.path.isfile(savename):
+                    image = np.load(savename)
+                else:
+                    print('Warning: Oversampled images were not previously saved! Making new ones now...')
+                    image = np.ma.masked_invalid(oversampling(image))
+                    if (saveoversamp == True):
+                        # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+                        image.dump(savename)
+            else:
+                image = np.ma.masked_invalid(oversampling(image))
             
-            # convert MJy/str to electron count
-            convfact = (hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']
-                        /hdu_list[0].header['FLUXCONV'])
-            image_stack = np.append(image_stack, convfact*image_data, axis=0)
+            if saveoversamp:
+                # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+                savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+                image.dump(savename)
+            scale = 2
+        else:
+            scale = 1
+        
+        # Add image to stack for later sigma clipping bad frames
+        image_stack = np.append(image_stack, image, axis=0)
     
     time = np.array(time)
     
-    #ignore any consistently bad frames in datacubes
-    for i in ignoreFrames:
-        l = image_stack.shape[0]
-        ignore_inds = (i + 64*np.arange(int(l/64)+int(l%64>i))).astype(int)
-        image_stack[ignore_inds] = np.nan
-    
-    # sigma clip along full time axis
+    # sigma clip bad pixels along full time axis
     image_stack = sigma_clipping(image_stack)
 
-    # Mask any other stars in the frame to avoid them influencing the background subtraction
-    if maskStars != []:
-        header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
-        w = WCS(header, naxis=[1,2])
-        mask = np.ma.getmaskarray(image_stack)
-        for st in maskStars:
-            coord = SkyCoord(st[0], st[1])
-            x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
-            x = x+np.arange(-1,2)
-            y = y+np.arange(-1,2)
-            x,y = np.meshgrid(x,y)
-            mask[:,x,y] = True
-        image_stack = np.ma.masked_array(image_stack, mask=mask)
+    # background subtract
+    image_stack, bg, bg_err = bgsubtract(image_stack)
 
-    # bg subtract
-    image_stack, bg_flux, bg_err = bgsubtract(image_stack)
-    
-    # oversampling
-    if oversamp:
-        if reuse_oversamp:
-            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
-            if os.path.isfile(savename):
-                image_stack = np.load(savename)
-            else:
-                print('Warning: Oversampled images were not previously saved! Making new ones now...')
-                image_stack = np.ma.masked_invalid(oversampling(image_stack))
-                if (saveoversamp == True):
-                    # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-                    image_stack.dump(savename)
-        else:
-            image_stack = np.ma.masked_invalid(oversampling(image_stack))
-
-        if saveoversamp:
-            # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
-            image_stack.dump(savename)
-
-        scale = 2
-    else:
-        scale = 1
-        
     # get centroids & PSF width
     xo, yo, xw, yw = centroid_FWM(image_stack, scale=scale)
-    xo[np.ma.getmaskarray(xo)] = np.ma.median(xo)
-    yo[np.ma.getmaskarray(yo)] = np.ma.median(yo)
+    
+    # Compute noise pixel parameter for each frame
+    npp = noisepixparam(image_stack)
+    
+    # Make into a global variable so that A_Photometry can be run with multiprocessing without
+    # needing to pickle image_stack - this is critical for datasets with many GB of data!
+    global image_stack
     
     # perform aperture photometry
-    for moveCentroid in moveCentroids:
-        for edge in edges:
-            for shape in shapes:
-                with Pool(ncpu) as pool:
-                    func = partial(try_aperture, image_stack, time, xo, yo,
-                                   xw, yw, bg_flux, bg_err,
-                                   shape, edge, scale,
-                                   bin_data, bin_size, plot,
-                                   save, rerun_photometry, savepath, save_bin,
-                                   save_full, moveCentroid, 
-                                   channel, planet)
-                    results = pool.map(func, rs)
+    with Pool(ncpu) as pool:
+        # FIX, currently only circular aperture is supported all the way from end to end
+        func = partial(A_photometry, bg_err, xo, yo, r, [], [], [], [], [],
+                       scale, shape, methods)
+        inds = range(image_stack.shape[0])
+        results = np.array(pool.map(func, inds))
+    fluxes = results[:,:,0]
+    flux_errs = results[:,:,1]
+    
+    # Free up RAM now that we aren't using the stack of images anymore
+    image_stack = None
+    results = None
+    
+    # removing flux outliers for each technique
+    try:
+        fluxes = sigma_clip(fluxes, sigma=5, maxiters=3, axis=0, cenfunc=np.ma.median)
+    except TypeError:
+        flux_errs = sigma_clip(flux_errs, sigma=5, iters=3, axis=0, cenfunc=np.ma.median)
+    
+    # Sort data into correct order    
+    order = np.argsort(time)
+    fluxes = fluxes[order]
+    flux_errs = flux_errs[order]
+    time = time[order]
+    xo = xo[order]
+    yo = yo[order]
+    xw = xw[order]
+    yw = yw[order]
+    bg = bg[order]
+    bg_err = bg_err[order]
+    npp = npp[order]
+    
+    # Make a folder name for each method
+    techniques = []
+    all_edges = []
+    all_rs = []
+    for edge in edges:
+        for r_tmp in r:
+            if channel=='ch1':
+                folder='3um'
+            else:
+                folder='4um'
+            folder += edge+shape+"_".join(str(np.round(r_tmp, 2)).split('.'))
+            if moveCentroid:
+                folder += '_movingCentroid'
+            techniques.append(folder)
+            all_edges.append(edge)
+            all_rs.append(r_tmp)
+    
+    # Choose the best photometry method, save diagnostic plot(s)
+    RMSs = compare_RMS(techniques, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
+                       onlyBest, showPlots, savePlots)
 
-    return results
+    if onlyBest:
+        # Keep these as arrays so they can be indexed lated
+        # If the user only want's to save the best results, discard the rest
+        fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
+        flux_errs = flux_errs[:,np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
+    
+    FULL_datas = []
+    BIN_datas = []
+    for i in range(fluxes.shape[1]):
+        flux = fluxes[:,i]
+        flux_err = flux_errs[:,i]
+        FULL_data = np.array([flux, flux_err, time, xo, yo, xw, yw, bg, bg_err, npp])
+        
+        if channel=='ch1':
+            folder='3um'
+        else:
+            folder='4um'
+        folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
+        if moveCentroid:
+            folder += '_movingCentroid'
+        folder += '/'
 
+        # create save folder
+        savepath = create_folder(savepath+folder, auto=True, rerun_photometry=True)
+        
+        # Bin the data if requested
+        if bin_data:
+            BIN_data = bin_all_data(flux, time, xo, yo, xw, yw, bg, bg_err, npp, bin_size)
+        
+        # Plot the photometry if requested
+        if savePlots or showPlots:
+            if bin_data:
+                (binned_flux, binned_flux_std, binned_time, binned_time_std,
+                 binned_xo, binned_xo_std, binned_yo, binned_yo_std,
+                 binned_xw, binned_xw_std, binned_yw, binned_yw_std,
+                 binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std,
+                 binned_npp, binned_npp_std) = BIN_data
 
+                plotx = binned_time
+                ploty0 = binned_flux
+                ploty1 = binned_xo
+                ploty2 = binned_yo
+            else:
+                plotx = time
+                ploty0 = flux
+                ploty1 = xo
+                ploty2 = yo
 
+            fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(15,5))
+            fig.suptitle(planet, fontsize="x-large")
+
+            axes[0].plot(plotx, ploty0,'k+', color='black')
+            axes[0].set_ylabel("Stellar Flux (electrons)")
+
+            axes[1].plot(plotx, ploty1, '+', color='black')
+            axes[1].set_ylabel("$x_0$")
+
+            axes[2].plot(plotx, ploty2, 'r+', color='black')
+            axes[2].set_xlabel("Time (BMJD))")
+            axes[2].set_ylabel("$y_0$")
+            fig.subplots_adjust(hspace=0)
+            axes[2].ticklabel_format(useOffset=False)
+
+            if savePlots:
+                # Save the plot if requested
+                pathplot = savepath + 'Lightcurve.pdf'
+                fig.savefig(pathplot)
+            if showPlots:
+                plt.show()
+            plt.close()
+        
+        # Save the data if requested
+        if save:
+            FULL_head = 'Flux, Flux Uncertainty, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux, bg flux err'
+            FULL_head += ', Noise Pixel Parameter'
+            pathFULL  = savepath+folder+save_full
+            np.savetxt(pathFULL, FULL_data.T, header=FULL_head)
+            if bin_data:
+                BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
+                BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
+                BIN_head += ', bg flux err, bg flux err std, Noise Pixel Parameter, Noise Pixel Parameter std'
+                pathBIN  = savepath+folder+save_bin
+                np.savetxt(pathBIN, BIN_data.T, header=BIN_head)
+        else:
+            FULL_datas.append(FULL_data)
+            if bin_data:
+                BIN_datas.append(BIN_data)
+        
+    if save:
+        # We are actually running the photometry and should return the RMS for later comparison
+        return np.nanmin(RMSs), savepath+folder
+    elif bin_data:
+        # We are running frame diagnostics and should return our results
+        return FULL_datas, BIN_datas
+    else:
+        # We are running frame diagnostics and should return our results
+        return FULL_datas
+        
+        
+    
 
 import unittest
 
@@ -525,13 +591,20 @@ class TestAperturehotometryMethods(unittest.TestCase):
 
     # Test that circular aperture photometry properly follows the input centroids and gives the expected values
     def test_circularAperture(self):
-        fake_images = np.zeros((4,32,32))
-        for i in range(fake_images.shape[0]):
-            fake_images[i,14+i,15] = 2
-        xo = np.ones(fake_images.shape[0])*15
+        image_stack = np.zeros((4,32,32))
+        global image_stack
+        
+        for i in range(image_stack.shape[0]):
+            image_stack[i,14+i,15] = 2
+        xo = np.ones(image_stack.shape[0])*15
         yo = np.arange(14,18)
-        flux, _ = A_photometry(fake_images, np.zeros_like(xo), cx=xo, cy=yo, r=1.,
-                               shape='Circular', method='center')
+        with Pool(1) as pool:
+            func = partial(A_photometry, np.zeros_like(xo), xo, yo, [1.,2.,3.], [], [], [], [], [],
+                           1, 'Circular', methods=['center'])
+            inds = range(image_stack.shape[0])
+            results = np.array(pool.map(func, inds))
+        flux = results[:,:,0]
+        
         self.assertTrue(np.all(flux==np.ones_like(flux)*2.))
 
 if __name__ == '__main__':
