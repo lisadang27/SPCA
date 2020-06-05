@@ -127,7 +127,7 @@ for planetNum, planet in enumerate(planets):
                 print('Analysing', channel, 'for systematically bad frames...')
                 ignoreFrames = frameDiagnosticsBackend.run_diagnostics(planet, channel, AOR_snip,
                                                                        basepath, addStack, ncpu, nsigma,
-                                                                       showPlot=True, savePlot=True)
+                                                                       showPlot=False, savePlot=True)
             else:
                 ignoreFrames = []
 
@@ -147,7 +147,7 @@ for planetNum, planet in enumerate(planets):
                         print('Starting PLD photometry!')
                         PLDPhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
                                                      stamp_sizes, True, bin_data, bin_size,
-                                                     True, True, addStack, ignoreFrames_temp,
+                                                     False, True, addStack, ignoreFrames_temp,
                                                      maskStars, ncpu)
                         if ignoreFrames_temp==ignoreFrames:
                             # Write down what frames should be ignored in case not doing PLDAper

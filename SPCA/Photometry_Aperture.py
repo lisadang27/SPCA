@@ -195,7 +195,7 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
         
     return results
 
-def compare_RMS(Run_list, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
+def compare_RMS(Run_list, fluxes, r, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
                 save=True, onlyBest=False, showPlots=False, savePlots=True):
     
     RMS = np.empty(len(Run_list))
@@ -523,7 +523,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 all_rs.append(r_tmp)
     
     # Choose the best photometry method, save diagnostic plot(s)
-    RMSs = compare_RMS(techniques, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
+    RMSs = compare_RMS(techniques, fluxes, r, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
                        save, onlyBest, showPlots, savePlots)
 
     if onlyBest:
