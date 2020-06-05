@@ -523,8 +523,8 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 all_rs.append(r_tmp)
     
     # Choose the best photometry method, save diagnostic plot(s)
-    RMSs = compare_RMS(techniques, fluxes, all_rs, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
-                       save, onlyBest, showPlots, savePlots)
+    RMSs = compare_RMS(techniques, fluxes, np.array(all_rs), time, highpassWidth, basepath,
+                       planet, channel, ignoreFrames, addStack, save, onlyBest, showPlots, savePlots)
 
     if onlyBest:
         # Keep these as arrays so they can be indexed lated
