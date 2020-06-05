@@ -27,9 +27,6 @@ basepath = '/homes/picaro/bellt/research/'
 # General settings
 #################
 
-# Whether you want to write over past photometry if it exists
-# rerun_photometry = True
-
 # Whether or not to bin data points together
 bin_data = True
 # Number of data points to bin together
