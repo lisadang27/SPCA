@@ -1,9 +1,24 @@
+import time as timepk
+
 import os, glob
 import numpy as np
+from multiprocessing import Pool
+from functools import partial
+
 from astropy.stats import sigma_clip
 from astropy.convolution import convolve, Box1DKernel
+from astropy.wcs import WCS
+from astropy.wcs.utils import skycoord_to_pixel
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+
 import scipy.interpolate
 from scipy.stats import binned_statistic
+
+import warnings
+warnings.filterwarnings('ignore')
+
+image_stack = np.zeros((0,32,32))
 
 def create_folder(fullname, auto=False, overwrite=False):
     """Create a folder unless it exists.
@@ -69,7 +84,7 @@ def get_fnames(directory, AOR_snip):
     fnames   = []
     lens = []
     for i in range(len(AOR_list)):
-        path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'	
+        path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'
         files = glob.glob(os.path.join(path, '*bcd.fits'))
         fnames.extend(files)
         lens.append(len(files))
@@ -137,13 +152,13 @@ def get_time(header, ignoreFrames):
         t[ignoreFrames] = np.nan
     return t
 
-def oversampling(image_data, a = 2):
+def oversampling(image_data, scale=2):
     """First, substitutes all invalid/sigma-clipped pixels by interpolating the value, then linearly oversamples the image.
 
     Args:
         image_data (ndarray): Data cube of images (2D arrays of pixel values).
-        a (int, optional):  Sampling factor, e.g. if a = 2, there will be twice as much data points in the x and y axis.
-            Default is 2. (Do not recommend larger than 2)
+        scale (int, optional):  Sampling factor, e.g. if scale = 2, there will be twice as many data points in the x
+            and y axis. Default is 2. (Do not recommend larger than 2)
 
     Returns:
         ndarray: Data cube of oversampled images (2D arrays of pixel values).
@@ -187,32 +202,23 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=2):
     lbx, ubx, lby, uby = bounds
     h, w, l = image_stack.shape
     
-    # mask invalids
-    image_stack2 = np.ma.masked_invalid(image_stack)
-    
-    # make mask to mask entire bad frame
-    x = np.ones((w, l))
-    mask = np.ma.make_mask(x)
-    
     try:
-        sig_clipped_stack = sigma_clip(image_stack2, sigma=sigma,
-                                       maxiters=maxiters, 
-                                       cenfunc=np.ma.median, axis = 0)
+        image_stack = sigma_clip(image_stack, sigma=sigma,
+                                 maxiters=maxiters, 
+                                 cenfunc=np.ma.median, axis = 0)
     except TypeError:
-        sig_clipped_stack = sigma_clip(image_stack2, sigma=sigma, iters=maxiters, 
-                                       cenfunc=np.ma.median, axis = 0)
-    for i in range(h):
-        # If any pixels near the target star are bad, mask the entire frame
-        if np.ma.is_masked(sig_clipped_stack[i, lbx:ubx, lby:uby]):
-            sig_clipped_stack[i,:,:] = np.ma.masked_array(sig_clipped_stack[i,:,:],
-                                                          mask = mask)
-    return sig_clipped_stack
+        image_stack = sigma_clip(image_stack, sigma=sigma, iters=maxiters, 
+                                 cenfunc=np.ma.median, axis = 0)
+    
+    # If any pixels near the target star are bad, mask the entire frame
+    image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
+    
+    return image_stack
 
-def bgsubtract(img_data, bounds=(11, 19, 11, 19)):
+def bgsubtract(bounds=(11, 19, 11, 19), i=0):
     """Measure the background level and subtracts the background from each frame.
 
     Args:
-        img_data (ndarray): Data cube of images (2D arrays of pixel values).
         bounds (tuple, optional): Bounds of box around the target. Default is (11, 19, 11, 19).
 
     Returns:
@@ -222,27 +228,25 @@ def bgsubtract(img_data, bounds=(11, 19, 11, 19)):
     
     """
     
+    # Access global variable
+    global image_stack
+    
     lbx, ubx, lby, uby = bounds
-    image_data = np.ma.copy(img_data)
-    h, w, l = image_data.shape
+    
+    # Get the initial mask
+    image = np.ma.masked_invalid(image_stack[i])
     
     # Mask out the target star
-    mask = np.zeros(image_data.shape)
-    mask[:, lbx:ubx,lby:uby] = 1
-    mask   = np.ma.make_mask(mask)
-    masked = np.ma.masked_array(image_data, mask = mask)
-    masked = np.reshape(masked, (h, w*l))
+    image[lbx:ubx,lby:uby] = np.ma.masked
     
     # Compute background and error
-    bg_med = np.reshape(np.ma.median(masked, axis=1), (h, 1, 1))
-    bg_flux = bg_med.ravel()
-    bg_err = np.ma.std(masked, axis=1)
+    bg = np.ma.median(image)
+    bg_err = np.ma.std(image)
     
     # Subtract background
-    bgsub_data = image_data - bg_med
-    bgsub_data = np.ma.masked_invalid(bgsub_data)
+    image_stack[i] -= bg
     
-    return bgsub_data, bg_flux, bg_err
+    return np.array([bg, bg_err])
 
 def noisepixparam(image_data, npp=[], bounds=(13, 18, 13, 18)):
     """Compute the noise pixel parameter.
@@ -293,115 +297,126 @@ def highpassflist(signal, highpassWidth):
     smooth = convolve(signal, g, boundary='extend')
     return smooth
 
-def compare_RMS(Run_list, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
-            onlyBest=False, showPlots=False, savePlots=True):
-    RMS_list_full = np.empty(len(Run_list))
+def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
+                  oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
+                  addStack=False, stackPath='', maskStars=[], i=0):
     
-    for i, foldername in enumerate(Run_list):
-        flux = fluxes[:,i]
-        smooth = highpassflist(flux_tmp, highpassWidth)
-        smoothed = (flux_tmp - smooth)+np.nanmean(flux_tmp)
-        RMS_list_full[i] = np.sqrt(np.nanmean((flux_tmp-smooth)**2.))/np.nanmean(smoothed)
-       
-    bestInd = np.nanargmin(RMS_list_full[i])
-    
-    if onlyBest:
-        # If the user only wants to save the best photomtery, get rid of the rest of the data
-        Run_list = Run_list[bestInd:bestInd+1]
-        RMS_list = RMS_list_full[bestInd:bestInd+1]
-        fluxes = fluxes[bestInd:bestInd+1]
-    else:
-        RMS_list = RMS_list_full
-    
-    figpath  = basepath+planet+'/analysis/photometryComparison/'+channel+'/'
+    # open fits file
+    with fits.open(fnames[i]) as hdu_list:
+        header = hdu_list[0].header
+        time = get_time(header, ignoreFrames)
+
+        if len(hdu_list[0].data.shape)==2:
+            # Reshape fullframe data so that it can be used with our routines
+            # Getting just the stamp around the sweet spot
+            image = hdu_list[0].data[np.newaxis,217:249,9:41]
+        else:
+            image = hdu_list[0].data
+            #ignore any consistently bad frames in datacubes
+            image[ignoreFrames] = np.nan
+
+    #add background correcting stack if requested
     if addStack:
-        figpath += 'addedStack/'
-    else:
-        figpath += 'addedBlank/'
-    if not os.path.exists(figpath):
-        os.makedirs(figpath)
+        j=0 #counter to keep track of which correction stack we're using
+        while i > np.sum(lens[:j+1]):
+            j+=1 #if we've moved onto a new AOR, increment j
+        stackHDU = fits.open(stacks[j])
+        image += stackHDU[0].data
 
-    if ignoreFrames != []:
-        figpath += 'ignore/'
-    else:
-        figpath += 'noIgnore/'
-    if not os.path.exists(figpath):
-        os.makedirs(figpath)
-    
-    exact_moving = np.array(['exact' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
-    soft_moving =  np.array(['soft' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
-    hard_moving =  np.array(['hard' in Run_list[i].lower() and 'moving' in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
+    # convert MJy/str to electron count
+    convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
+    image = convfact*image
 
-    exact = np.array(['exact' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
-    soft =  np.array(['soft' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
-    hard =  np.array(['hard' in Run_list[i].lower() and 'moving' not in Run_list[i].lower() for i in range(len(Run_list))], dtype=bool)
-    
-    if showPlots or savePlots:
-        for i in range(len(Run_list)):
-            plt.figure(figsize = (10,4))
-            
-            if np.any(exact_moving):
-                plt.plot(r[exact_moving],  RMS[exact_moving]*1e6, 'o-', label = 'Circle: Exact Edge, Moving')
-            if np.any(soft_moving):
-                plt.plot(r[soft_moving],  RMS[soft_moving]*1e6, 'o-', label = 'Circle: Soft Edge, Moving')
-            if np.any(hard_moving):
-                plt.plot(r[hard_moving],  RMS[hard_moving]*1e6, 'o-', label = 'Circle: Hard Edge, Moving')
+    # Mask any other stars in the frame to avoid them influencing the background subtraction
+    if maskStars != []:
+        header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
+        w = WCS(header, naxis=[1,2])
+        mask = np.ma.getmaskarray(image)
+        for st in maskStars:
+            coord = SkyCoord(st[0], st[1])
+            x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
+            x = x+np.arange(-1,2)
+            y = y+np.arange(-1,2)
+            x,y = np.meshgrid(x,y)
+            mask[:,x,y] = True
+        image = np.ma.masked_array(image, mask=mask)
 
-            if np.any(exact):
-                plt.plot(r[exact],  RMS[exact]*1e6, 'o-', label = 'Circle: Exact Edge')
-            if np.any(soft):
-                plt.plot(r[soft],  RMS[soft]*1e6, 'o-', label = 'Circle: Soft Edge')
-            if np.any(hard):
-                plt.plot(r[hard],  RMS[hard]*1e6, 'o-', label = 'Circle: Hard Edge')
-
-            plt.xlabel('Aperture Radius')
-            plt.ylabel('RMS Scatter (ppm)')
-            plt.legend(loc='best')
-
-            if channel=='ch2':
-                fname = figpath + '4um'
+    # oversampling
+    if oversamp:
+        if reuse_oversamp:
+            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+            if os.path.isfile(savename):
+                image = np.load(savename)
             else:
-                fname = figpath + '3um'
-            fname += '_Photometry_Comparison.pdf'
-            if savePlots:
-                plt.savefig(fname)
-            if showPlots:
-                plt.show()
-            plt.close()
-        
-    if np.any(exact_moving):
-        print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
-        print('Exact Moving - Best Aperture Radius:',
-              r[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
-        print()
-    if np.any(soft_moving):
-        print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
-        print('Soft Moving - Best Aperture Radius:',
-              r[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
-        print()
-    if np.any(hard_moving):
-        print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
-        print('Hard Moving - Best Aperture Radius:',
-              r[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
-        print()
-    if np.any(exact):
-        print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
-        print('Exact - Best Aperture Radius:', r[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
-        print()
-    if np.any(soft):
-        print('Soft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
-        print('Soft - Best Aperture Radius:', r[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
-        print()
-    if np.any(hard):
-        print('Hard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
-        print('Hard - Best Aperture Radius:', r[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
+                print('Warning: Oversampled images were not previously saved! Making new ones now...')
+                image = np.ma.masked_invalid(oversampling(image, scale))
+                if (saveoversamp == True):
+                    # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+                    image.dump(savename)
+        else:
+            image = np.ma.masked_invalid(oversampling(image))
 
-    print('Best photometry of this batch:', Run_list[np.argmin(RMS)])
-
-    with open(figpath+'best_option.txt', 'w') as file:
-        file.write(Run_list[np.argmin(RMS)])
+        if saveoversamp:
+            # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+            image.dump(savename)
+    
+    data = image.reshape(-1,np.product(image.shape[1:]))
+    data = np.append(data, time[:,np.newaxis], axis=1)
         
-    return RMS_list_full
+    return data
+
+def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
+                   oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
+                   addStack=False, stackPath='', maskStars=[], ncpu=4):
+    
+    print('\tGetting images', end='')
+    if len(ignoreFrames)!=0:
+        print(', deleting bad frames', end='')
+    print('... ', end='')
+    # get list of filenames and number of files
+    fnames, lens = get_fnames(datapath, AOR_snip)
+    if addStack:
+        stacks = get_stacks(stackPath, datapath, AOR_snip)
+    else:
+        stacks = []
+    
+    # Load all of the images using multiprocessing to speed things up
+    with Pool(ncpu) as pool:
+        func = partial(prepare_image, savepath, AOR_snip, fnames, lens, stacks, ignoreFrames,
+                       oversamp, scale, reuse_oversamp, saveoversamp, addStack, stackPath, maskStars)
+        inds = range(len(fnames))
+        results = np.array(pool.map(func, inds)).reshape(-1,int(32**2+1))
+    
+    # Access global variable
+    global image_stack
+    
+    time = results[:,-1].flatten()
+    image_stack = results[:,:-1].reshape(-1, 32, 32)
+    # Free up a bit of RAM
+    results = None
+    
+    # Sort data into correct order
+    order = np.argsort(time)
+    time = time[order]
+    image_stack = image_stack[order]
+    # Free up a bit of RAM
+    order = None
+    
+    print('Sigma clipping... ', end='')
+    # sigma clip bad pixels along full time axis
+    image_stack = sigma_clipping(image_stack)
+    
+    print('Background subtracting... ', end='')
+    # background subtraction is done on global variable
+    with Pool(ncpu) as pool:
+        func = partial(bgsubtract, (11, 19, 11, 19))
+        inds = range(image_stack.shape[0])
+        bg, bg_err = np.array(pool.map(func, inds)).T
+    
+    print('Images loaded!')
+    
+    return image_stack, bg, bg_err, time
 
 
 

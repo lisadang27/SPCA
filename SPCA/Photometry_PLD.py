@@ -1,19 +1,12 @@
 import numpy as np
-from scipy import interpolate
-
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches
 
-from astropy.io import fits
-from astropy.wcs import WCS
-from astropy.wcs.utils import skycoord_to_pixel
-from astropy.coordinates import SkyCoord
 from astropy.stats import sigma_clip
 
-import os, sys, csv, glob, warnings
+from .Photometry_Common import bin_array, create_folder, prepare_images
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, sigma_clipping, bgsubtract, bin_array, create_folder
+import warnings
+warnings.filterwarnings('ignore')
 
 def bin_array2D(data, size):
     """Median bin PLD stamps.
@@ -66,11 +59,11 @@ def get_pixel_values(image, cx = 15, cy = 15, nbx = 3, nby = 3):
     P = image_data[:, (cx-deltax):(cx+deltax+1), (cy-deltay):(cy+deltay+1)].reshape(h, -1)
     return P
 
-def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
-    save = True, save_full = '/ch2_datacube_full_AORs579.dat', bin_data = True, 
-    bin_size = 64, save_bin = '/ch2_datacube_binned_AORs579.dat', plot = True, 
-    plot_name= 'Lightcurve.pdf', planet = 'CoRoT-2b', stamp_size = 3, addStack = False,
-    stackPath = '', ignoreFrames = None, maskStars = None, rerun_photometry=False):
+def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
+                         save=True, bin_data=True, bin_size=64,
+                         showPlots=False, savePlots=True,
+                         addStack = False, ignoreFrames = None,
+                         maskStars = None, ncpu=4):
     
     """Given a directory, looks for data (bcd.fits files), opens them and performs PLD "photometry".
 
@@ -103,175 +96,132 @@ def get_pixel_lightcurve(datapath, savepath, AOR_snip, channel,
     """
     
     #Fix: Throw actual errors in these cases
-    if stamp_size!=3 and stamp_size!=5:
-        print('Error: Only stamp sizes of 3 and 5 are currently allowed.')
-        return
-    
-    if save and savepath[-1]!='/':
-        savepath += '/'
-    
-    if save:
-        if channel=='ch1':
-            folder='3um'
-        else:
-            folder='4um'
-        folder += f'PLD_{stamp_size}x{stamp_size}/'
-
-        # create save folder
-        savepath = create_folder(savepath+folder, True, rerun_photometry)
-        if savepath == None:
-            # This photometry has already been run and shouldn't be rerun
+    for stamp_size in stamp_sizes:
+        if stamp_size!=3 and stamp_size!=5:
+            print(f'Error: Stamp size {stamp_size} not permitted')
+            print('Only stamp sizes of 3 and 5 are currently allowed.')
             return
-        print('Starting:', savepath)
-    
-    while datapath[-1]=='/':
-        datapath=datapath[:-1]
     
     if ignoreFrames is None:
         ignoreFrames = []
     if maskStars is None:
         maskStars = []
     
-    # Ignore warning
-    warnings.filterwarnings('ignore')
-
-    # get list of filenames and nb of files
-    fnames, lens = get_fnames(datapath, AOR_snip)
+    if basepath[-1]!='/':
+        basepath += '/'
+    
+    stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
+    datapath   = basepath+planet+'/data/'+channel
+    
+    savepath = basepath+planet+'/analysis/'+channel+'/'
     if addStack:
-        stacks = get_stacks(stackPath, datapath, AOR_snip)
+        savepath += 'addedStack/'
+    else:
+        savepath += 'addedBlank/'
+    if ignoreFrames != []:
+        savepath += 'ignore/'
+    else:
+        savepath += 'noIgnore/'
+    
+    # prepare filenames for saved data
+    save_full = channel+'_datacube_full_AORs'+AOR_snip[1:]+'.dat'
+    save_bin = channel+'_datacube_binned_AORs'+AOR_snip[1:]+'.dat'
+    
+    # Ignore warning
+    # warnings.filterwarnings('ignore')
 
-    time = []
-    image_stack = np.zeros((0,32,32))
+    # Prepare all of the images
+    image_stack, bg, bg_err, time = prepare_images(datapath, savepath, AOR_snip, ignoreFrames,
+                                                   False, 1, False, False,
+                                                   addStack, stackPath, maskStars, ncpu)
     
-    # data reduction & aperture photometry part
-    j=0 #counter to keep track of which correction stack we're using
-    for i in range(len(fnames)):
-        # open fits file
-        with fits.open(fnames[i]) as hdu_list:
-            if len(hdu_list[0].data.shape)==2:
-                # Reshape fullframe data so that it can be used with our routines
-                hdu_list[0].data = hdu_list[0].data[np.newaxis,217:249,9:41]
+    savepath_raw = savepath
+    for stamp_size in stamp_sizes:
+        if save:
+            if channel=='ch1':
+                folder='3um'
+            else:
+                folder='4um'
+            folder += f'PLD_{stamp_size}x{stamp_size}/'
 
-            image_data = hdu_list[0].data
-            header = hdu_list[0].header
-            # get time
-            time = np.append(time, get_time(hdu_list, ignoreFrames))
-            #add background correcting stack if requested
-            if addStack:
-                while i > np.sum(lens[:j+1]):
-                    j+=1 #if we've moved onto a new AOR, increment j
-                stackHDU = fits.open(stacks[j])
-                image_data += stackHDU[0].data
-            
-            # convert MJy/str to electron count
-            convfact = (hdu_list[0].header['GAIN']*hdu_list[0].header['EXPTIME']
-                        /hdu_list[0].header['FLUXCONV'])
-            image_stack = np.append(image_stack, convfact*image_data, axis=0)
-    
-    time = np.array(time)
-    
-    #ignore any consistently bad frames in datacubes
-    for i in ignoreFrames:
-        l = image_stack.shape[0]
-        ignore_inds = (i + 64*np.arange(int(l/64)+int(l%64>i))).astype(int)
-        image_stack[ignore_inds] = np.nan
-    
-    # sigma clip along full time axis
-    image_stack = sigma_clipping(image_stack)
+            # create save folder
+            savepath = create_folder(savepath_raw+folder, True, True)
 
-    # Mask any other stars in the frame to avoid them influencing the background subtraction
-    if maskStars != []:
-        header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
-        w = WCS(header, naxis=[1,2])
-        mask = np.ma.getmaskarray(image_stack)
-        for st in maskStars:
-            coord = SkyCoord(st[0], st[1])
-            x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
-            x = x+np.arange(-1,2)
-            y = y+np.arange(-1,2)
-            x,y = np.meshgrid(x,y)
-            mask[:,x,y] = True
-        image_stack = np.ma.masked_array(image_stack, mask=mask)
+        # get pixel peak index
+        print(f'\tGetting {stamp_size}x{stamp_size} pixel stamps...')
+        P = get_pixel_values(image_stack, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
 
-    # bg subtract
-    image_stack, bg_flux, bg_err = bgsubtract(image_stack)
-    
-    # get pixel peak index
-    P = get_pixel_values(image_stack, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
-    
-    if bin_data:
-        binned_P, binned_P_std = bin_array2D(P, bin_size)
-        binned_time, binned_time_std = bin_array(time, bin_size)
-        binned_bg, binned_bg_std = bin_array(bg_flux, bin_size)
-        binned_bg_err, binned_bg_err_std = bin_array(bg_err, bin_size)
-        
-        #sigma clip binned data to remove wildly unacceptable data
-        binned_flux = binned_P.sum(axis=1)
-        try:
-            # Need different versions for different versions of astropy...
-            binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
-        except TypeError:
-            binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
-        if np.ma.is_masked(binned_flux_mask):
-            binned_time[binned_flux_mask!=binned_flux] = np.nan
-            binned_time_std[binned_flux_mask!=binned_flux] = np.nan
-            binned_bg[binned_flux_mask!=binned_flux] = np.nan
-            binned_bg_std[binned_flux_mask!=binned_flux] = np.nan
-            binned_bg_err[binned_flux_mask!=binned_flux] = np.nan
-            binned_bg_err_std[binned_flux_mask!=binned_flux] = np.nan
-            binned_P_std[binned_flux_mask!=binned_flux] = np.nan
-            binned_P[binned_flux_mask!=binned_flux] = np.nan
-
-    if plot:
         if bin_data:
-            plotx = binned_time
-            ploty0 = binned_P
-            ploty2 = binned_P_std
-            nrows=3
-        else:
-            plotx = time
-            ploty0 = P
-            nrows = 2
-        fig, axes = plt.subplots(nrows = nrows, ncols = 1, sharex = True, figsize=(nrows*5,10))
-        fig.suptitle(planet, fontsize="x-large")
-        for i in range(int(stamp_size**2)):
-            axes[0].plot(binned_time, binned_P[:,i], '+', label = '$P_'+str(i+1)+'$')
-        axes[0].set_ylabel("Pixel Flux (MJy/pixel)")
-        axes[0].legend()
-        axes[1].set_ylabel('Sum Flux (MJy/pixel)')
-        axes[1].plot(binned_time, np.sum(binned_P, axis = 1), '+')
-        if bin_data:
+            print('\tBinning data')
+            binned_P, binned_P_std = bin_array2D(P, bin_size)
+            binned_time, binned_time_std = bin_array(time, bin_size)
+            binned_bg, binned_bg_std = bin_array(bg, bin_size)
+            binned_bg_err, binned_bg_err_std = bin_array(bg_err, bin_size)
+
+            #sigma clip binned data to remove wildly unacceptable data
+            binned_flux = binned_P.sum(axis=1)
+            try:
+                # Need different versions for different versions of astropy...
+                binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+            except TypeError:
+                binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+            if np.ma.is_masked(binned_flux_mask):
+                binned_time[binned_flux_mask!=binned_flux] = np.nan
+                binned_time_std[binned_flux_mask!=binned_flux] = np.nan
+                binned_bg[binned_flux_mask!=binned_flux] = np.nan
+                binned_bg_std[binned_flux_mask!=binned_flux] = np.nan
+                binned_bg_err[binned_flux_mask!=binned_flux] = np.nan
+                binned_bg_err_std[binned_flux_mask!=binned_flux] = np.nan
+                binned_P_std[binned_flux_mask!=binned_flux] = np.nan
+                binned_P[binned_flux_mask!=binned_flux] = np.nan
+
+        if plot:
+            if bin_data:
+                plotx = binned_time
+                ploty0 = binned_P
+                ploty2 = binned_P_std
+                nrows=3
+            else:
+                plotx = time
+                ploty0 = P
+                nrows = 2
+            fig, axes = plt.subplots(nrows = nrows, ncols = 1, sharex = True, figsize=(nrows*5,10))
+            fig.suptitle(planet, fontsize="x-large")
             for i in range(int(stamp_size**2)):
-                axes[2].plot(binned_time, binned_P_std[:,i], '+', label = '$Pstd_'+str(i+1)+'$')
-            axes[2].set_xlabel("Time since IRAC turn-on (days)")
-        fig.subplots_adjust(hspace=0)
+                axes[0].plot(binned_time, binned_P[:,i], '+', label = '$P_'+str(i+1)+'$')
+            axes[0].set_ylabel("Pixel Flux (electrons)")
+            axes[0].legend()
+            axes[1].set_ylabel('Sum Flux (electrons)')
+            axes[1].plot(binned_time, np.sum(binned_P, axis = 1), '+')
+            if bin_data:
+                for i in range(int(stamp_size**2)):
+                    axes[2].plot(binned_time, binned_P_std[:,i], '+', label = '$Pstd_'+str(i+1)+'$')
+                axes[2].set_xlabel("Time (BMJD)")
+            fig.subplots_adjust(hspace=0)
+
+            if save:
+                pathplot = savepath + 'Lightcurve.pdf'
+                fig.savefig(pathplot)
+            plt.show()
+            plt.close()
+
 
         if save:
-            pathplot = savepath + plot_name
-            fig.savefig(pathplot)
-        plt.show()
-        plt.close()
-        
-
-    if save:
-        FULL_data = np.c_[P, time, bg_flux, bg_err]
-        FULL_head = ''
-        for i in range(int(stamp_size**2)):
-            FULL_head += 'P'+str(i+1)+', '
-        FULL_head += 'time, bg, bg_err'
-        pathFULL  = savepath + save_full
-        np.savetxt(pathFULL, FULL_data, header = FULL_head)
-        if bin_data:
-            BINN_data = np.c_[binned_P, binned_P_std, binned_time, binned_time_std,
-                              binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std]
-            BINN_head = ''
-            for i in range(int(stamp_size**2)):
-                BINN_head += 'P'+str(i+1)+', '
-            for i in range(int(stamp_size**2)):
-                BINN_head += 'P'+str(i+1)+'_std, '
-            BINN_head = 'time, time_std, bg, bg_std, bg_err, bg_err_std'
-            pathBINN  = savepath + save_bin
-            np.savetxt(pathBINN, BINN_data, header = BINN_head)
+            FULL_data = np.array(P, time, bg, bg_err).T
+            FULL_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
+            FULL_head += 'time, bg, bg_err'
+            pathFULL  = savepath + save_full
+            np.savetxt(pathFULL, FULL_data, header = FULL_head)
+            if bin_data:
+                BINN_data = np.array(binned_P, binned_P_std, binned_time, binned_time_std,
+                                     binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std).T
+                BINN_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
+                BINN_head += ''.join([f'P{i+1}_std, ' for i in range(int(stamp_size**2))])
+                BINN_head = 'time, time_std, bg, bg_std, bg_err, bg_err_std'
+                pathBINN  = savepath + save_bin
+                np.savetxt(pathBINN, BINN_data, header = BINN_head)
+    
+    image_stack = None
     
     return
 

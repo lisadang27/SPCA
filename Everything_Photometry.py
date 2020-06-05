@@ -2,20 +2,20 @@
 # coding: utf-8
 
 import numpy as np
-import matplotlib.pyplot as plt
 import os
-import multiprocessing
-from functools import partial
 
 # SPCA libraries
 from SPCA import frameDiagnosticsBackend
-from SPCA import photometryBackend
+from SPCA import Photometry_Aperture as APhotometry
+from SPCA import Photometry_PSF as PSFPhotometry
+from SPCA import Photometry_Companion as CPhotometry
+from SPCA import Photometry_PLD as PLDPhotometry
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b', 'WASP-103b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b']
 
 # Were the data taken in subarray mode?
-subarray = [True, True, True, True, True, True, True, True, True, True, True, True, False]
+subarray = [True, True, True, True, True, True, True, True, True, True, True, True, True, False]
 
 # The number of CPU threads you want to use for running photometry methods in parallel
 ncpu = 23
@@ -23,23 +23,25 @@ ncpu = 23
 #folder containing data from each planet
 basepath = '/homes/picaro/bellt/research/'
 
-#####################################################################
-# Parameters to set how you want your photometry done
-#####################################################################
-
 #################
 # General settings
 #################
 
 # Whether you want to write over past photometry if it exists
-rerun_photometry = True
+# rerun_photometry = True
 
 # Whether or not to bin data points together
 bin_data = True
 # Number of data points to bin together
 bin_size = 64
 
+# Do you want to oversample frames before performing aperture photometry?
+# Don't recommend a value larger than 2
+oversamp = False
+scale = 2
+
 # Do you want the frame diagnostics to automatically remove certain frames within a data cube?
+# Doesn't work for fullframe photometry!
 allowIgnoreFrames = [True, False]
 
 # The number of sigma a frame's median value must be off from the median frame in order to be added to ignore_frames
@@ -68,6 +70,10 @@ addStacks = [False]
 # Can leave untouched if not using aperture photometry; these settings would be ignored
 #################
 
+# Do you want to only save the best aperture photometry method?
+# This will save quite a bit of hard drive space
+onlyBest = True
+
 # Aperture radii to try
 radii = np.linspace(2.,6.,21,endpoint=True)
 
@@ -81,7 +87,7 @@ edges = ['Exact', 'Hard']
 moveCentroids = [False, True]
 
 # How wide should the boxcar filter be that smooths the raw data to select the best aperture
-highpassWidth = 5
+highpassWidth = 5*64
 
 #################
 # Settings for PLD
@@ -90,15 +96,6 @@ highpassWidth = 5
 
 # Size of PLD stamp to use (only 3 and 5 currently supported)
 stamp_sizes = [3, 5]
-
-#################
-# Settings for photometry comparisons
-#################
-
-# Trim data between some start and end point (good for bad starts or ends to data)
-trim = False
-trimStart = 5.554285e4
-trimEnd = 5.5544266e4
 
 
 
@@ -117,6 +114,10 @@ for planetNum, planet in enumerate(planets):
     for channel in channels:
         print('Starting planet', planet, 'channel', channel)
         
+        #bit of AOR to pick out which folders contain AORs that should be analyzed
+        with open(basepath+planet+'/analysis/aorSnippet.txt', 'r') as file:
+            AOR_snip = file.readline().strip()
+
         minRMSs = []
         phoptions = []
 
@@ -125,7 +126,8 @@ for planetNum, planet in enumerate(planets):
                 # Perform frame diagnostics to figure out which frames within a datacube are consistently bad
                 print('Analysing', channel, 'for systematically bad frames...')
                 ignoreFrames = frameDiagnosticsBackend.run_diagnostics(planet, channel, AOR_snip,
-                                                                       basepath, addStack, ncpu, nsigma)
+                                                                       basepath, addStack, ncpu, nsigma,
+                                                                       showPlot=True, savePlot=True)
             else:
                 ignoreFrames = []
 
@@ -136,51 +138,29 @@ for planetNum, planet in enumerate(planets):
                 elif allowIgnoreFrame and (False in allowIgnoreFrames):
                     continue
                 else:
-                    print('Overwriting ignoreFrames to []')
+                    print('Trying no ignoreFrames')
                     ignoreFrames_temp = []
 
                 # Try all of the different photometry methods
-                print('Trying the many different photometries. This will take quite some time...')
                 for photometryMethod in photometryMethods:
                     if photometryMethod=='PLD':
-                        for stamp_size in stamp_sizes:
-                            photometryBackend.run_photometry(photometryMethod, basepath, ncpu,
-                                                             planet, channel, AOR_snip, rerun_photometry,
-                                                             addStack, bin_data, bin_size, ignoreFrames_temp,
-                                                             maskStars, stamp_size)
+                        print('Starting PLD photometry!')
+                        PLDPhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
+                                                     stamp_sizes, True, bin_data, bin_size,
+                                                     True, True, addStack, ignoreFrames_temp,
+                                                     maskStars, ncpu)
+                        if ignoreFrames_temp==ignoreFrames:
+                            # Write down what frames should be ignored in case not doing PLDAper
+                            with open(basepath+planet+'/analysis/'+channel+'/PLD_ignoreFrames.txt', 'w') as file:
+                                file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
+
                     elif photometryMethod=='Aperture':
-                        photometryBackend.run_photometry(photometryMethod, basepath, ncpu,
-                                                         planet, channel, AOR_snip, rerun_photometry,
-                                                         addStack, bin_data, bin_size, ignoreFrames_temp,
-                                                         maskStars, None, shapes, edges, moveCentroids, radii)
-
-                        print('Selecting the best aperture photometry method from this suite...')
-                        minRMS, phoption = photometryBackend.comparePhotometry(basepath, planet, channel, AOR_snip,
-                                                                               ignoreFrames_temp, addStack, highpassWidth,
-                                                                               trim, trimStart, trimEnd)
-
-                        minRMSs.append(minRMS)
-                        phoptions.append(phoption)
-
-        if photometryMethods != ['PLD']:
-            bestPhOption = phoptions[np.argmin(minRMSs)]
-
-            if (False in allowIgnoreFrames) and not np.sort(allowIgnoreFrames)[::-1][np.argmin(minRMSs)]:
-                # Best photometry didn't use ignoreFrames
-                ignoreFrames = []
-
-            print('The best overall aperture photometry method is:')
-            print(bestPhOption)
-            print('With an RMS of:')
-            print(str(np.round(np.min(minRMSs)*1e6,1)))
-
-            with open(basepath+planet+'/analysis/'+channel+'/bestPhOption.txt', 'a') as file:
-                file.write(bestPhOption+'\n')
-                file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
-                file.write(str(np.round(np.min(minRMSs)*1e6,1))+'\n\n')
-
-        if 'PLD' in photometryMethods:
-            with open(basepath+planet+'/analysis/'+channel+'/PLD_ignoreFrames.txt', 'a') as file:
-                file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
+                        print('Starting Aperture photometry!')
+                        APhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
+                                                   True, onlyBest, highpassWidth,
+                                                   bin_data, bin_size, False, True,
+                                                   oversamp, scale, True, True, radii, edges,
+                                                   addStack, ignoreFrames_temp,
+                                                   maskStars, moveCentroids, ncpu)
 
 print('Done!')          

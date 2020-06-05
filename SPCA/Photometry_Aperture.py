@@ -1,29 +1,45 @@
 import numpy as np
-from scipy import interpolate
-
-import matplotlib
 import matplotlib.pyplot as plt
-import matplotlib.patches
+# from pqdm.threads import pqdm
+# from pqdm.processes import pqdm
+from tqdm import tqdm
+# from tqdm import trange
+# tracker = None
 
-from astropy.io import fits
-from astropy.wcs import WCS
-from astropy.wcs.utils import skycoord_to_pixel
-from astropy.coordinates import SkyCoord
 from astropy.stats import sigma_clip
 
 from photutils import aperture_photometry
 from photutils import CircularAperture, EllipticalAperture, RectangularAperture
 from photutils.utils import calc_total_error
 
-import os, sys, csv, glob, warnings
-
 from multiprocessing import Pool
 from functools import partial
 
 from collections import Iterable
 
-from .Photometry_Common import get_fnames, get_stacks, get_time, oversampling, compare_RMS
-from .Photometry_Common import sigma_clipping, bgsubtract, noisepixparam, bin_array, create_folder
+from .Photometry_Common import highpassflist, noisepixparam, bin_array, create_folder, prepare_images
+
+import os, warnings
+warnings.filterwarnings('ignore')
+
+# Make into a global variable so that A_Photometry can be run with multiprocessing without
+# needing to pickle image_stack - this is critical for datasets with many GB of data!
+image_stack = np.zeros((0,32,32))
+
+# We need to resort to some hackery to make a tqdm progress bar work with multiprocessing
+results = []
+func = lambda arg: arg
+pbar = None
+def wrapMyFunc(arg):
+    global func
+    return arg, func(arg)
+def update(outputs):
+    # note: input comes from async `wrapMyFunc`
+    global results
+    results[outputs[0]] = outputs[1]  # put answer into correct index of result list
+    global pbar
+    pbar.update()
+    return
 
 def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=['median','median'],
                  defaultPSFW=['median','median']):
@@ -102,8 +118,8 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=[
     
     return xo, yo, wx, wy
 
-def A_photometry(bg_err, cx = 15, cy = 15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[5], theta=[0],
-                 scale = 1, shape='Circular', methods=['center', 'exact'], i=0):
+def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[5], theta=[0],
+                 scale = 1, shape='Circular', methods=['center', 'exact'], moveCentroids=[True], i=0):
     """Performs aperture photometry, first by creating the aperture then summing the flux within the aperture.
 
     Note that this will implicitly use the global variable image_stack (3D array) to allow for parallel computing
@@ -133,10 +149,13 @@ def A_photometry(bg_err, cx = 15, cy = 15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[
             methods are 'exact', 'subpixel', 'center'. Default is ['center', 'exact'].
 
     Returns:
-        tuple: results (2D array) Array of flux and flux errors, of shape (nMethods*nSizes, 2), where nSizes loop
-            is nested inside nMethods loop.
+        tuple: results (2D array) Array of flux and flux errors, of shape (nMethods*nSizes, 2), where the nSizes loop
+            is nested inside the nMethods loop which is itself nested inside the moveCentoids loop.
 
     """
+    
+    # Access the global variable
+    global image_stack
     
     # The following could be arrays
     cx = np.array(cx)*scale
@@ -147,33 +166,145 @@ def A_photometry(bg_err, cx = 15, cy = 15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[
     w_r = np.array(w_r)*scale
     h_r = np.array(h_r)*scale
     
-    # Set up aperture(s)
-    apertures = []
-    movingCentroid = (isinstance(cx, Iterable) and isinstance(cy, Iterable))
-    if not movingCentroid:
-        position = [cx, cy]
-    else:
-        position = [cx[i], cy[i]]
-    if   (shape == 'Circular'):
-        for j in range(len(r)):
-            apertures.append(CircularAperture(position, r=r[j]))
-    elif (shape == 'Elliptical'):
-        for j in range(len(a)):
-            apertures.append(EllipticalAperture(position, a=a[j], b=b[j], theta=theta[j]))
-    elif (shape == 'Rectangular'):
-        for j in range(len(w_r)):
-            apertures.append(RectangularAperture(position, w=w_r[j], h=h_r[j], theta=theta[j]))
-    
     data_error = calc_total_error(image_stack[i,:,:], bg_err[i], effective_gain=1)
     
     results = np.zeros((0,2))
-    for method in methods:
-        phot_table = aperture_photometry(image_stack[i,:,:], apertures, error=data_error, method=method)
-        results = np.append(results, np.array([np.array([phot_table[f'aperture_sum_{j}'],
-                                                         phot_table[f'aperture_sum_err_{j}']]).flatten()
-                                               for j in range(len(apertures))]), axis=0)
+    
+    for moveCentroid in moveCentroids:
+        # Set up aperture(s)
+        apertures = []
+        if not moveCentroid:
+            position = [cx_med, cy_med]
+        else:
+            position = [cx[i], cy[i]]
+        if   (shape == 'Circular'):
+            for j in range(len(r)):
+                apertures.append(CircularAperture(position, r=r[j]))
+        elif (shape == 'Elliptical'):
+            for j in range(len(a)):
+                apertures.append(EllipticalAperture(position, a=a[j], b=b[j], theta=theta[j]))
+        elif (shape == 'Rectangular'):
+            for j in range(len(w_r)):
+                apertures.append(RectangularAperture(position, w=w_r[j], h=h_r[j], theta=theta[j]))
+    
+        for method in methods:
+            phot_table = aperture_photometry(image_stack[i,:,:], apertures, error=data_error, method=method)
+            results = np.append(results, np.array([np.array([phot_table[f'aperture_sum_{j}'],
+                                                             phot_table[f'aperture_sum_err_{j}']]).flatten()
+                                                   for j in range(len(apertures))]), axis=0)
         
     return results
+
+def compare_RMS(Run_list, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
+                save=True, onlyBest=False, showPlots=False, savePlots=True):
+    
+    RMS = np.empty(len(Run_list))
+    
+    for i, foldername in enumerate(Run_list):
+        flux = fluxes[:,i]
+        smooth = highpassflist(flux, highpassWidth)
+        smoothed = (flux - smooth)+np.nanmean(flux)
+        RMS[i] = np.sqrt(np.nanmean((flux-smooth)**2.))/np.nanmean(smoothed)
+    
+    exact_moving = np.array(['exact' in Run_list[i].lower() and 'moving' in Run_list[i].lower()
+                             for i in range(len(Run_list))], dtype=bool)
+    soft_moving =  np.array(['soft' in Run_list[i].lower() and 'moving' in Run_list[i].lower()
+                             for i in range(len(Run_list))], dtype=bool)
+    hard_moving =  np.array(['hard' in Run_list[i].lower() and 'moving' in Run_list[i].lower()
+                             for i in range(len(Run_list))], dtype=bool)
+
+    exact = np.array(['exact' in Run_list[i].lower() and 'moving' not in Run_list[i].lower()
+                      for i in range(len(Run_list))], dtype=bool)
+    soft =  np.array(['soft' in Run_list[i].lower() and 'moving' not in Run_list[i].lower()
+                      for i in range(len(Run_list))], dtype=bool)
+    hard =  np.array(['hard' in Run_list[i].lower() and 'moving' not in Run_list[i].lower()
+                      for i in range(len(Run_list))], dtype=bool)
+    
+    if showPlots or savePlots:
+        plt.figure(figsize = (10,4))
+
+        if np.any(exact_moving):
+            plt.plot(r[exact_moving],  RMS[exact_moving]*1e6, 'o-', label = 'Circle: Exact Edge, Moving')
+        if np.any(soft_moving):
+            plt.plot(r[soft_moving],  RMS[soft_moving]*1e6, 'o-', label = 'Circle: Soft Edge, Moving')
+        if np.any(hard_moving):
+            plt.plot(r[hard_moving],  RMS[hard_moving]*1e6, 'o-', label = 'Circle: Hard Edge, Moving')
+
+        if np.any(exact):
+            plt.plot(r[exact],  RMS[exact]*1e6, 'o-', label = 'Circle: Exact Edge')
+        if np.any(soft):
+            plt.plot(r[soft],  RMS[soft]*1e6, 'o-', label = 'Circle: Soft Edge')
+        if np.any(hard):
+            plt.plot(r[hard],  RMS[hard]*1e6, 'o-', label = 'Circle: Hard Edge')
+
+        plt.xlabel('Aperture Radius')
+        plt.ylabel('RMS Scatter (ppm)')
+        plt.legend(loc='best')
+
+        if savePlots:
+            figpath  = basepath+planet+'/analysis/photometryComparison/'+channel+'/'
+            if addStack:
+                figpath += 'addedStack/'
+            else:
+                figpath += 'addedBlank/'
+            if not os.path.exists(figpath):
+                os.makedirs(figpath)
+
+            if ignoreFrames != []:
+                figpath += 'ignore/'
+            else:
+                figpath += 'noIgnore/'
+            if not os.path.exists(figpath):
+                os.makedirs(figpath)
+                
+            if channel=='ch2':
+                fname = figpath + '4um'
+            else:
+                fname = figpath + '3um'
+            fname += '_Photometry_Comparison.pdf'
+        
+            plt.savefig(fname)
+        if showPlots:
+            plt.show()
+        plt.close()
+        
+    if save:
+        if np.any(exact_moving):
+            print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
+            print('Exact Moving - Best Aperture Radius:',
+                  r[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
+            print()
+        if np.any(soft_moving):
+            print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
+            print('Soft Moving - Best Aperture Radius:',
+                  r[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
+            print()
+        if np.any(hard_moving):
+            print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
+            print('Hard Moving - Best Aperture Radius:',
+                  r[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
+            print()
+        if np.any(exact):
+            print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
+            print('Exact - Best Aperture Radius:', r[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
+            print()
+        if np.any(soft):
+            print('Soft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
+            print('Soft - Best Aperture Radius:', r[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
+            print()
+        if np.any(hard):
+            print('Hard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
+            print('Hard - Best Aperture Radius:', r[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
+
+        bestPhOption = Run_list[np.ma.argmin(RMS)]
+        print('Best photometry of this batch:', bestPhOption)
+        
+        with open(basepath+planet+'/analysis/'+channel+'/bestPhOption.txt', 'a') as file:
+            file.write(bestPhOption+'\n')
+            file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
+            file.write(str(np.round(np.ma.min(RMS)*1e6,1))+'\n\n')
+        
+    return RMS
 
 def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, bg_err, npp, bin_size):
     binned_flux, binned_flux_std = bin_array(flux, bin_size)
@@ -221,7 +352,7 @@ def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, bg_err, npp, bin_size):
 def get_lightcurve(basepath, AOR_snip, channel, planet,
                    save=True, onlyBest=True, highpassWidth=5*64, bin_data=True, bin_size=64,
                    showPlots=False, savePlots=True,
-                   oversamp=False, saveoversamp=True, reuse_oversamp=True,
+                   oversamp=False, scale=2, saveoversamp=True, reuse_oversamp=True,
                    r = [2.5], edges=['hard'], addStack = False, ignoreFrames = None,
                    maskStars = None, moveCentroids=[True],
                    ncpu=4):
@@ -269,6 +400,14 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     # Currently only circular apertures are supported!
     shape='Circular'
     
+    if ignoreFrames is None:
+        ignoreFrames = []
+    if maskStars is None:
+        maskStars = []
+    
+    if basepath[-1]!='/':
+        basepath += '/'
+    
     stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
     datapath   = basepath+planet+'/data/'+channel
     
@@ -286,20 +425,21 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     save_full = channel+'_datacube_full_AORs'+AOR_snip[1:]+'.dat'
     save_bin = channel+'_datacube_binned_AORs'+AOR_snip[1:]+'.dat'
     
-    if not isinstance(rs, Iterable):
-        rs = [rs]
+    if not isinstance(r, Iterable):
+        r = [r]
     if not isinstance(edges, Iterable):
         edges = [edges]
     if not isinstance(moveCentroids, Iterable):
         moveCentroids = [moveCentroids]
     
     if shape!='Circular' and shape!='Elliptical' and shape!='Rectangular':
-        # FIX: Throw an actual error
-        print('Warning: No such aperture shape "'+shape+'". Using Circular aperture instead.')
+        print('Warning: No such aperture shape "'+shape+'".',
+              'Using Circular aperture instead.')
         shape = 'Circular'
     
     methods = []
     for edge_tmp in edges:
+        edge_tmp=edge_tmp.lower()
         if edge_tmp=='hard' or edge_tmp=='center' or edge_tmp=='centre':
             methods.append('center')
         elif edge_tmp=='soft' or edge_tmp=='subpixel':
@@ -307,130 +447,53 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         elif edge_tmp=='exact':
             methods.append('exact')
         else:
-            # FIX: Throw an actual error
             print("Warning: No such method \""+edge_tmp+"\".",
                   "Using hard edged aperture instead.")
             methods.append('center')
     
-    if save and savepath[-1]!='/':
-        savepath += '/'
-        
-    while datapath[-1]=='/':
-        datapath=datapath[:-1]
-    
-    if ignoreFrames is None:
-        ignoreFrames = []
-    if maskStars is None:
-        maskStars = []
-    
-    # Ignore warning
-    warnings.filterwarnings('ignore')
-
-    # get list of filenames and nb of files
-    fnames, lens = get_fnames(datapath, AOR_snip)
-    if addStack:
-        stacks = get_stacks(stackPath, datapath, AOR_snip)
-    
-    image_stack = np.zeros((0,32,32))
-    time = []
-    
-    # data reduction & aperture photometry part
-    j=0 #counter to keep track of which correction stack we're using
-    for i in range(len(fnames)):
-        # open fits file
-        with fits.open(fnames[i]) as hdu_list:
-            header = hdu_list[0].header
-            time = np.append(time, get_time(header, ignoreFrames))
-            
-            if len(hdu_list[0].data.shape)==2:
-                # Reshape fullframe data so that it can be used with our routines
-                image = hdu_list[0].data[np.newaxis,217:249,9:41]
-            else:
-                image = hdu_list[0].data
-                #ignore any consistently bad frames in datacubes
-                image[ignoreFrames] = np.nan
-        
-        #add background correcting stack if requested
-        if addStack:
-            while i > np.sum(lens[:j+1]):
-                j+=1 #if we've moved onto a new AOR, increment j
-            stackHDU = fits.open(stacks[j])
-            image += stackHDU[0].data
-
-        # convert MJy/str to electron count
-        convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
-        image = convfact*image
-        
-        # Mask any other stars in the frame to avoid them influencing the background subtraction
-        if maskStars != []:
-            header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
-            w = WCS(header, naxis=[1,2])
-            mask = np.ma.getmaskarray(image)
-            for st in maskStars:
-                coord = SkyCoord(st[0], st[1])
-                x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
-                x = x+np.arange(-1,2)
-                y = y+np.arange(-1,2)
-                x,y = np.meshgrid(x,y)
-                mask[:,x,y] = True
-            image = np.ma.masked_array(image, mask=mask)
-        
-        # oversampling
-        if oversamp:
-            if reuse_oversamp:
-                savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
-                if os.path.isfile(savename):
-                    image = np.load(savename)
-                else:
-                    print('Warning: Oversampled images were not previously saved! Making new ones now...')
-                    image = np.ma.masked_invalid(oversampling(image))
-                    if (saveoversamp == True):
-                        # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-                        image.dump(savename)
-            else:
-                image = np.ma.masked_invalid(oversampling(image))
-            
-            if saveoversamp:
-                # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-                savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
-                image.dump(savename)
-            scale = 2
-        else:
-            scale = 1
-        
-        # Add image to stack for later sigma clipping bad frames
-        image_stack = np.append(image_stack, image, axis=0)
-    
-    time = np.array(time)
-    
-    # sigma clip bad pixels along full time axis
-    image_stack = sigma_clipping(image_stack)
-
-    # background subtract
-    image_stack, bg, bg_err = bgsubtract(image_stack)
+    # Access the global variable
+    global image_stack
+    # Prepare all of the images
+    image_stack, bg, bg_err, time, = prepare_images(datapath, savepath, AOR_snip, ignoreFrames,
+                                                    oversamp, scale, reuse_oversamp, saveoversamp,
+                                                    addStack, stackPath, maskStars, ncpu)
 
     # get centroids & PSF width
+    print('\tGetting centroids... ', end='')
     xo, yo, xw, yw = centroid_FWM(image_stack, scale=scale)
     
     # Compute noise pixel parameter for each frame
+    print('Getting noise pixel parameter... ', end='')
     npp = noisepixparam(image_stack)
     
-    # Make into a global variable so that A_Photometry can be run with multiprocessing without
-    # needing to pickle image_stack - this is critical for datasets with many GB of data!
-    global image_stack
-    
     # perform aperture photometry
-    with Pool(ncpu) as pool:
-        # FIX, currently only circular aperture is supported all the way from end to end
-        func = partial(A_photometry, bg_err, xo, yo, r, [], [], [], [], [],
-                       scale, shape, methods)
-        inds = range(image_stack.shape[0])
-        results = np.array(pool.map(func, inds))
-    fluxes = results[:,:,0]
-    flux_errs = results[:,:,1]
+    print('Starting photometry!', flush=True)
+    
+    # Resorting to a bit of hackery to get tqdm to work with multiprocessing
+    global pbar
+    global results
+    global func
+    N = image_stack.shape[0]
+    pbar = tqdm(total=N)
+    results = [None] * N  # result list of correct size
+    func = partial(A_photometry, bg_err, xo, np.ma.median(xo), yo, np.ma.median(yo), r,
+                   [], [], [], [], [],
+                   scale, shape, methods, moveCentroids)
+
+    pool = Pool(ncpu)
+    for i in range(N):
+        pool.apply_async(wrapMyFunc, args=(i,), callback=update)
+    pool.close()
+    pool.join()
+    pbar.close()
     
     # Free up RAM now that we aren't using the stack of images anymore
     image_stack = None
+    
+    results = np.array(results)
+    fluxes = results[:,:,0]
+    flux_errs = results[:,:,1]
+    # Free up some more RAM
     results = None
     
     # removing flux outliers for each technique
@@ -439,48 +502,40 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     except TypeError:
         flux_errs = sigma_clip(flux_errs, sigma=5, iters=3, axis=0, cenfunc=np.ma.median)
     
-    # Sort data into correct order    
-    order = np.argsort(time)
-    fluxes = fluxes[order]
-    flux_errs = flux_errs[order]
-    time = time[order]
-    xo = xo[order]
-    yo = yo[order]
-    xw = xw[order]
-    yw = yw[order]
-    bg = bg[order]
-    bg_err = bg_err[order]
-    npp = npp[order]
-    
     # Make a folder name for each method
     techniques = []
     all_edges = []
     all_rs = []
-    for edge in edges:
-        for r_tmp in r:
-            if channel=='ch1':
-                folder='3um'
-            else:
-                folder='4um'
-            folder += edge+shape+"_".join(str(np.round(r_tmp, 2)).split('.'))
-            if moveCentroid:
-                folder += '_movingCentroid'
-            techniques.append(folder)
-            all_edges.append(edge)
-            all_rs.append(r_tmp)
+    all_moveCentroids = []
+    for moveCentroid in moveCentroids:
+        for edge in edges:
+            for r_tmp in r:
+                if channel=='ch1':
+                    folder='3um'
+                else:
+                    folder='4um'
+                folder += edge+shape+"_".join(str(np.round(r_tmp, 2)).split('.'))
+                if moveCentroid:
+                    folder += '_movingCentroid'
+                techniques.append(savepath+folder)
+                all_moveCentroids.append(moveCentroid)
+                all_edges.append(edge)
+                all_rs.append(r_tmp)
     
     # Choose the best photometry method, save diagnostic plot(s)
     RMSs = compare_RMS(techniques, fluxes, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
-                       onlyBest, showPlots, savePlots)
+                       save, onlyBest, showPlots, savePlots)
 
     if onlyBest:
         # Keep these as arrays so they can be indexed lated
         # If the user only want's to save the best results, discard the rest
         fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
         flux_errs = flux_errs[:,np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_moveCentroids = all_moveCentroids[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
     
+    # Bin, save, and/or plot each of the methods depending on what was requested
     FULL_datas = []
     BIN_datas = []
     for i in range(fluxes.shape[1]):
@@ -493,15 +548,19 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         else:
             folder='4um'
         folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
-        if moveCentroid:
+        if all_moveCentroids[i]:
             folder += '_movingCentroid'
         folder += '/'
 
-        # create save folder
-        savepath = create_folder(savepath+folder, auto=True, rerun_photometry=True)
+        savepath_tmp = savepath+folder
+        if save or savePlots:
+            # create save folder
+            savepath_tmp = create_folder(savepath_tmp, True, True)
         
         # Bin the data if requested
         if bin_data:
+            if i==0:
+                print('\tBinning data')
             BIN_data = bin_all_data(flux, time, xo, yo, xw, yw, bg, bg_err, npp, bin_size)
         
         # Plot the photometry if requested
@@ -540,7 +599,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
 
             if savePlots:
                 # Save the plot if requested
-                pathplot = savepath + 'Lightcurve.pdf'
+                pathplot = savepath_tmp + 'Lightcurve.pdf'
                 fig.savefig(pathplot)
             if showPlots:
                 plt.show()
@@ -550,13 +609,13 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         if save:
             FULL_head = 'Flux, Flux Uncertainty, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux, bg flux err'
             FULL_head += ', Noise Pixel Parameter'
-            pathFULL  = savepath+folder+save_full
+            pathFULL  = savepath_tmp+save_full
             np.savetxt(pathFULL, FULL_data.T, header=FULL_head)
             if bin_data:
                 BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
                 BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
                 BIN_head += ', bg flux err, bg flux err std, Noise Pixel Parameter, Noise Pixel Parameter std'
-                pathBIN  = savepath+folder+save_bin
+                pathBIN  = savepath_tmp+save_bin
                 np.savetxt(pathBIN, BIN_data.T, header=BIN_head)
         else:
             FULL_datas.append(FULL_data)
@@ -564,8 +623,8 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 BIN_datas.append(BIN_data)
         
     if save:
-        # We are actually running the photometry and should return the RMS for later comparison
-        return np.nanmin(RMSs), savepath+folder
+        # We are actually running the photometry
+        return
     elif bin_data:
         # We are running frame diagnostics and should return our results
         return FULL_datas, BIN_datas
@@ -592,7 +651,6 @@ class TestAperturehotometryMethods(unittest.TestCase):
     # Test that circular aperture photometry properly follows the input centroids and gives the expected values
     def test_circularAperture(self):
         image_stack = np.zeros((4,32,32))
-        global image_stack
         
         for i in range(image_stack.shape[0]):
             image_stack[i,14+i,15] = 2
