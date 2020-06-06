@@ -41,7 +41,7 @@ def update(outputs):
     pbar.update()
     return
 
-def noisepixparam(image_data, npp=[], bounds=(13, 18, 13, 18)):
+def noisepixparam(image_data, bounds=(13, 18, 13, 18)):
     """Compute the noise pixel parameter.
 
     Args:
@@ -58,9 +58,8 @@ def noisepixparam(image_data, npp=[], bounds=(13, 18, 13, 18)):
     #To find noise pixel parameter for each frame. For eqn, refer Knutson et al. 2012
     numer = np.ma.sum(image_data[:, lbx:ubx, lby:uby], axis=(1,2))**2
     denom = np.ma.sum(image_data[:, lbx:ubx, lby:uby]**2, axis=(1,2))
-    npp.extend(numer/denom)
     
-    return npp
+    return numer/denom
 
 def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=['median','median'],
                  defaultPSFW=['median','median']):
@@ -322,15 +321,15 @@ def compare_RMS(Run_list, fluxes, r, time, highpassWidth, basepath, planet, chan
         
     return RMS
 
-def bin_all_data(flux, time, xo, yo, xw, yw, bg_flux, npp, bin_size):
+def bin_all_data(flux, time, xo, yo, xw, yw, bg, npp, bin_size):
     binned_flux, binned_flux_std = bin_array(flux, bin_size)
     binned_time, binned_time_std = bin_array(time, bin_size)
     binned_xo, binned_xo_std     = bin_array(xo, bin_size)
     binned_yo, binned_yo_std     = bin_array(yo, bin_size)
     binned_xw, binned_xw_std     = bin_array(xw, bin_size)
     binned_yw, binned_yw_std     = bin_array(yw, bin_size)
-    binned_bg, binned_bg_std     = bin_array(bg_flux, bin_size)
-    binned_npp, binned_npp_std     = bin_array(npp, bin_size)
+    binned_bg, binned_bg_std     = bin_array(bg, bin_size)
+    binned_npp, binned_npp_std   = bin_array(npp, bin_size)
 
     #sigma clip binned data to remove wildly unacceptable data
     try:
