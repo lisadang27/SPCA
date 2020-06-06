@@ -220,9 +220,9 @@ for iterationNumber in range(len(planets)):
                                                                      cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
             Pnorm_0, flux0, time0 = helpers.get_data(foldername+filename, mode,
-                                                                foldername_aper+filename_aper)
+                                                     foldername_aper+filename_aper)
             Pnorm, flux, time = helpers.get_data(foldername+filename, mode,
-                                                           foldername_aper+filename_aper, cut=cut)
+                                                 foldername_aper+filename_aper, cut=cut)
 
             pca = PCA(n_components=int(Pnorm_full.shape[0]-1))
             pca.fit(Pnorm_full.T)
@@ -244,14 +244,12 @@ for iterationNumber in range(len(planets)):
             # FIX: Add an initial PLD plot
         else:
             # get data from photometry
-            (flux_full, fluxerr_full, time_full, xdata_full, ydata_full,
+            (flux_full, time_full, xdata_full, ydata_full,
              psfxw_full, psfyw_full) = helpers.get_full_data(foldername+filename_full, mode, cut=cut,
                                                              nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
-            (flux0, flux_err0, time0, xdata0, ydata0,
-             psfxw0, psfyw0) = helpers.get_data(foldername+filename, mode)
-            (flux, flux_err, time, xdata, ydata,
-             psfxw, psfyw) = helpers.get_data(foldername+filename, mode, cut=cut)
+            (flux0, time0, xdata0, ydata0, psfxw0, psfyw0) = helpers.get_data(foldername+filename, mode)
+            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername+filename, mode, cut=cut)
 
             if not oldPhotometry:
                 sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)

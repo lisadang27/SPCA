@@ -144,7 +144,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
             binned_P, binned_P_std = bin_array2D(P, bin_size)
             binned_time, binned_time_std = bin_array(time, bin_size)
             binned_bg, binned_bg_std = bin_array(bg, bin_size)
-            binned_bg_err, binned_bg_err_std = bin_array(bg_err, bin_size)
 
             #sigma clip binned data to remove wildly unacceptable data
             binned_flux = binned_P.sum(axis=1)
@@ -158,8 +157,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
                 binned_time_std[binned_flux_mask!=binned_flux] = np.nan
                 binned_bg[binned_flux_mask!=binned_flux] = np.nan
                 binned_bg_std[binned_flux_mask!=binned_flux] = np.nan
-                binned_bg_err[binned_flux_mask!=binned_flux] = np.nan
-                binned_bg_err_std[binned_flux_mask!=binned_flux] = np.nan
                 binned_P_std[binned_flux_mask!=binned_flux] = np.nan
                 binned_P[binned_flux_mask!=binned_flux] = np.nan
 
@@ -207,17 +204,17 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
 
 
         if save:
-            FULL_data = np.c_[P, time, bg, bg_err]
+            FULL_data = np.c_[P, time, bg]
             FULL_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
-            FULL_head += 'time, bg, bg_err'
+            FULL_head += 'time, bg'
             pathFULL  = savepath + save_full
             np.savetxt(pathFULL, FULL_data, header = FULL_head)
             if bin_data:
                 BINN_data = np.c_[binned_P, binned_P_std, binned_time, binned_time_std,
-                                  binned_bg, binned_bg_std, binned_bg_err, binned_bg_err_std]
+                                  binned_bg, binned_bg_std]
                 BINN_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
                 BINN_head += ''.join([f'P{i+1}_std, ' for i in range(int(stamp_size**2))])
-                BINN_head = 'time, time_std, bg, bg_std, bg_err, bg_err_std'
+                BINN_head = 'time, time_std, bg, bg_std'
                 pathBINN  = savepath + save_bin
                 np.savetxt(pathBINN, BINN_data, header = BINN_head)
     
