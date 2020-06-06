@@ -26,12 +26,12 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
 
     """
     
-    flux, flux_err, time, xo, yo, xw, yw, bg, bg_err, npp = get_lightcurve(basepath, AOR_snip, channel, planet,
-                                                                           save=False, bin_data=False,
-                                                                           showPlots=False, savePlots=False,
-                                                                           oversamp=False, r=[2.5], edges=['hard'],
-                                                                           addStack=addStack, moveCentroids=[True],
-                                                                           ncpu=ncpu)[0]
+    flux, time, xo, yo, xw, yw, bg, npp = get_lightcurve(basepath, AOR_snip, channel, planet,
+                                                         save=False, bin_data=False,
+                                                         showPlots=False, savePlots=False,
+                                                         oversamp=False, r=[2.4], edges=['exact'],
+                                                         addStack=addStack, moveCentroids=[True],
+                                                         ncpu=ncpu)[0]
     
     try:
         flux  = sigma_clip(flux, sigma=5, maxiters=5).reshape(-1,64)

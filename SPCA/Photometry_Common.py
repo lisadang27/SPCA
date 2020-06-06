@@ -248,27 +248,6 @@ def bgsubtract(bounds=(11, 19, 11, 19), i=0):
     
     return np.array([bg, bg_err])
 
-def noisepixparam(image_data, npp=[], bounds=(13, 18, 13, 18)):
-    """Compute the noise pixel parameter.
-
-    Args:
-        image_data (ndarray): FITS images stack.
-        npp (list, optional): Previously computed noise pixel parameters for other frames that will be appended to.
-
-    Returns:
-        list: The noise pixel parameter for each image in the stack.
-
-    """
-    
-    lbx, ubx, lby, uby = bounds
-    
-    #To find noise pixel parameter for each frame. For eqn, refer Knutson et al. 2012
-    numer = np.ma.sum(image_data[:, lbx:ubx, lby:uby], axis=(1,2))**2
-    denom = np.ma.sum(image_data[:, lbx:ubx, lby:uby]**2, axis=(1,2))
-    npp.extend(numer/denom)
-    
-    return npp
-
 def bin_array(data, size):
     """Median bin an array.
 
