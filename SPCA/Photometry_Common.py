@@ -349,7 +349,7 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
                    oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
                    addStack=False, stackPath='', maskStars=[], ncpu=4):
     
-    print('\tGetting images', end='', flush=True)
+    print('\tGetting frames', end='', flush=True)
     if len(ignoreFrames)!=0:
         print(', deleting bad frames', end='', flush=True)
     print('... ', end='')
@@ -386,14 +386,14 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     # sigma clip bad pixels along full time axis
     image_stack = sigma_clipping(image_stack)
     
-    print('Background subtracting... ', end='', flush=True)
+    print('Subtracting background... ', end='', flush=True)
     # background subtraction is done on global variable
     with Pool(ncpu) as pool:
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T
     
-    print('Images loaded!', flush=True)
+    print('Frames loaded!', flush=True)
     
     return image_stack, bg, bg_err, time
 

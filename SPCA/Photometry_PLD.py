@@ -59,11 +59,9 @@ def get_pixel_values(image, cx = 15, cy = 15, nbx = 3, nby = 3):
     P = image_data[:, (cx-deltax):(cx+deltax+1), (cy-deltay):(cy+deltay+1)].reshape(h, -1)
     return P
 
-def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
-                         save=True, bin_data=True, bin_size=64,
-                         showPlots=False, savePlots=True,
-                         addStack = False, ignoreFrames = None,
-                         maskStars = None, ncpu=4):
+def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=True,
+                   bin_data=True, bin_size=64, showPlots=False, savePlots=True,
+                   addStack = False, ignoreFrames = None, maskStars = None, ncpu=4):
     
     """Given a directory, looks for data (bcd.fits files), opens them and performs PLD "photometry".
 
@@ -137,22 +135,12 @@ def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
     
     savepath_raw = savepath
     for stamp_size in stamp_sizes:
-        if save:
-            if channel=='ch1':
-                folder='3um'
-            else:
-                folder='4um'
-            folder += f'PLD_{stamp_size}x{stamp_size}/'
-
-            # create save folder
-            savepath = create_folder(savepath_raw+folder, True, True)
-
         # get pixel peak index
-        print(f'\tGetting {stamp_size}x{stamp_size} pixel stamps...')
+        print(f'\tGetting {stamp_size}x{stamp_size} stamps... ', end='', flush=True)
         P = get_pixel_values(image_stack, cx=15, cy=15, nbx=stamp_size, nby=stamp_size)
 
         if bin_data:
-            print('\tBinning data')
+            print('Binning... ', end='', flush=True)
             binned_P, binned_P_std = bin_array2D(P, bin_size)
             binned_time, binned_time_std = bin_array(time, bin_size)
             binned_bg, binned_bg_std = bin_array(bg, bin_size)
@@ -175,7 +163,18 @@ def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
                 binned_P_std[binned_flux_mask!=binned_flux] = np.nan
                 binned_P[binned_flux_mask!=binned_flux] = np.nan
 
-        if plot:
+        if save or savePlots:
+            print('Saving... ', end='', flush=True)
+            if channel=='ch1':
+                folder='3um'
+            else:
+                folder='4um'
+            folder += f'PLD_{stamp_size}x{stamp_size}/'
+
+            # create save folder
+            savepath = create_folder(savepath_raw+folder, True, True)
+                
+        if savePlots or showPlots:
             if bin_data:
                 plotx = binned_time
                 ploty0 = binned_P
@@ -199,10 +198,11 @@ def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
                 axes[2].set_xlabel("Time (BMJD)")
             fig.subplots_adjust(hspace=0)
 
-            if save:
+            if savePlots:
                 pathplot = savepath + 'Lightcurve.pdf'
                 fig.savefig(pathplot)
-            plt.show()
+            if showPlots:
+                plt.show()
             plt.close()
 
 
@@ -222,6 +222,8 @@ def get_pixel_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5],
                 np.savetxt(pathBINN, BINN_data, header = BINN_head)
     
     image_stack = None
+    
+    print('Done.', flush=True)
     
     return
 

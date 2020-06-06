@@ -511,7 +511,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     results=None
     
     # removing flux outliers for each technique
-    print('\tSigma clipping fluxes...', end='', flush=True)
+    print('\tSigma clipping fluxes... ', end='', flush=True)
     try:
         fluxes = sigma_clip(fluxes, sigma=5, maxiters=3, axis=0, cenfunc=np.ma.median)
     except TypeError:
@@ -543,7 +543,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         RMS_times = []
         highpassWidth /= bin_size
         
-        print('Binning data...', end='', flush=True)
+        print('Binning... ', end='', flush=True)
         binned_time, binned_time_std = bin_array(time, bin_size)
         binned_xo, binned_xo_std     = bin_array(xo, bin_size)
         binned_yo, binned_yo_std     = bin_array(yo, bin_size)
@@ -579,7 +579,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         # Keep these as arrays so they can be indexed lated
         # If the user only want's to save the best results, discard the rest
         fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
-#         flux_errs = flux_errs[:,np.argmin(RMSs):np.argmin(RMSs)+1]
         all_moveCentroids = all_moveCentroids[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
@@ -591,6 +590,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         FULL_data = np.array([flux, time, xo, yo, xw, yw, bg, npp])
         
         if save or savePlots:
+            print('Saving... ', end='', flush=True)
             # create save folder
             if channel=='ch1':
                 folder='3um'
@@ -660,7 +660,9 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 np.savetxt(pathBIN, BIN_data.T, header=BIN_head)
         else:
             FULL_datas.append(FULL_data)
-        
+    
+    print('Done.', flush=True)
+    
     if save:
         # We are actually running the photometry
         return
