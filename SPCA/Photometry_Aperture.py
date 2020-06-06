@@ -543,7 +543,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         RMS_times = []
         highpassWidth /= bin_size
         
-        print('Binning... ', flush=True)
+        print('Binning... ', end='', flush=True)
         binned_time, binned_time_std = bin_array(time, bin_size)
         binned_xo, binned_xo_std     = bin_array(xo, bin_size)
         binned_yo, binned_yo_std     = bin_array(yo, bin_size)
@@ -572,6 +572,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         RMS_times = time
     
     # Choose the best photometry method, save diagnostic plot(s)
+    print('Choosing best photometry...', flush=True)
     RMSs = compare_RMS(techniques, RMS_fluxes, np.array(all_rs), RMS_times, highpassWidth, basepath,
                        planet, channel, ignoreFrames, addStack, save, onlyBest, showPlots, savePlots)
 
@@ -590,7 +591,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         FULL_data = np.array([flux, time, xo, yo, xw, yw, bg, npp])
         
         if save or savePlots:
-            print('Saving... ', end='', flush=True)
+            print('\tSaving... ', end='', flush=True)
             # create save folder
             if channel=='ch1':
                 folder='3um'
