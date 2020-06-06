@@ -543,7 +543,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         RMS_times = []
         highpassWidth /= bin_size
         
-        print('Binning... ', end='', flush=True)
+        print('Binning... ', flush=True)
         binned_time, binned_time_std = bin_array(time, bin_size)
         binned_xo, binned_xo_std     = bin_array(xo, bin_size)
         binned_yo, binned_yo_std     = bin_array(yo, bin_size)
