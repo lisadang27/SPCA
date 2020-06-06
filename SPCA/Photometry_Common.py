@@ -349,9 +349,9 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
                    oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
                    addStack=False, stackPath='', maskStars=[], ncpu=4):
     
-    print('\tGetting images', end='')
+    print('\tGetting images', end='', flush=True)
     if len(ignoreFrames)!=0:
-        print(', deleting bad frames', end='')
+        print(', deleting bad frames', end='', flush=True)
     print('... ', end='')
     # get list of filenames and number of files
     fnames, lens = get_fnames(datapath, AOR_snip)
@@ -382,18 +382,18 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     # Free up a bit of RAM
     order = None
     
-    print('Sigma clipping... ', end='')
+    print('Sigma clipping... ', end='', flush=True)
     # sigma clip bad pixels along full time axis
     image_stack = sigma_clipping(image_stack)
     
-    print('Background subtracting... ', end='')
+    print('Background subtracting... ', end='', flush=True)
     # background subtraction is done on global variable
     with Pool(ncpu) as pool:
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T
     
-    print('Images loaded!')
+    print('Images loaded!', flush=True)
     
     return image_stack, bg, bg_err, time
 

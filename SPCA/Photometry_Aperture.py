@@ -321,21 +321,25 @@ def compare_RMS(Run_list, fluxes, r, time, highpassWidth, basepath, planet, chan
         
     return RMS
 
-def bin_all_data(flux, time, xo, yo, xw, yw, bg, npp, bin_size):
+def bin_all_data(flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
+                 binned_yo, binned_yo_std, binned_xw, binned_xw_std,
+                 binned_yw, binned_yw_std, binned_bg, binned_bg_std,
+                 binned_npp, binned_npp_std, bin_size):
+    
     binned_flux, binned_flux_std = bin_array(flux, bin_size)
-    binned_time, binned_time_std = bin_array(time, bin_size)
-    binned_xo, binned_xo_std     = bin_array(xo, bin_size)
-    binned_yo, binned_yo_std     = bin_array(yo, bin_size)
-    binned_xw, binned_xw_std     = bin_array(xw, bin_size)
-    binned_yw, binned_yw_std     = bin_array(yw, bin_size)
-    binned_bg, binned_bg_std     = bin_array(bg, bin_size)
-    binned_npp, binned_npp_std   = bin_array(npp, bin_size)
-
+    binned_time, binned_time_std = np.copy(binned_time), np.copy(binned_time_std)
+    binned_xo, binned_xo_std     = np.copy(binned_xo), np.copy(binned_xo_std)
+    binned_yo, binned_yo_std     = np.copy(binned_yo), np.copy(binned_yo_std)
+    binned_xw, binned_xw_std     = np.copy(binned_xw), np.copy(binned_xw_std)
+    binned_yw, binned_yw_std     = np.copy(binned_yw), np.copy(binned_yw_std)
+    binned_bg, binned_bg_std     = np.copy(binned_bg), np.copy(binned_bg_std)
+    binned_npp, binned_npp_std   = np.copy(binned_npp), np.copy(binned_npp_std)
+    
     #sigma clip binned data to remove wildly unacceptable data
     try:
-        binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=2)
+        binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=5)
     except TypeError:
-        binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=2)
+        binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=5)
     if np.ma.is_masked(binned_flux_mask):
         mask_pos = binned_flux_mask!=binned_flux
         binned_time[mask_pos] = np.nan
@@ -472,11 +476,11 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                                                     addStack, stackPath, maskStars, ncpu)
 
     # get centroids & PSF width
-    print('\tGetting centroids... ', end='')
+    print('\tGetting centroids... ', end='', flush=True)
     xo, yo, xw, yw = centroid_FWM(image_stack, scale=scale)
     
     # Compute noise pixel parameter for each frame
-    print('Getting noise pixel parameter... ', end='')
+    print('Getting noise pixel parameter... ', end='', flush=True)
     npp = noisepixparam(image_stack)
     
     # perform aperture photometry
@@ -507,6 +511,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     results=None
     
     # removing flux outliers for each technique
+    print('\tSigma clipping fluxes...', end='', flush=True)
     try:
         fluxes = sigma_clip(fluxes, sigma=5, maxiters=3, axis=0, cenfunc=np.ma.median)
     except TypeError:
@@ -537,18 +542,29 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         RMS_fluxes = np.zeros((int(np.ceil(fluxes.shape[0]/bin_size)),0))
         RMS_times = []
         highpassWidth /= bin_size
+        
+        print('Binning data...', end='', flush=True)
+        binned_time, binned_time_std = bin_array(time, bin_size)
+        binned_xo, binned_xo_std     = bin_array(xo, bin_size)
+        binned_yo, binned_yo_std     = bin_array(yo, bin_size)
+        binned_xw, binned_xw_std     = bin_array(xw, bin_size)
+        binned_yw, binned_yw_std     = bin_array(yw, bin_size)
+        binned_bg, binned_bg_std     = bin_array(bg, bin_size)
+        binned_npp, binned_npp_std   = bin_array(npp, bin_size)
+        
         for i in range(fluxes.shape[1]):
-            if i==0:
-                print('\tBinning data')
             flux = fluxes[:,i]
-            BIN_data = bin_all_data(flux, time, xo, yo, xw, yw, bg, npp, bin_size)
+            BIN_data = bin_all_data(flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
+                                    binned_yo, binned_yo_std, binned_xw, binned_xw_std,
+                                    binned_yw, binned_yw_std, binned_bg, binned_bg_std,
+                                    binned_npp, binned_npp_std, bin_size)
             
             (binned_flux, binned_flux_std, binned_time, binned_time_std,
              binned_xo, binned_xo_std, binned_yo, binned_yo_std,
              binned_xw, binned_xw_std, binned_yw, binned_yw_std,
              binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_data
             
-            RMS_fluxes = np.append(RMS_fluxes, binned_flux[:,np.newaxis], axis=1)
+            RMS_fluxes = np.append(RMS_fluxes, BIN_data[0][:,np.newaxis], axis=1)
             RMS_times = binned_time
             BIN_datas.append(BIN_data)
     else:
@@ -572,21 +588,21 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     FULL_datas = []
     for i in range(fluxes.shape[1]):
         flux = fluxes[:,i]
-#         flux_err = flux_errs[:,i]
         FULL_data = np.array([flux, time, xo, yo, xw, yw, bg, npp])
         
-        if channel=='ch1':
-            folder='3um'
-        else:
-            folder='4um'
-        folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
-        if all_moveCentroids[i]:
-            folder += '_movingCentroid'
-        folder += '/'
-
-        savepath_tmp = savepath+folder
         if save or savePlots:
             # create save folder
+            if channel=='ch1':
+                folder='3um'
+            else:
+                folder='4um'
+            folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
+            if all_moveCentroids[i]:
+                folder += '_movingCentroid'
+            folder += '/'
+
+            savepath_tmp = savepath+folder
+        
             savepath_tmp = create_folder(savepath_tmp, True, True)
         
         # Plot the photometry if requested
@@ -644,8 +660,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 np.savetxt(pathBIN, BIN_data.T, header=BIN_head)
         else:
             FULL_datas.append(FULL_data)
-            if bin_data:
-                BIN_datas.append(BIN_data)
         
     if save:
         # We are actually running the photometry
