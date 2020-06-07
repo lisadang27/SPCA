@@ -28,7 +28,7 @@ def bin_array2D(data, size):
     binned_data_std = []
     for i in range(w):
         result = bin_array(data[:,i], size)
-        binned_data.append(result[1])
+        binned_data.append(result[0])
         binned_data_std.append(result[1])
         
     binned_data = np.array(binned_data).T
