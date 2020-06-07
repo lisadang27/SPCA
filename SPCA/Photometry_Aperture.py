@@ -274,31 +274,31 @@ def compare_RMS(Run_list, fluxes, r, time, highpassWidth, basepath, planet, chan
         
     if save:
         if np.any(exact_moving):
-            print('Exact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
-            print('Exact Moving - Best Aperture Radius:',
+            print('\tExact Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[exact_moving])*1e6, decimals=2))
+            print('\tExact Moving - Best Aperture Radius:',
                   r[exact_moving][np.where(RMS[exact_moving]==np.nanmin(RMS[exact_moving]))[0][0]])
             print()
         if np.any(soft_moving):
-            print('Soft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
-            print('Soft Moving - Best Aperture Radius:',
+            print('\tSoft Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[soft_moving])*1e6, decimals=2))
+            print('\tSoft Moving - Best Aperture Radius:',
                   r[soft_moving][np.where(RMS[soft_moving]==np.nanmin(RMS[soft_moving]))[0][0]])
             print()
         if np.any(hard_moving):
-            print('Hard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
-            print('Hard Moving - Best Aperture Radius:',
+            print('\tHard Moving - Best RMS (ppm):', np.round(np.nanmin(RMS[hard_moving])*1e6, decimals=2))
+            print('\tHard Moving - Best Aperture Radius:',
                   r[hard_moving][np.where(RMS[hard_moving]==np.nanmin(RMS[hard_moving]))[0][0]])
             print()
         if np.any(exact):
-            print('Exact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
-            print('Exact - Best Aperture Radius:', r[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
+            print('\tExact - Best RMS (ppm):', np.round(np.nanmin(RMS[exact])*1e6, decimals=2))
+            print('\tExact - Best Aperture Radius:', r[exact][np.where(RMS[exact]==np.nanmin(RMS[exact]))[0][0]])
             print()
         if np.any(soft):
-            print('Soft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
-            print('Soft - Best Aperture Radius:', r[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
+            print('\tSoft - Best RMS (ppm):', np.round(np.nanmin(RMS[soft])*1e6, decimals=2))
+            print('\tSoft - Best Aperture Radius:', r[soft][np.where(RMS[soft]==np.nanmin(RMS[soft]))[0][0]])
             print()
         if np.any(hard):
-            print('Hard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
-            print('Hard - Best Aperture Radius:', r[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
+            print('\tHard - Best RMS (ppm):', np.round(np.nanmin(RMS[hard])*1e6, decimals=2))
+            print('\tHard - Best Aperture Radius:', r[hard][np.where(RMS[hard]==np.nanmin(RMS[hard]))[0][0]])
 
         bestPhOption = Run_list[np.ma.argmin(RMS)]
         print('Best photometry of this batch:', bestPhOption)
