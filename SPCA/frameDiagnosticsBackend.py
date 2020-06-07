@@ -31,7 +31,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
                                                          showPlots=False, savePlots=False,
                                                          oversamp=False, r=[2.4], edges=['exact'],
                                                          addStack=addStack, moveCentroids=[True],
-                                                         ncpu=ncpu)[0]
+                                                         ncpu=ncpu)[0].T
     
     try:
         flux  = sigma_clip(flux, sigma=5, maxiters=5).reshape(-1,64)

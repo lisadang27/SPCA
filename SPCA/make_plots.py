@@ -49,7 +49,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
     axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
     axes[0].set_ylabel("Relative Flux $F$")
-    axes[0].set_xlim((np.min(time0), np.max(time0)))
+    axes[0].set_xlim((np.nanmin(time0), np.nanmax(time0)))
 
     axes[1].plot(time0, xdata0,  'r.', markersize=1, alpha = 0.7)
     axes[1].plot(time, xdata,  'k.', markersize=2, alpha = 1.0)

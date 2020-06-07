@@ -149,9 +149,9 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
             binned_flux = binned_P.sum(axis=1)
             try:
                 # Need different versions for different versions of astropy...
-                binned_flux_mask = sigma_clip(binned_flux, sigma=10, maxiters=2)
+                binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=3)
             except TypeError:
-                binned_flux_mask = sigma_clip(binned_flux, sigma=10, iters=2)
+                binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=3)
             if np.ma.is_masked(binned_flux_mask):
                 binned_time[binned_flux_mask!=binned_flux] = np.nan
                 binned_time_std[binned_flux_mask!=binned_flux] = np.nan
@@ -202,7 +202,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
                 plt.show()
             plt.close()
 
-
         if save:
             FULL_data = np.c_[P, time, bg]
             FULL_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
@@ -210,15 +209,13 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
             pathFULL  = savepath + save_full
             np.savetxt(pathFULL, FULL_data, header = FULL_head)
             if bin_data:
-                BINN_data = np.c_[binned_P, binned_P_std, binned_time, binned_time_std,
-                                  binned_bg, binned_bg_std]
-                BINN_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
-                BINN_head += ''.join([f'P{i+1}_std, ' for i in range(int(stamp_size**2))])
-                BINN_head = 'time, time_std, bg, bg_std'
-                pathBINN  = savepath + save_bin
-                np.savetxt(pathBINN, BINN_data, header = BINN_head)
-    
-    image_stack = None
+                BIN_data = np.c_[binned_P, binned_P_std, binned_time, binned_time_std,
+                                 binned_bg, binned_bg_std]
+                BIN_head = ''.join([f'P{i+1}, ' for i in range(int(stamp_size**2))])
+                BIN_head += ''.join([f'P{i+1}_std, ' for i in range(int(stamp_size**2))])
+                BIN_head = 'time, time_std, bg, bg_std'
+                pathBIN = savepath + save_bin
+                np.savetxt(pathBIN, BIN_data, header = BIN_head)
     
     print('Done.', flush=True)
     

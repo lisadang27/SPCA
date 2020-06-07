@@ -1,10 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-# from pqdm.threads import pqdm
-# from pqdm.processes import pqdm
 from tqdm import tqdm
-# from tqdm import trange
-# tracker = None
+import sys
 
 from astropy.stats import sigma_clip
 
@@ -18,6 +15,7 @@ from functools import partial
 from collections import Iterable
 
 from .Photometry_Common import highpassflist, bin_array, create_folder, prepare_images
+from .make_plots import plot_photometry
 
 import os, warnings
 warnings.filterwarnings('ignore')
@@ -174,15 +172,6 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
     # Access the global variable
     global image_stack
     
-    # The following could be arrays
-    cx = np.array(cx)*scale
-    cy = np.array(cy)*scale
-    r = np.array(r)*scale
-    a = np.array(a)*scale
-    b = np.array(b)*scale
-    w_r = np.array(w_r)*scale
-    h_r = np.array(h_r)*scale
-    
     data_error = calc_total_error(image_stack[i,:,:], bg_err[i], effective_gain=1)
     
     results = []
@@ -191,24 +180,24 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
         # Set up aperture(s)
         apertures = []
         if not moveCentroid:
-            position = [cx_med, cy_med]
+            position = [cx_med*scale, cy_med*scale]
         else:
-            position = [cx[i], cy[i]]
+            position = [cx[i]*scale, cy[i]*scale]
         if   (shape == 'Circular'):
             for j in range(len(r)):
-                apertures.append(CircularAperture(position, r=r[j]))
+                apertures.append(CircularAperture(position, r=r[j]*scale))
         elif (shape == 'Elliptical'):
             for j in range(len(a)):
-                apertures.append(EllipticalAperture(position, a=a[j], b=b[j], theta=theta[j]))
+                apertures.append(EllipticalAperture(position, a=a[j]*scale, b=b[j]*scale, theta=theta[j]))
         elif (shape == 'Rectangular'):
             for j in range(len(w_r)):
-                apertures.append(RectangularAperture(position, w=w_r[j], h=h_r[j], theta=theta[j]))
+                apertures.append(RectangularAperture(position, w=w_r[j]*scale, h=h_r[j]*scale, theta=theta[j]))
     
         for method in methods:
             phot_table = aperture_photometry(image_stack[i,:,:], apertures, error=data_error, method=method)
-            results.append([phot_table[f'aperture_sum_{j}'] for j in range(len(apertures))])
+            results.extend([float(phot_table[f'aperture_sum_{j}']) for j in range(len(apertures))])
         
-    return np.array(results).flatten()
+    return np.array(results)
 
 def compare_RMS(Run_list, fluxes, r, time, highpassWidth, basepath, planet, channel, ignoreFrames, addStack,
                 save=True, onlyBest=False, showPlots=False, savePlots=True):
@@ -337,9 +326,9 @@ def bin_all_data(flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
     
     #sigma clip binned data to remove wildly unacceptable data
     try:
-        binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=5)
+        binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=3)
     except TypeError:
-        binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=5)
+        binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=3)
     if np.ma.is_masked(binned_flux_mask):
         mask_pos = binned_flux_mask!=binned_flux
         binned_time[mask_pos] = np.nan
@@ -359,10 +348,10 @@ def bin_all_data(flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
         binned_flux_std[mask_pos] = np.nan
         binned_flux[mask_pos] = np.nan
         
-    return np.array([binned_flux, binned_flux_std, binned_time, binned_time_std,
-                     binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-                     binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-                     binned_bg, binned_bg_std, binned_npp, binned_npp_std])
+    return np.c_[binned_flux, binned_flux_std, binned_time, binned_time_std,
+                 binned_xo, binned_xo_std, binned_yo, binned_yo_std,
+                 binned_xw, binned_xw_std, binned_yw, binned_yw_std,
+                 binned_bg, binned_bg_std, binned_npp, binned_npp_std]
 
 def get_lightcurve(basepath, AOR_snip, channel, planet,
                    save=True, onlyBest=True, highpassWidth=5*64, bin_data=True, bin_size=64,
@@ -504,13 +493,15 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     pool.join()
     pbar.close()
     
+    sys.stderr.flush()
+    
     # Free up RAM now that we aren't using the stack of images anymore
     image_stack = None
     
     fluxes = np.array(results)
     results=None
     
-    # removing flux outliers for each technique
+    # removing outrageously bad flux outliers for each technique
     print('\tSigma clipping fluxes... ', end='', flush=True)
     try:
         fluxes = sigma_clip(fluxes, sigma=5, maxiters=3, axis=0, cenfunc=np.ma.median)
@@ -562,9 +553,9 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
             (binned_flux, binned_flux_std, binned_time, binned_time_std,
              binned_xo, binned_xo_std, binned_yo, binned_yo_std,
              binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-             binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_data
+             binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_data.T
             
-            RMS_fluxes = np.append(RMS_fluxes, BIN_data[0][:,np.newaxis], axis=1)
+            RMS_fluxes = np.append(RMS_fluxes, binned_flux[:,np.newaxis], axis=1)
             RMS_times = binned_time
             BIN_datas.append(BIN_data)
     else:
@@ -575,11 +566,12 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     print('Choosing best photometry...', flush=True)
     RMSs = compare_RMS(techniques, RMS_fluxes, np.array(all_rs), RMS_times, highpassWidth, basepath,
                        planet, channel, ignoreFrames, addStack, save, onlyBest, showPlots, savePlots)
-
+    
     if onlyBest:
         # Keep these as arrays so they can be indexed lated
         # If the user only want's to save the best results, discard the rest
         fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
+        BIN_datas = BIN_datas[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_moveCentroids = all_moveCentroids[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
         all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
@@ -588,7 +580,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     FULL_datas = []
     for i in range(fluxes.shape[1]):
         flux = fluxes[:,i]
-        FULL_data = np.array([flux, time, xo, yo, xw, yw, bg, npp])
+        FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg, npp]
         
         if save or savePlots:
             print('\tSaving... ', end='', flush=True)
@@ -612,8 +604,8 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                 (binned_flux, binned_flux_std, binned_time, binned_time_std,
                  binned_xo, binned_xo_std, binned_yo, binned_yo_std,
                  binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-                 binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_datas[i]
-
+                 binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_datas[i].T
+                
                 plotx = binned_time
                 ploty0 = binned_flux
                 ploty1 = binned_xo
@@ -652,13 +644,13 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
             FULL_head = 'Flux, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux'
             FULL_head += ', Noise Pixel Parameter'
             pathFULL  = savepath_tmp+save_full
-            np.savetxt(pathFULL, FULL_data.T, header=FULL_head)
+            np.savetxt(pathFULL, FULL_data, header=FULL_head)
             if bin_data:
                 BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
                 BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
                 BIN_head += ', Noise Pixel Parameter, Noise Pixel Parameter std'
                 pathBIN  = savepath_tmp+save_bin
-                np.savetxt(pathBIN, BIN_data.T, header=BIN_head)
+                np.savetxt(pathBIN, BIN_datas[i], header=BIN_head)
         else:
             FULL_datas.append(FULL_data)
     

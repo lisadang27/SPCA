@@ -185,7 +185,7 @@ def oversampling(image_data, scale=2):
     # conserve flux
     return image_masked/(a**2)
 
-def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=2):
+def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
     """Sigma clips bad pixels and mask entire frame if the sigma clipped pixel is too close to the target.
 
     Args:
@@ -200,7 +200,6 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=2):
     """
     
     lbx, ubx, lby, uby = bounds
-    h, w, l = image_stack.shape
     
     try:
         image_stack = sigma_clip(image_stack, sigma=sigma,
@@ -273,8 +272,7 @@ def bin_array(data, size):
 
 def highpassflist(signal, highpassWidth):
     g = Box1DKernel(highpassWidth)
-    smooth = convolve(signal, g, boundary='extend')
-    return smooth
+    return convolve(signal, g, boundary='extend')
 
 def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
                   oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
@@ -302,6 +300,10 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
         stackHDU = fits.open(stacks[j])
         image += stackHDU[0].data
 
+    if image.shape[0]!=1:
+        # Sigma clipping within datacubes as well seems to be important
+        image = sigma_clipping(np.ma.masked_invalid(image), sigma=4.)
+        
     # convert MJy/str to electron count
     convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
     image = convfact*image
@@ -384,7 +386,7 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     
     print('Sigma clipping... ', end='', flush=True)
     # sigma clip bad pixels along full time axis
-    image_stack = sigma_clipping(image_stack)
+    image_stack = sigma_clipping(image_stack, sigma=5)
     
     print('Subtracting background... ', end='', flush=True)
     # background subtraction is done on global variable
