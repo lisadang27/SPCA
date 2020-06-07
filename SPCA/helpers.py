@@ -26,9 +26,10 @@ def signal_params():
     
     p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
     p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
-    p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(1,10)]))
-    p0_obj.update(dict([['p'+str(i)+'_1', 0.5] for i in range(10,26)]))
-    p0_obj.update(dict([['p'+str(i)+'_2', 0.2] for i in range(1,26)]))
+    p0_obj.update(dict([['p1_1', 1.0] for i in range(1,10)]))
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.05] for i in range(2,10)]))
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.05] for i in range(10,26)]))
+    p0_obj.update(dict([['p'+str(i)+'_2', 0.05] for i in range(1,26)]))
     p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0, 'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
     
     params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
