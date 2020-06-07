@@ -404,7 +404,8 @@ def lnprior_gaussian(p0, priorInds, priors, errs):
 
 # FIX: Add a docstring for this function
 def lnprior_uniform(p0, priorInds, limits):
-    if priorInds == []:
+    if len(priorInds)==0:
+        # Need to evaluate this first, otherwise the next line would fail
         return 0
     elif np.any(np.logical_or(np.array(limits)[:,0] > p0[priorInds],
                             np.array(limits)[:,1] < p0[priorInds])):
