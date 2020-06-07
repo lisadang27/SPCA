@@ -36,7 +36,10 @@ gparams = ['t0', 'per', 'a', 'inc']
 # parameters you want to place a uniform prior on
 uparams = ['gpLx', 'gpLy']
 uparams_limits = [[0,-3],[0,-3]]
-
+uparams.extend(['p'+str(i)+'_1' for i in range(1,26)])
+uparams.extend(['p'+str(i)+'_2' for i in range(1,26)])
+uparams_limits.extend([[-3,3] for i in range(1,26)])
+uparams_limits.extend([[-500,500] for i in range(1,26)])
 
 
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
@@ -122,6 +125,7 @@ for iterationNumber in range(len(planets)):
     gparams = np.array([parm for parm in p0_obj['params'] if parm in gparams])
     uparams_unsorted = np.copy(uparams)
     uparams = np.array([parm for parm in p0_obj['params'] if parm in uparams])
+    uparams_limits = np.array([uparams_limits[np.where(uparams_unsorted==uparams[i])[0][0]] for i in range(len(uparams))])
         
     # set up Gaussian priors
     priors, errs = dh.setup_gpriors(gparams, p0_obj)
@@ -297,8 +301,12 @@ for iterationNumber in range(len(planets)):
         p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
         p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
 
-        gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
-        upriorInds = [np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels]
+        
+        gparams = np.array([parm for parm in gparams if parm in p0_labels])
+        uparams_limits = np.array([uparams_limits[i] for i in range(len(uparams)) if uparams[i] in p0_labels])
+        uparams = np.array([parm for parm in uparams if parm in p0_labels])
+        gpriorInds = np.array([np.where(p0_labels==gpar)[0][0] for gpar in gparams])
+        upriorInds = np.array([np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels])
         if 'gp' in mode.lower():
             gammaInd = np.where(p0_labels=='gpAmp')[0][0]
         else:
