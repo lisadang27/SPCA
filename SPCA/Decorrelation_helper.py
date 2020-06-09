@@ -276,7 +276,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                 foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                 phoption = lines[i].split('/')[-1].strip()
                 i += 1
-                ignoreFrames = np.array(lines[i].strip().split('=')[1].replace(' ','').split(','))
+                ignoreFrames = np.array(lines[i].strip().split('=')[1].strip().replace(' ','').split(','))
                 if np.all(ignoreFrames==['']):
                     ignoreFrames = np.array([]).astype(int)
                 else:
@@ -288,7 +288,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                     foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                     phoption = lines[i].split('/')[-1].strip()
                     i += 1
-                    ignoreFrames = np.array(lines[i].split('=')[1].strip().split(','))
+                    ignoreFrames = np.array(lines[i].split('=')[1].strip().replace(' ','').split(','))
                     if np.all(ignoreFrames==['']):
                         ignoreFrames = np.array([]).astype(int)
                     else:
