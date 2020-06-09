@@ -70,7 +70,7 @@ for planet in planets:
         breaks = np.sort(breaks)[1:]
         
         filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
-        flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername+filename, 'Poly2_v1')
+        flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername+filename, 'Poly2_v1')
     
         # Make the plots
         make_plots.plot_photometry(time, flux, xdata, ydata, psfxw, psfyw, 
