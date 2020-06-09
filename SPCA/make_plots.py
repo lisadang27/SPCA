@@ -8,14 +8,10 @@ import os,sys
 lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
 sys.path.append(lib_path)
 
-try:
-    from mc3.stats import time_avg
-except ImportError:
-    print('Warning: time_avg from mc3.stats failed to import. To install it, run the getMCcubed.sh script.')
+from mc3.stats import time_avg
 
 # SPCA libraries
-from . import bliss
-from . import helpers
+from . import bliss, helpers, astro_models
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
@@ -168,77 +164,27 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     plt.close()
     return
 
-def plot_init_guess(time, data, astro, detec_full, savepath=None, showPlot=False):
-    """Makes a multi-panel plots for the initial light curve guesses.
-    
-    Args:
-        time (1D array): Time stamps.
-        data (1D array): Flux values for each time stamps.
-        astro (1D array): Initial modelled astrophysical flux variation for each time stamps.
-        detec_full (1D array): Initial modelled flux variation due to the detector for each time stamps.
-        savepath (str): Path to directory where the plot will be saved.
-    
-    Returns:
-        None
-    
-    """
-    
-    fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(10,9))
-    
-    axes[0].plot(time, data, '.', label='data')
-    axes[0].plot(time, astro*detec_full, '.', label='guess')
-    
-    axes[1].plot(time, data/detec_full, '.', label='Corrected')
-    axes[1].plot(time, astro, '.', label='Astrophysical')
-    
-    axes[2].plot(time, data/detec_full, '.', label='Corrected')
-    axes[2].plot(time, astro, '.', label='Astrophysical')
-    axes[2].set_ylim(0.998, 1.005)
-    
-    axes[3].plot(time, data/detec_full-astro, '.', label='residuals')
-    axes[3].axhline(y=0, linewidth=2, color='black')
-    
-    axes[0].set_ylabel('Relative Flux')
-    axes[2].set_ylabel('Relative Flux')
-    axes[2].set_xlabel('Time (BMJD)')
-    
-    axes[0].legend(loc=3)
-    axes[1].legend(loc=3)
-    axes[2].legend(loc=3)
-    axes[3].legend(loc=3)
-    axes[3].set_xlim(np.min(time), np.max(time))
-    
-    fig.subplots_adjust(hspace=0)
-    if savepath is not None:
-        pathplot = savepath + '02_Initial_Guess.pdf'
-        fig.savefig(pathplot, bbox_inches='tight')
-        
-    if showPlot:
-        plt.show()
-        
-    plt.close()
-    return
-
-def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPlot=False):
+def walk_style(chain, labels, interv=10, fname=None, showPlot=False):
     """Make a plot showing the evolution of the walkers throughout the emcee sampling.
 
     Args:
-        ndim (int): Number of free parameters
-        nwalk (int): Number of walkers
-        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
-        interv (int): Take every 'interv' element to thin out the plot
-        subsamp (int): Only show the last 'subsamp' steps
+        chain (ndarray): The ndarray accessed by calling sampler.chain when using emcee
         labels (ndarray): The fancy labels for each dimension
-        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+        interv (int): Take every 'interv' element to thin out the plot
+        name (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+        showPlot (bool, optional): Whether or not you want to show the plotted figure.
 
     Returns:
         None
     
     """
     
+    nwalk = chain.shape[0]
+    ndim = chain.shape[-1]
+    
     # get first index
-    beg   = len(samples[0,:,0]) - subsamp
-    end   = len(samples[0,:,0]) 
+    beg   = 0
+    end   = len(chain[0,:,0]) 
     step  = np.arange(beg,end)
     step  = step[::interv] 
     
@@ -255,7 +201,8 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPl
         sig2 = (0.9545)/2.*100
         sig3 = (0.9973)/2.*100
         percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
-        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
+        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(chain[:,:,ind][:,beg:end:interv],
+                                                                                       percentiles, axis=0)
         plt.plot(step, mu_param)
         plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
         plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
@@ -276,29 +223,17 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPl
     return
     
 # FIX - add docstring for this function
-def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc,
-                 breaks, savepath, plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24,plot_peritime=False):
+def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initial_Guess.pdf',
+               plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24, plot_peritime=False):
     
-    ind_a = len(p0_astro) # index where the astro params end
-
-    # generate the models from best-fit parameters
-    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_labels))]))
-    astro = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
-    detec = mcmc_signal/astro
-
-#     time2 = np.linspace(np.min(time), np.max(time), 1000)
-    
-#     #for higher-rez red curve
-#     astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    mcmc_signal = astro*detec
     
     if plotTrueAnomaly:
         # FIX: convert time to true anomaly for significantly eccentric planets!!
         # Use p0_mcmc if there, otherwise p0_obj
         x = time
-#         x2 = time2
     else:
         x = time
-#         x2 = time2
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -352,7 +287,7 @@ def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_
     fig.subplots_adjust(hspace=0)
     
     if savepath is not None:
-        plotname = savepath + 'MCMC_'+mode+'_2.pdf'
+        plotname = savepath + plotName
         fig.savefig(plotname, bbox_inches='tight')
         
     if showPlot:
@@ -489,3 +424,78 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
     plt.close()
     return
 
+def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
+                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False):
+    if 't0' in p0_labels:
+        t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
+    else:
+        t0MCMC = p0_obj['t0']
+    if 'per' in p0_labels:
+        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+    else:
+        perMCMC = p0_obj['per']
+    if 'rp' in p0_labels:
+        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+    else:
+        rpMCMC = p0_obj['rp']
+    if 'a' in p0_labels:
+        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+    else:
+        aMCMC = p0_obj['a']
+    if 'inc' in p0_labels:
+        incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
+    else:
+        incMCMC = p0_obj['inc']
+    if 'ecosw' in p0_labels:
+        ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
+    else:
+        ecoswMCMC = p0_obj['ecosw']
+    if 'esinw' in p0_labels:
+        esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
+    else:
+        esinwMCMC = p0_obj['esinw']
+    if 'q1' in p0_labels:
+        q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
+    else:
+        q1MCMC = p0_obj['q1']
+    if 'q2' in p0_labels:
+        q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
+    else:
+        q2MCMC = p0_obj['q2']
+    if 'fp'in p0_labels:
+        fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
+    else:
+        fpMCMC = p0_obj['fp']
+
+    eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
+    wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
+    u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
+    u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
+
+    trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
+                                                         aMCMC, incMCMC, eccMCMC, wMCMC,
+                                                         u1MCMC, u2MCMC)
+    # generating secondary eclipses model
+    eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
+                                 fpMCMC, t_sec)
+
+    # get in-transit indices
+    ind_trans  = np.where(trans!=1)
+    # get in-eclipse indices
+    ind_eclip  = np.where((eclip!=(1+fpMCMC)))
+    # seperating first and second eclipse
+    ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
+    ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
+
+    data1 = [xdata, ydata, psfxw, psfyw, flux, residuals]
+    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residuals[ind_ecli1]]
+    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residuals[ind_trans]]
+    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residuals[ind_ecli2]]
+
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_7.pdf'
+    else:
+        plotname = None
+    triangle_colors(data1, data2, data3, data4, plotname, showPlot)
+    
+    return

@@ -21,35 +21,39 @@ def signal_params():
     
     p0_obj = {'name': 'planet', 't0': 0.0, 't0_err': 0.0, 'per': 1.0, 'per_err': 0.0,
               'rp': 0.1, 'a': 8.0, 'a_err': 0.0, 'inc': 90.0, 'inc_err': 0.0, 'ecosw': 0.0,
-              'esinw': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.001, 'A': 0.1, 'B': 0.0,
+              'esinw': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.003, 'A': 0.35, 'B': 0.0,
               'C': 0.0, 'D': 0.0, 'r2': None, 'r2off': 0.0, 'c1': 1.0}
     
     p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
-    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
     p0_obj.update(dict([['p1_1', 1.0] for i in range(1,10)]))
-    p0_obj.update(dict([['p'+str(i)+'_1', 0.05] for i in range(2,10)]))
-    p0_obj.update(dict([['p'+str(i)+'_1', 0.05] for i in range(10,26)]))
-    p0_obj.update(dict([['p'+str(i)+'_2', 0.05] for i in range(1,26)]))
-    p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0, 'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.03] for i in range(2,10)]))
+    p0_obj.update(dict([['p'+str(i)+'_1', 0.01] for i in range(10,26)]))
+    p0_obj.update(dict([['p'+str(i)+'_2', 0.01] for i in range(1,26)]))
+    p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0})
+    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
+    p0_obj.update({'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
     
     params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
                             'A', 'B', 'C', 'D', 'r2', 'r2off'])
     params = np.append(params, ['c'+str(i) for i in range(1,22)])
-    params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
     params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
     params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
-    params = np.append(params, ['gpAmp', 'gpLx', 'gpLy', 'sigF'])
+    params = np.append(params, ['gpAmp', 'gpLx', 'gpLy'])
+    params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
+    params = np.append(params, ['sigF'])
  
     fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
                             r'$e \cos(\omega)$', r'$e \sin(\omega)$', r'$q_1$', r'$q_2$', r'$f_p$', r'$A$', r'$B$',
                             r'$C$', r'$D$', r'$R_{p,2}/R_*$', r'$R_{p,2}/R_*$ Offset'])
     fancyParams = np.append(fancyParams, ['$C_'+str(i)+'$' for i in range(1,22)])
-    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-1}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-2}$' for i in range(1,26)])
-    fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$', r'$\sigma_F$'])
+    fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$'])
+    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
+    fancyParams = np.append(fancyParams, [r'$\sigma_F$'])
     
-    p0_obj.update({'params': params, 'fancyParams': fancyParams})
+    p0_obj.update({'params': params, 'fancyParams': fancyParams,
+                   'checkPhasePhis':np.linspace(-np.pi,np.pi,1000)})
 
     return p0_obj
 
@@ -432,7 +436,7 @@ def lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gam
 
 
 # FIX - check if sigF in p0, otherwise use a fixed value passed in through signal_input or something
-def lnlike(p0, p0_labels, signalfunc, signal_input):
+def lnlike(p0, flux, mode, signal_func, signal_inputs):
     """Evaluate the ln-likelihood at the position p0.
     
     Note: We assumine that we are always fitting for the photometric scatter (sigF). 
@@ -448,19 +452,18 @@ def lnlike(p0, p0_labels, signalfunc, signal_input):
     
     """
     
-    flux = signal_input[0]
-    mode = signal_input[-1]
-    
     if 'gp' in mode.lower():
-        model, gp = signalfunc(signal_input, predictGp=False, returnGp=True, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
+        model, gp = signalfunc(p0, *signal_inputs)
         
         return gp.log_likelihood(flux-model)
     else:
         # define model
-        model = signalfunc(signal_input, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
+        model = signal_func(p0, *signal_inputs)
         return loglikelihood(flux, model, p0[-1])
     
-def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd):
+def lnprob(p0, flux, mode, p0_labels, signal_func, signal_inputs,
+           gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, 
+           positivity_func=None, positivity_labels=None):
     """Evaluate the ln-probability of the signal function at the position p0, including priors.
 
     Args:
@@ -478,77 +481,23 @@ def lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_input, checkPhasePhis,
     
     """
     
+    lp = 0
+    
     # Evalute the prior first since this is much quicker to compute
-    lp = lnpriorfunc(mode=signal_input[-1], checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-    if not np.isfinite(lp):
-        return -np.inf
+    if positivity_func is not None:
+        lp = positivity_func(**dict([[label, p0[i]] for i, label in enumerate(p0_labels) if label in positivity_labels]))
+        if not np.isfinite(lp):
+            return -np.inf
     
     lp += lnprior_custom(p0, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
     if not np.isfinite(lp):
         return -np.inf
     
-    lp += lnlike(p0, p0_labels, signalfunc, signal_input)
+    lp += lnlike(p0, flux, mode, signal_func, signal_inputs)
     if not np.isfinite(lp):
         return -np.inf
     else:
         return lp
-
-def lnprior(t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C, D, r2, r2off,
-            c1,  c2,  c3,  c4,  c5,  c6, c7,  c8,  c9,  c10, c11, c12, c13, c14, c15, c16, c17, c18, c19, c20, c21,
-            d1, d2, d3, s1, s2, m1,
-            p1_1, p2_1, p3_1, p4_1, p5_1, p6_1, p7_1, p8_1, p9_1, p10_1, p11_1, p12_1, p13_1, p14_1, p15_1,
-            p16_1, p17_1, p18_1, p19_1, p20_1, p21_1, p22_1, p23_1, p24_1, p25_1,
-            p1_2, p2_2, p3_2, p4_2, p5_2, p6_2, p7_2, p8_2, p9_2, p10_2, p11_2, p12_2, p13_2, p14_2, p15_2,
-            p16_2, p17_2, p18_2, p19_2, p20_2, p21_2, p22_2, p23_2, p24_2, p25_2,
-            gpAmp, gpLx, gpLy, sigF,
-            mode, checkPhasePhis):
-    """Check that the parameters are physically plausible.
-
-    Args:
-        t0 (float): Time of inferior conjunction.
-        per (float): Orbital period.
-        rp (float): Planet radius (in units of stellar radii).
-        a (float): Semi-major axis (in units of stellar radii).
-        inc (float): Orbital inclination (in degrees).
-        ecosw (float): Eccentricity multiplied by the cosine of the longitude of periastron (value between -1 and 1).
-        esinw (float): Eccentricity multiplied by the sine of the longitude of periastron (value between -1 and 1).
-        q1 (float): Limb darkening coefficient 1, parametrized to range between 0 and 1.
-        q2 (float): Limb darkening coefficient 2, parametrized to range between 0 and 1.
-        fp (float): Planet-to-star flux ratio.
-        A (float): Amplitude of the first-order cosine term.
-        B (float): Amplitude of the first-order sine term.
-        C (float): Amplitude of the second-order cosine term. Default=0.
-        D (float): Amplitude of the second-order sine term. Default=0.
-        r2 (float): Planet radius along sub-stellar axis (in units of stellar radii). Default=None.
-        r2off (float): Angle to the elongated axis with respect to the sub-stellar axis (in degrees). Default=None.
-        c1--c21 (float): The polynomial model amplitudes.
-        d1 (float): The constant offset term. #FIX - I don't think this should be here.
-        d2 (float): The slope in sensitivity with the PSF width in the x direction.
-        d3 (float): The slope in sensitivity with the PSF width in the y direction.
-        s1 (float): The amplitude of the heaviside step function.
-        s2 (float): The location of the step in the heaviside function.
-        m1 (float): The slope in sensitivity over time with respect to time[0].
-        p1_1--p25_1 (float): The 1st order PLD coefficients for 3x3 or 5x5 PLD stamps.
-        p1_2--p25_2 (float): The 2nd order PLD coefficients for 3x3 or 5x5 PLD stamps.
-        gpAmp (float): The natural logarithm of the GP covariance amplitude.
-        gpLx (float): The natural logarithm of the GP covariance lengthscale in x.
-        gpLy (float): The natural logarithm of the GP covariance lengthscale in y.
-        sigF (float): The white noise in units of F_star.
-        mode (string): The string specifying the detector and astrophysical model to use.
-        checkPhasePhis (ndarray): The phase angles to use when checking that the phasecurve is always positive.
-
-    Returns:
-        float: The default ln-prior evaluated at the position p0.
-    
-    """
-    
-    check = astro_models.check_phase(checkPhasePhis, A, B, C, D)
-    if ((0 < rp < 1) and (0 < fp < 1) and (0 < q1 < 1) and (0 < q2 < 1) and
-        (70 < inc < 110) and (-1 < ecosw < 1) and (-1 < esinw < 1)
-        and (check == False) and (0 < sigF < 1) and (m1 > -1)):
-        return 0.0
-    else:
-        return -np.inf
 
 def chi2(data, fit, err):
     """Compute the chi-squared statistic.
