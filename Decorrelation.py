@@ -60,15 +60,16 @@ tryPSFW = False
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 10                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
-nBurnInSteps2 = 1.5e6                    # number of steps to use for the second mcmc burn-in
-nProductionSteps = 2e5                   # number of steps to use with mcmc production run
+nIterScipy = 10                          # Number of iterative scipy runs used to locate best-fit before starting MCMCs
+nBurnInSteps2 = 7.5e5                    # number of steps to use for the second mcmc burn-in
+nProductionSteps = 1.5e5                 # number of steps to use with mcmc production run
 usebestfit = True                        # used best-fit instead of median of chain
 blissNBin = 8                            # number of knots to allow in each direction
 secondOrderOffset = False                # should you use the second order sinusoid terms when calculating offset
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
 nFrames  = 64                            # number of frames per binned data point
 initializeWithOld = False                # initial with previous mcmc results using the same method
-pldIgnoreFrames = True                   # Whether to use PLD data that ignored bad frames (only used for PLD, not PLDAper)
+pldIgnoreFrames = True                   # Whether or not to use the PLD photometry that ignored bad frames
 pldAddStack = False                      # Whether or not to use the PLD photometry that used background correction stacks
 debug = False                            # True if user wants details about the lambda functions created
 
@@ -278,7 +279,7 @@ for iterationNumber in range(len(planets)):
         gparams = np.array([parm for parm in p0_labels if parm in gparams_raw])
         uparams_unsorted = np.copy(uparams_raw)
         uparams = np.array([parm for parm in p0_labels if parm in uparams_raw])
-        uparams_limits = np.array([uparams_limits[np.where(uparams_unsorted==uparams[i])[0][0]]
+        uparams_limits = np.array([uparams_limits_raw[np.where(uparams_unsorted==uparams[i])[0][0]]
                                    for i in range(len(uparams))])
         
         gpriorInds = np.array([np.where(p0_labels==gpar)[0][0] for gpar in gparams])
