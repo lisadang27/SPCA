@@ -233,19 +233,15 @@ def map_flux_avgQuick(flux, astroModel, knot_nrst_lin, nBin, knotNdata):
     return sensMap/knotNdata
 
 
-def precompute(flux, time, xdata, ydata, psfxw, psfyw, mode, astroGuess, nBin=10, savepath=None, plot=True):
+def precompute(flux, xdata, ydata, nBin=10, astroGuess=None, savepath=None, plot=False):
     """Precompute all of the knot associations, etc. that are needed to run BLISS in a fitting routine.
 
     Args:
         flux (ndarray): The flux measurements for each data point.
-        time (ndarray): The time stamp for each data point.
         xdata (ndarray): The x-centroid for each data point.
         ydata (ndarray): The y-centroid for each data point.
-        psfxw (ndarray): The PSF width in the x-direction for each data point.
-        psfyw (ndarray): The PSF width in the y-direction for each data point.
-        mode (string): The string specifying which detector and astrophysical models should be used.
-        astroGuess (ndarray): The astrophysical model for each data point.
         nBin (int): The number of knots you want along each axis.
+        astroGuess (ndarray): The astrophysical model for each data point.
         savepath (string): The full path to where you would like to save plots that can be used to debug BLISS.
         plot (boolean): Whether or not you want to make plots that can be used to debug BLISS (default is False).
         
@@ -304,7 +300,7 @@ def precompute(flux, time, xdata, ydata, psfxw, psfyw, mode, astroGuess, nBin=10
                               tmask_good_knotNdata, knots_x, knots_y, 
                               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath)
     
-    return (flux, time, psfxw, psfyw, nBin, nData, knotNdata,
+    return (flux, nBin, nData, knotNdata,
             low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y, LL_dist, LR_dist, UL_dist, UR_dist,
             delta_xo, delta_yo, knot_nrst_x, knot_nrst_y, knot_nrst_lin, BLS, NNI,
-            knots_x_mesh, knots_y_mesh, tmask_good_knotNdata, mode)
+            knots_x_mesh, knots_y_mesh, tmask_good_knotNdata)
