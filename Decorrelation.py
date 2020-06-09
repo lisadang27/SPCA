@@ -172,7 +172,7 @@ for iterationNumber in range(len(planets)):
     
     for mode in modes:
         
-        print('Beginning', planet, channel, mode)
+        print('Beginning', planet, channel, mode, flush=True)
         
         p0_obj['mode'] = mode
         
@@ -417,17 +417,17 @@ for iterationNumber in range(len(planets)):
                 iters -= 1
             if iters==0 and np.any(priorlnls):
                 print('Warning: Some of the initial values still fail the lnprior!')
-                print('The following MCMC will most likely not work')
+                print('The following MCMC will most likely not work', flush=True)
             
             # Run the MCMC
-            print('Running MCMC')
+            print('Running MCMC', flush=True)
             with threadpool_limits(limits=1, user_api='blas'):
                 with Pool(ncpu) as pool:
                     sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs,
                                                     a = 2, pool=pool)
                     pos2, prob, state = sampler.run_mcmc(pos0, np.rint((nBurnInSteps2+nProductionSteps)/nwalkers),
                                                          progress=True)
-            print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)))
+            print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)), flush=True)
             
             # Show the evolution of MCMC walkers
             burnInChain = sampler.chain[:,:int(np.rint((nBurnInSteps2)/nwalkers)),:]

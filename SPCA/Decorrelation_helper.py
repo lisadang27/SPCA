@@ -27,7 +27,7 @@ def downloadExoplanetArchive():
     try:
         _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', './masterfile.ecsv')
     except:
-        print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.')
+        print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.', flush=True)
     return
 
 # FIX: Add a docstring for this function
@@ -37,7 +37,7 @@ def loadArchivalData(rootpath, planet, channel):
     else:
         # Fix: throw a proper error
         print('ERROR: No previously downloaded Exoplanet Archive data - try again when you are connected to the internet.')
-        print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), './masterfile.ecsv'))
+        print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), './masterfile.ecsv'), flush=True)
         return
 
     names = np.array(data['pl_hostname'])+np.array(data['pl_letter'])
@@ -53,7 +53,7 @@ def loadArchivalData(rootpath, planet, channel):
     indices = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0]
     if len(indices)==0:
         # Fix: throw a proper error
-        print('ERROR: Planet', planet, 'not found in the Exoplanet Archive - please load your own prior values.')
+        print('ERROR: Planet', planet, 'not found in the Exoplanet Archive - please load your own prior values.', flush=True)
         return
     
     nameIndex = indices[0]
@@ -98,7 +98,7 @@ def loadArchivalData(rootpath, planet, channel):
     if e != 0 and np.isfinite(e):
 
         if not np.isfinite(argp):
-            print('Randomly generating an argument of periastron...')
+            print('Randomly generating an argument of periastron...', flush=True)
             argp = np.random.uniform(0.,360.,1)
 
         p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
@@ -136,7 +136,7 @@ def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tsta
     if e != 0:
 
         if not np.isfinite(argp):
-            print('Randomly generating an argument of periastron...')
+            print('Randomly generating an argument of periastron...', flush=True)
             argp = np.random.uniform(0.,360.,1)
 
         p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
@@ -182,9 +182,10 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
             _ = urllib.request.urlretrieve(webfolder+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits', phoenixWavFile)
         except:
             # Fix: throw a proper error
-            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.')
+            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.',
+                  flush=True)
             exit()
-        print('Done download.')
+        print('Done download.', flush=True)
 
     webfolder += 'PHOENIX-ACES-AGSS-COND-2011/Z'+("{0:+.01f}".format(feh) if feh!=0 else '-0.0')+'/'
 
@@ -196,14 +197,15 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     phoenixSpectraFile = phoenixPath+webfile
 
     if not os.path.exists(phoenixSpectraFile):
-        print('Downloading relevant PHOENIX spectra...')
+        print('Downloading relevant PHOENIX spectra...', flush=True)
         try:
             _ = urllib.request.urlretrieve(webfolder+webfile, phoenixSpectraFile)
         except:
             # Fix: throw a proper error
-            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.')
+            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.',
+                  flush=True)
             exit()
-        print('Done download.')
+        print('Done download.', flush=True)
     
     
     with fits.open(phoenixSpectraFile) as f:
@@ -331,7 +333,7 @@ def get_photon_limit(path, mode, nFrames, ignoreFrames):
             npix = 5
         else:
             # FIX, throw an actual error
-            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.', flush=True)
             return np.nan
         stamp = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1).T
         flux = np.nansum(stamp, axis=0)
@@ -398,9 +400,9 @@ def reload_old_fit(path_params, p0_obj):
             p0_obj[name]  = Table_par[name][0]
         except Exception as e:
             # FIX: throw a more meaningful error message
-            print("type error: " + str(e))            # catch errors if you use values from fun with less params
+            print("type error: " + str(e), flush=True)            # catch errors if you use values from fun with less params
 
-    return
+    return p0_obj
 
 # FIX: Add a docstring for this function
 def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
@@ -495,7 +497,7 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Night: ', np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16))
     out += 'For T_{*,b} = '+str(p0_obj['tstar_b'])+'\n'
 
-    print(out)
+    print(out, flush=True)
     with open(savepath+'MCMC_RESULTS_'+mode+'.txt','w') as file:
         file.write(out) 
     
@@ -571,7 +573,7 @@ Unbinned data:
 
     with open(savepath+'EVIDENCE_'+mode+'.txt','w') as file:
         file.write(out)
-    print(out)
+    print(out, flush=True)
     
     ###########################
     # Save computed parameters to be used later in table generation
@@ -608,7 +610,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
            ncpu, savepath=None, showPlot=False, nIterScipy=10):
     
     if 'gp' not in mode.lower() and 'bliss' not in mode.lower():
-        print('Optimizing detector parameters first...')
+        print('Optimizing detector parameters first...', flush=True)
         def minfunc(p0_detec, p0_astro, lnprob_inputs):
             # Add back in the astrophysical parameters
             p0_full = np.append(p0_astro, p0_detec)
@@ -624,7 +626,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
     
     #########################
     
-    print('Running iterative scipy.optimize on all parameters')
+    print('Running iterative scipy.optimize on all parameters', flush=True)
     def minfunc(p0, lnprob_inputs):
         return -helpers.lnprob(p0, *lnprob_inputs)
 
@@ -664,12 +666,12 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
 
     if final_lnprob > initial_lnprob:
         print('Improved ln-likelihood!')
-        print("ln-likelihood: {0:.2f}".format(final_lnprob))
+        print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
         p0 = np.copy(p0_optimized)
         
     #########################
         
-    print('Running first mini burn-ins')
+    print('Running first mini burn-ins', flush=True)
     p0_temps_mcmc = []
     for p0_temp in p0_temps:
         ndim = len(p0)
@@ -691,20 +693,21 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
             priorlnls[priorlnls] = np.array([np.isinf(helpers.lnprob(p_tmp, *lnprob_inputs)) for p_tmp in pos0[priorlnls]])
             iters -= 1
         if iters==0 and np.any(priorlnls):
-            print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
+            print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!',
+                  flush=True)
 
         #Do quick burn-in to get walkers spread out
         with threadpool_limits(limits=1, user_api='blas'):
             with Pool(ncpu) as pool:
                 sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs, a = 2, pool=pool)
                 pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
-        print('Mean burn-in acceptance fraction: {0:.3f}'.format(np.median(sampler.acceptance_fraction)))
+        print('Mean burn-in acceptance fraction: {0:.3f}'.format(np.median(sampler.acceptance_fraction)), flush=True)
 
         p0_temps_mcmc.append(np.copy(sampler.flatchain[np.argmax(sampler.flatlnprobability)]))
     
     #########################
     
-    print('Running final iterative scipy.optimize on all parameters')
+    print('Running final iterative scipy.optimize on all parameters', flush=True)
     initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
     final_lnprob = -np.inf
     p0_optimized = []
@@ -724,7 +727,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
 
     if final_lnprob > initial_lnprob:
         print('Improved ln-likelihood!')
-        print("ln-likelihood: {0:.2f}".format(final_lnprob))
+        print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
         p0 = np.copy(p0_optimized)
     
     astroModel = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels) if label in astro_labels]))

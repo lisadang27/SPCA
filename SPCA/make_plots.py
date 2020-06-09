@@ -360,7 +360,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     outStr += str(sreal/s0)
 
     if showtxt:
-        print(outStr)
+        print(outStr, flush=True)
     if savetxt:
         fname = savepath + 'MCMC_'+mode+'_RedNoise.txt'
         with open(fname,'w') as file:
