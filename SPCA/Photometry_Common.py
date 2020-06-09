@@ -147,7 +147,7 @@ def get_time(header, ignoreFrames):
         h = header['NAXIS3']
     sec2day = 1.0/(3600.0*24.0)
     step    = header['FRAMTIME']*sec2day
-    t       = np.linspace(header['BMJD_OBS'] + step/2, header['BMJD_OBS'] + (h-1)*step, h)
+    t       = np.linspace(header['BMJD_OBS'] + step/2, header['BMJD_OBS'] + (h-1)*step, h, endpoint=True)
     if ignoreFrames != []:
         t[ignoreFrames] = np.nan
     return t
@@ -347,7 +347,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
         
     return data
 
-def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
+def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, ignoreFrames=[],
                    oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
                    addStack=False, stackPath='', maskStars=[], ncpu=4):
     
@@ -359,18 +359,20 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     fnames, lens = get_fnames(datapath, AOR_snip)
     
     # get path where the aor breaks will be saved
-    channel   = datapath.split('/')[-1]
-    breakpath = '/'.join(datapath.split('/')[:-2])+'/analysis/'+channel+'/aorBreaks.txt'
-
+    breakpath = basepath+planet+'/analysis/'+channel+'/aorBreaks.txt'
     # get & write aor breaks
-    index  = 0
+    index  = lens[0]
+    breaktimes = []
+    print(lens)
+    for length in lens[1:]:
+        with fits.open(fnames[index]) as rawImage:
+            header = rawImage[0].header
+            breaktimes.append(get_time(header, []).flatten()[0])
+        index += length
     with open(breakpath, 'w') as f:
-        for length in lens[:-1]:
-            index += length
-            rawImage = fits.open(fnames[index])
-            f.write(str(rawImage[0].header['BMJD_OBS']))
-            rawImage.close()
-
+        f.write(str(np.sort(breaktimes))[1:-1])
+        
+    
     # if need to add correction stack
     if addStack:
         stacks = get_stacks(stackPath, datapath, AOR_snip)
@@ -391,6 +393,9 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     image_stack = results[:,:-1].reshape(-1, 32, 32)
     # Free up a bit of RAM
     results = None
+    
+    print(breaktimes)
+    print(time[0])
     
     # Sort data into correct order
     order = np.argsort(time)

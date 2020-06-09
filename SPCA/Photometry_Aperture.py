@@ -461,7 +461,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     # Access the global variable
     global image_stack
     # Prepare all of the images
-    image_stack, bg, bg_err, time, = prepare_images(datapath, savepath, AOR_snip, ignoreFrames,
+    image_stack, bg, bg_err, time, = prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, ignoreFrames,
                                                     oversamp, scale, reuse_oversamp, saveoversamp,
                                                     addStack, stackPath, maskStars, ncpu)
 

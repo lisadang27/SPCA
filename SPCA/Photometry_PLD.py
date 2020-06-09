@@ -129,7 +129,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
     # warnings.filterwarnings('ignore')
 
     # Prepare all of the images
-    image_stack, bg, bg_err, time = prepare_images(datapath, savepath, AOR_snip, ignoreFrames,
+    image_stack, bg, bg_err, time = prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, ignoreFrames,
                                                    False, 1, False, False,
                                                    addStack, stackPath, maskStars, ncpu)
     

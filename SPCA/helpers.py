@@ -85,8 +85,8 @@ def get_data(path, mode, path_aper='', cut=0):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
-        time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)     # BMJD
+        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1) # electrons
+        time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)         # BMJD
         
         order = np.argsort(time)
         stamp = stamp[order][cut:]
@@ -100,12 +100,12 @@ def get_data(path, mode, path_aper='', cut=0):
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         if 'pld' not in mode.lower():
             path_aper = path
-        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
-        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # BMJD
-        xdata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixel
-        ydata    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixel
-        psfxw = np.loadtxt(path_aper, usecols=[8], skiprows=1)     # pixel
-        psfyw = np.loadtxt(path_aper, usecols=[10], skiprows=1)    # pixel
+        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1) # electrons
+        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1) # BMJD
+        xdata    = np.loadtxt(path_aper, usecols=[4], skiprows=1) # pixel
+        ydata    = np.loadtxt(path_aper, usecols=[6], skiprows=1) # pixel
+        psfxw = np.loadtxt(path_aper, usecols=[8], skiprows=1)    # pixel
+        psfyw = np.loadtxt(path_aper, usecols=[10], skiprows=1)   # pixel
         
         order = np.argsort(time)
         flux = flux[order][cut:]
@@ -229,11 +229,11 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         if 'pld' not in mode.lower():
             path_aper = path
         flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
-        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # hours
-        xdata    = np.loadtxt(path_aper, usecols=[3], skiprows=1)     # pixels
-        ydata    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
-        psfxw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
-        psfyw    = np.loadtxt(path_aper, usecols=[6], skiprows=1)     # pixels
+        time     = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # hours
+        xdata    = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # pixels
+        ydata    = np.loadtxt(path_aper, usecols=[3], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
         
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]

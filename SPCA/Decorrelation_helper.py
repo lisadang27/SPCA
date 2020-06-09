@@ -309,7 +309,9 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     AOR_snip = AOR_snip[1:]
     
     # Figure out where there are AOR breaks
-    breaks = find_breaks(rootpath, planet, channel, aors)
+    breakpath = roothpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
+    with open(breakpath, 'r') as file:
+        breaks = np.array(file.readline().strip().split(' ')).astype(float)
     
     # path to photometry outputs
     filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
@@ -318,23 +320,6 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     path_params = foldername + mode + '/ResultMCMC_'+mode+'_Params.npy'
     
     return foldername, filename, filename_full, savepath, path_params, AOR_snip, aors, breaks, ignoreFrames
-
-# FIX: Add a docstring for this function
-def find_breaks(rootpath, planet, channel, aors):
-    breaks = []
-    for aor in aors:
-        rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
-        rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
-        rawImage = fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0])
-
-        # Get the time of the first exposure of each AOR after the first
-        #     - this allows us to plot dashed lines where AOR breaks happen and where jump discontinuities happen
-        breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
-        rawHeader = rawImage[0].header
-        rawImage.close()
-    
-    # Remove the first break which is just the start of observations
-    return np.sort(breaks)[1:]
 
 # FIX: Add a docstring for this function
 def get_photon_limit(path, mode, nFrames, ignoreFrames):

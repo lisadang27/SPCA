@@ -60,7 +60,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
     yw_med = np.ma.median(yw, axis=0)
     npp_med = np.ma.median(npp, axis=0)
     
-    # get mean values for all data
+    # get median values for all data
     meanflux = np.ma.median(flux_med)
     meanbg = np.ma.median(bg_med)
     meanxdata = np.ma.median(xdata_med)
@@ -69,7 +69,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
     meanyw = np.ma.median(yw_med)
     meannpp = np.ma.median(npp_med)
     
-    # not sure...
+    # Normalize sub-frames by their median value for simpler plotting
     flux_med /= meanflux
     bg_med /= meanbg
     xdata_med /= meanxdata
