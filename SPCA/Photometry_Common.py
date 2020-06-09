@@ -1,5 +1,3 @@
-import time as timepk
-
 import os, glob
 import numpy as np
 from multiprocessing import Pool
@@ -86,9 +84,8 @@ def get_fnames(directory, AOR_snip):
     for i in range(len(AOR_list)):
         path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'
         files = glob.glob(os.path.join(path, '*bcd.fits'))
-        fnames.extend(files)
+        fnames.extend(np.sort(files))
         lens.append(len(files))
-    #fnames.sort()
     return fnames, lens
 
 def get_stacks(calDir, dataDir, AOR_snip):
@@ -114,7 +111,7 @@ def get_stacks(calDir, dataDir, AOR_snip):
     good = np.where(locs!=-1)[0] #filter out all files that don't fit the correct naming convention for correction stacks
     offset = 11 #legth of the string "SPITZER_I#_"
     keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
-
+    
     data_list = os.listdir(dataDir)
     AOR_list = [a for a in data_list if AOR_snip in a]
     calFiles = []
@@ -178,7 +175,7 @@ def oversampling(image_data, scale=2):
         image_over[i,:,:] = scipy.interpolate.griddata(points, image_compre,
                                                        (gridx, gridy), 
                                                        method = 'linear')
-        
+    
     # Mask any bad values
     image_masked = np.ma.masked_invalid(image_over)
     
@@ -291,7 +288,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             image = hdu_list[0].data
             #ignore any consistently bad frames in datacubes
             image[ignoreFrames] = np.nan
-
+    
     #add background correcting stack if requested
     if addStack:
         j=0 #counter to keep track of which correction stack we're using
@@ -299,15 +296,15 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             j+=1 #if we've moved onto a new AOR, increment j
         stackHDU = fits.open(stacks[j])
         image += stackHDU[0].data
-
+    
     if image.shape[0]!=1:
         # Sigma clipping within datacubes as well seems to be important
         image = sigma_clipping(np.ma.masked_invalid(image), sigma=4.)
-        
+    
     # convert MJy/str to electron count
     convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
     image = convfact*image
-
+    
     # Mask any other stars in the frame to avoid them influencing the background subtraction
     if maskStars != []:
         header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
@@ -321,7 +318,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             x,y = np.meshgrid(x,y)
             mask[:,x,y] = True
         image = np.ma.masked_array(image, mask=mask)
-
+    
     # oversampling
     if oversamp:
         if reuse_oversamp:
@@ -336,7 +333,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
                     image.dump(savename)
         else:
             image = np.ma.masked_invalid(oversampling(image))
-
+        
         if saveoversamp:
             # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
             savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
@@ -344,7 +341,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
     
     data = image.reshape(-1,np.product(image.shape[1:]))
     data = np.append(data, time[:,np.newaxis], axis=1)
-        
+    
     return data
 
 def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, ignoreFrames=[],
@@ -361,17 +358,16 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     # get path where the aor breaks will be saved
     breakpath = basepath+planet+'/analysis/'+channel+'/aorBreaks.txt'
     # get & write aor breaks
-    index  = lens[0]
+    index  = 0
     breaktimes = []
-    print(lens)
-    for length in lens[1:]:
+    for length in lens:
         with fits.open(fnames[index]) as rawImage:
             header = rawImage[0].header
-            breaktimes.append(get_time(header, []).flatten()[0])
+            breaktimes.append(get_time(header, ignoreFrames).flatten()[0])
         index += length
+    breaktimes = np.sort(breaktimes)[1:]
     with open(breakpath, 'w') as f:
-        f.write(str(np.sort(breaktimes))[1:-1])
-        
+        f.write(str(breaktimes)[1:-1])    
     
     # if need to add correction stack
     if addStack:
@@ -394,9 +390,6 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     # Free up a bit of RAM
     results = None
     
-    print(breaktimes)
-    print(time[0])
-    
     # Sort data into correct order
     order = np.argsort(time)
     time = time[order]
@@ -418,8 +411,3 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     print('Frames loaded!', flush=True)
     
     return image_stack, bg, bg_err, time
-
-
-
-
-

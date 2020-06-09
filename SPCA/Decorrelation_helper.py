@@ -309,7 +309,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     AOR_snip = AOR_snip[1:]
     
     # Figure out where there are AOR breaks
-    breakpath = roothpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
+    breakpath = rootpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
     with open(breakpath, 'r') as file:
         breaks = np.array(file.readline().strip().split(' ')).astype(float)
     

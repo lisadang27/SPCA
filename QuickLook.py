@@ -19,7 +19,7 @@ for planet in planets:
     
         AOR_snip = ''
         with open(rootpath+planet+'/analysis/aorSnippet.txt') as f:
-            AOR_snip = f.readline().strip()
+            AOR_snip = f.readline().strip()[1:]
     
         mainpath   = rootpath+planet+'/analysis/'+channel+'/'
         phoption = ''
@@ -54,21 +54,10 @@ for planet in planets:
                     else:
                         i += 3
     
-        aors = os.listdir(rootpath+planet+'/data/'+channel)
-        aors = np.sort([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
-        AOR_snip = AOR_snip[1:]
-        
-        breaks = []
-        for aor in aors:
-            rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
-            rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
-            rawImage = fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0])
-    
-            # Get the time of the first exposure of each AOR after the first
-            #     - this allows us to plot dashed lines where AOR breaks happen and where jump discontinuities happen
-            breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
-        breaks = np.sort(breaks)[1:]
-        
+        breakpath = rootpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
+        with open(breakpath, 'r') as file:
+            breaks = np.array(file.readline().strip().split(' ')).astype(float)
+
         filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
         flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername+filename, 'Poly2_v1')
     
