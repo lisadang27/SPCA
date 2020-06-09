@@ -26,13 +26,14 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
 
     """
     
+    # get lightcurve, centroids, psf width, npp
     flux, time, xo, yo, xw, yw, bg, npp = get_lightcurve(basepath, AOR_snip, channel, planet,
                                                          save=False, bin_data=False,
                                                          showPlots=False, savePlots=False,
                                                          oversamp=False, r=[2.4], edges=['exact'],
                                                          addStack=addStack, moveCentroids=[True],
                                                          ncpu=ncpu)[0].T
-    
+    # sigma clipping & reshape 
     try:
         flux  = sigma_clip(flux, sigma=5, maxiters=5).reshape(-1,64)
         bg    = sigma_clip(bg, sigma=5, maxiters=5).reshape(-1,64)
@@ -49,7 +50,8 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
         xw    = sigma_clip(xw, sigma=5, iters=5).reshape(-1,64)
         yw    = sigma_clip(yw, sigma=5, iters=5).reshape(-1,64)
         npp   = sigma_clip(npp, sigma=5, iters=5).reshape(-1,64)
-        
+    
+    # get median values for each datacube
     flux_med = np.ma.median(flux, axis=0)
     bg_med = np.ma.median(bg, axis=0)
     xdata_med = np.ma.median(xdata, axis=0)
@@ -57,7 +59,8 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
     xw_med = np.ma.median(xw, axis=0)
     yw_med = np.ma.median(yw, axis=0)
     npp_med = np.ma.median(npp, axis=0)
-
+    
+    # get mean values for all data
     meanflux = np.ma.median(flux_med)
     meanbg = np.ma.median(bg_med)
     meanxdata = np.ma.median(xdata_med)
@@ -65,7 +68,8 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
     meanxw = np.ma.median(xw_med)
     meanyw = np.ma.median(yw_med)
     meannpp = np.ma.median(npp_med)
-
+    
+    # not sure...
     flux_med /= meanflux
     bg_med /= meanbg
     xdata_med /= meanxdata
@@ -74,6 +78,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
     yw_med /= meanyw
     npp_med /= meannpp
     
+    # get sigma
     sigmaflux = np.ma.std(sigma_clip(flux_med, sigma=5, maxiters=5, cenfunc=np.ma.median))
     sigmabg = np.ma.std(sigma_clip(bg_med, sigma=5, maxiters=5, cenfunc=np.ma.median))
     sigmaxdata = np.ma.std(sigma_clip(xdata_med, sigma=5, maxiters=5, cenfunc=np.ma.median))

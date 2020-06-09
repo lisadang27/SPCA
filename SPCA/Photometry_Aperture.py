@@ -31,6 +31,7 @@ pbar = None
 def wrapMyFunc(arg):
     global func
     return arg, func(arg)
+
 def update(outputs):
     # note: input comes from async `wrapMyFunc`
     global results

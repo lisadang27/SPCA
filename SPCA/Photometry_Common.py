@@ -357,6 +357,21 @@ def prepare_images(datapath, savepath, AOR_snip, ignoreFrames=[],
     print('... ', end='')
     # get list of filenames and number of files
     fnames, lens = get_fnames(datapath, AOR_snip)
+    
+    # get path where the aor breaks will be saved
+    channel   = datapath.split('/')[-1]
+    breakpath = '/'.join(datapath.split('/')[:-2])+'/analysis/'+channel+'/aorBreaks.txt'
+
+    # get & write aor breaks
+    index  = 0
+    with open(breakpath, 'w') as f:
+        for length in lens[:-1]:
+            index += length
+            rawImage = fits.open(fnames[index])
+            f.write(str(rawImage[0].header['BMJD_OBS']))
+            rawImage.close()
+
+    # if need to add correction stack
     if addStack:
         stacks = get_stacks(stackPath, datapath, AOR_snip)
     else:
