@@ -55,12 +55,12 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
     
     """
     
-    full_args  = inspect.getfullargspec(function).args[1:]
+    full_args  = inspect.getfullargspec(function).args
     freeze_kwargs = dict([[dparams[i], obj[dparams[i]]] for i in range(len(dparams)) if dparams[i] in full_args])
     dynamic_funk = partial(function, **freeze_kwargs)
     
     if debug:
-        print(inspect.getfullargspec(dynamic_funk).args[1:])
+        print(inspect.getfullargspec(dynamic_funk).args)
         print()
     
     return dynamic_funk

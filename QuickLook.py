@@ -32,7 +32,7 @@ for planet in planets:
                     foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                     phoption = lines[i].split('/')[-1].strip()
                     i += 1
-                    ignoreFrames = np.array(lines[i].strip().split('=')[1].replace(' ','').split(','))
+                    ignoreFrames = np.array(lines[i].strip().split('=')[1].strip().replace(' ','').split(','))
                     if np.all(ignoreFrames==['']):
                         ignoreFrames = np.array([]).astype(int)
                     else:
@@ -44,7 +44,7 @@ for planet in planets:
                         foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                         phoption = lines[i].split('/')[-1].strip()
                         i += 1
-                        ignoreFrames = np.array(lines[i].split('=')[1].replace(' ','').split(','))
+                        ignoreFrames = np.array(lines[i].split('=')[1].strip().replace(' ','').split(','))
                         if np.all(ignoreFrames==['']):
                             ignoreFrames = np.array([]).astype(int)
                         else:
@@ -70,9 +70,7 @@ for planet in planets:
         breaks = np.sort(breaks)[1:]
         
         filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
-        data = helpers.get_data(foldername+filename, 'Poly2_v1')
-        # Sort data
-        flux, flux_err, time, xdata, ydata, psfxw, psfyw = helpers.time_sort_data(*data)
+        flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername+filename, 'Poly2_v1')
     
         # Make the plots
         make_plots.plot_photometry(time, flux, xdata, ydata, psfxw, psfyw, 
