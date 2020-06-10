@@ -81,7 +81,7 @@ shapes = ['Circular']
 edges = ['Exact', 'Hard']
 
 # Whether or not to keep the aperture centred at the centroid (otherwise keeps centred at the middle of the subarray)
-moveCentroids = [False, True]
+moveCentroids = [True]
 
 # How wide should the boxcar filter be that smooths the raw data to select the best aperture
 highpassWidth = 5*64
