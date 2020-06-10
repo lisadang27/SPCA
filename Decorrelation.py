@@ -58,7 +58,7 @@ tryEllipse = False                       # Whether to try an ellipsoidal variati
 tryPSFW = False
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
-ncpu = 10                                # The number of cpu threads to be used when running MCMC
+ncpu = 12                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nIterScipy = 10                          # Number of iterative scipy runs used to locate best-fit before starting MCMCs
 nBurnInSteps2 = 7.5e5                    # number of steps to use for the second mcmc burn-in
@@ -77,7 +77,9 @@ debug = False                            # True if user wants details about the 
 compFactors = np.ones(len(planets))
 
 # Adding companion dilution correction factor for WASP-12b
-compFactors[-1] += 0.8858*0.1196
+compFactors[planets=='WASP-12b'] += 0.8858*0.1196
+compFactors[planets=='WASP-12b_old'] += 0.8858*0.1196
+
 
 
 # Set this to non-zero if you want to remove some initial data points
