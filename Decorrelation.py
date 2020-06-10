@@ -78,7 +78,8 @@ debug = False                            # True if user wants details about the 
 compFactors = np.ones(len(planets))
 
 # Adding companion dilution correction factor for WASP-12b
-compFactors[-1] += 0.8858*0.1196
+compFactors[planets=='WASP-12b'] += 0.8858*0.1196
+compFactors[planets=='WASP-12b_old'] += 0.8858*0.1196
 
 
 # Set this to non-zero if you want to remove some initial data points
