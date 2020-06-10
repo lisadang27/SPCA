@@ -57,7 +57,7 @@ def signal_params():
 
     return p0_obj
 
-def get_data(path, mode, path_aper='', cut=0):
+def get_data(foldername, filename, mode, foldername_aper='', foldername_psf='', cut=0):
     """Retrieve binned data.
 
     Args:
@@ -85,12 +85,11 @@ def get_data(path, mode, path_aper='', cut=0):
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
             return
-        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1) # electrons
-        time     = np.loadtxt(path, usecols=[int(2*npix**2)], skiprows=1)         # BMJD
+        stamp    = np.loadtxt(foldername+filename, usecols=np.arange(int(npix**2)), skiprows=1) # electrons
+        time     = np.loadtxt(foldername+filename, usecols=[int(2*npix**2)], skiprows=1)         # BMJD
         
-        order = np.argsort(time)
-        stamp = stamp[order][cut:]
-        time_pld = time[order][cut:]
+        stamp = stamp[cut:]
+        time_pld = time[cut:]
         
         # Sigma clip per data cube (also masks invalids)
         # Convert masks into which indices to keep
@@ -99,21 +98,20 @@ def get_data(path, mode, path_aper='', cut=0):
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         if 'pld' not in mode.lower():
-            path_aper = path
-        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1) # electrons
-        time     = np.loadtxt(path_aper, usecols=[2], skiprows=1) # BMJD
-        xdata    = np.loadtxt(path_aper, usecols=[4], skiprows=1) # pixel
-        ydata    = np.loadtxt(path_aper, usecols=[6], skiprows=1) # pixel
-        psfxw = np.loadtxt(path_aper, usecols=[8], skiprows=1)    # pixel
-        psfyw = np.loadtxt(path_aper, usecols=[10], skiprows=1)   # pixel
+            foldername_aper = foldername
+        flux     = np.loadtxt(foldername_aper+filename, usecols=[0], skiprows=1) # electrons
+        time     = np.loadtxt(foldername_aper+filename, usecols=[2], skiprows=1) # BMJD
+        xdata    = np.loadtxt(foldername_aper+filename, usecols=[4], skiprows=1) # pixel
+        ydata    = np.loadtxt(foldername_aper+filename, usecols=[6], skiprows=1) # pixel
+        psfxw = np.loadtxt(foldername_aper+filename, usecols=[8], skiprows=1)    # pixel
+        psfyw = np.loadtxt(foldername_aper+filename, usecols=[10], skiprows=1)   # pixel
         
-        order = np.argsort(time)
-        flux = flux[order][cut:]
-        time = time[order][cut:]
-        xdata = xdata[order][cut:]
-        ydata = ydata[order][cut:]
-        psfxw = psfxw[order][cut:]
-        psfyw = psfyw[order][cut:]
+        flux = flux[cut:]
+        time = time[cut:]
+        xdata = xdata[cut:]
+        ydata = ydata[cut:]
+        psfxw = psfxw[cut:]
+        psfyw = psfyw[cut:]
         
         # Sigma clip per data cube (also masks invalids)
         try:
@@ -134,11 +132,41 @@ def get_data(path, mode, path_aper='', cut=0):
         # Convert masks into which indices to keep
         mask_aper = np.logical_not(MASK)
         
+    if 'psfx' in mode.lower():
+        xdata    = np.loadtxt(foldername_psf+filename, usecols=[4], skiprows=1) # pixel
+        ydata    = np.loadtxt(foldername_psf+filename, usecols=[6], skiprows=1) # pixel
+        psfxw = np.loadtxt(foldername_psf+filename, usecols=[8], skiprows=1)    # pixel
+        psfyw = np.loadtxt(foldername_psf+filename, usecols=[10], skiprows=1)   # pixel
+        
+        xdata = xdata[cut:]
+        ydata = ydata[cut:]
+        psfxw = psfxw[cut:]
+        psfyw = psfyw[cut:]
+        
+        # Sigma clip per data cube (also masks invalids)
+        try:
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
+        except TypeError:
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
+
+        # Combine masks for aperture photometry
+        MASK  = XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
+        # Convert masks into which indices to keep
+        mask_psf = np.logical_not(MASK)
+        
     # Combine masks in needed
     if 'pldaper' in mode.lower():
         mask = np.logical_and(mask_pld, mask_aper)
     elif 'pld' in mode.lower():
         mask = mask_pld
+    elif 'psfx' in mode.lower():
+        mask = np.logical_and(mask_psf, mask_aper)
     else:
         mask = mask_aper
         
@@ -183,9 +211,9 @@ def get_data(path, mode, path_aper='', cut=0):
     else:
         return flux, time, xdata, ydata, psfxw, psfyw
 
-def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([])):
+def get_full_data(foldername, filename, mode, foldername_aper='', foldername_psf='', cut=0, nFrames=64, ignore=np.array([])):
     """Retrieve unbinned data.
-
+    
     Args:
         path (string): Full path to the unbinned data file output by photometry routine.
         mode (string): The string specifying the detector and astrophysical model to use.
@@ -193,7 +221,7 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         cut (int, optional): Number of data points to remove from the start of the arrays.
         nFrames (int, optional): The number of frames that were binned together in the binned data.
         ignore (ndarray, optional): Array specifying which frames were found to be bad and should be ignored.
-
+    
     Returns:
         tuple: flux (ndarray; Flux extracted for each frame),
             time (ndarray; Time stamp for each frame),
@@ -201,7 +229,7 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             ydata (ndarray; Y-coordinate of the centroid for each frame), 
             psfwx (ndarray; X-width of the target's PSF for each frame), 
             psfwy (ndarray; Y-width of the target's PSF for each frame).
-
+    
     """
     
     if 'pld' in mode.lower():
@@ -213,8 +241,8 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
             # FIX, throw an actual error
             print('Error: only 3x3 and 5x5 stamps for PLD are supported.')
             return
-        stamp     = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
-        time     = np.loadtxt(path, usecols=[int(npix**2)], skiprows=1)     # BMJD
+        stamp     = np.loadtxt(foldername+filename, usecols=np.arange(int(npix**2)), skiprows=1)       # electrons
+        time     = np.loadtxt(foldername+filename, usecols=[int(npix**2)], skiprows=1)     # BMJD
         
         order = np.argsort(time)
         stamp = stamp[order][int(cut*nFrames):]
@@ -227,13 +255,13 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
     
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         if 'pld' not in mode.lower():
-            path_aper = path
-        flux     = np.loadtxt(path_aper, usecols=[0], skiprows=1)     # electrons
-        time     = np.loadtxt(path_aper, usecols=[1], skiprows=1)     # hours
-        xdata    = np.loadtxt(path_aper, usecols=[2], skiprows=1)     # pixels
-        ydata    = np.loadtxt(path_aper, usecols=[3], skiprows=1)     # pixels
-        psfxw    = np.loadtxt(path_aper, usecols=[4], skiprows=1)     # pixels
-        psfyw    = np.loadtxt(path_aper, usecols=[5], skiprows=1)     # pixels
+            foldername_aper = foldername
+        flux     = np.loadtxt(foldername_aper+filename, usecols=[0], skiprows=1)     # electrons
+        time     = np.loadtxt(foldername_aper+filename, usecols=[1], skiprows=1)     # hours
+        xdata    = np.loadtxt(foldername_aper+filename, usecols=[2], skiprows=1)     # pixels
+        ydata    = np.loadtxt(foldername_aper+filename, usecols=[3], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(foldername_aper+filename, usecols=[4], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(foldername_aper+filename, usecols=[5], skiprows=1)     # pixels
         
         order = np.argsort(time)
         flux = flux[order][int(cut*nFrames):]
@@ -263,16 +291,45 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         MASK  = FLUX_clip.mask + XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask + mask_nan
         # Convert masks into which indices to keep
         mask_aper = np.logical_not(MASK)
+    
+    if 'psfx' in mode.lower():
+        xdata    = np.loadtxt(foldername_psf+filename, usecols=[2], skiprows=1)     # pixels
+        ydata    = np.loadtxt(foldername_psf+filename, usecols=[3], skiprows=1)     # pixels
+        psfxw    = np.loadtxt(foldername_psf+filename, usecols=[4], skiprows=1)     # pixels
+        psfyw    = np.loadtxt(foldername_psf+filename, usecols=[5], skiprows=1)     # pixels
         
+        xdata = xdata[int(cut*nFrames):]
+        ydata = ydata[int(cut*nFrames):]
+        psfxw = psfxw[int(cut*nFrames):]
+        psfyw = psfyw[int(cut*nFrames):]
+        
+        # Sigma clip per data cube (also masks invalids)
+        try:
+            XDATA_clip = sigma_clip(xdata, sigma=6, maxiters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, maxiters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, maxiters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, maxiters=1)
+        except TypeError:
+            XDATA_clip = sigma_clip(xdata, sigma=6, iters=1)
+            YDATA_clip = sigma_clip(ydata, sigma=6, iters=1)
+            PSFXW_clip = sigma_clip(psfxw, sigma=6, iters=1)
+            PSFYW_clip = sigma_clip(psfyw, sigma=6, iters=1)
+        
+        # Combine aperture masks
+        MASK  = XDATA_clip.mask + YDATA_clip.mask + PSFXW_clip.mask + PSFYW_clip.mask
+        # Convert masks into which indices to keep
+        mask_psf = np.logical_not(MASK)
+    
     # Combine masks in needed
     if 'pldaper' in mode.lower():
         mask = np.logical_and(mask_pld, mask_aper)
     elif 'pld' in mode.lower():
         mask = mask_pld
+    elif 'psfx' in mode.lower():
+        mask = np.logical_and(mask_psf, mask_aper)
     else:
         mask = mask_aper
-        
-        
+    
     # Apply masks
     if 'pld' in mode.lower():
         #Transpose pixel stamp array for easier use
@@ -284,7 +341,7 @@ def get_full_data(path, mode, path_aper='', cut=0, nFrames=64, ignore=np.array([
         
         #Normalize stamp pixel values by the sum of the stamp
         stamp /= np.sum(stamp, axis=0)
-        
+    
     if 'pldaper' in mode.lower() or 'pld' not in mode.lower():
         flux = flux[mask]
         time = time[mask]

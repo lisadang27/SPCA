@@ -56,6 +56,7 @@ tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
+usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 10                                # The number of cpu threads to be used when running MCMC
@@ -168,6 +169,9 @@ for iterationNumber in range(len(planets)):
     if tryPSFW:
         modes.extend([mode+'_PSFW' for mode in modes])
     
+    if usePSFX:
+        mode_appendix = '_PSFX'+mode_appendix
+    
     modes = [mode+mode_appendix for mode in modes]
     
     for mode in modes:
@@ -182,23 +186,25 @@ for iterationNumber in range(len(planets)):
         # Figure out where data is located
         if 'pldaper' in mode.lower():
             # Get separately aperture data for when running PLDAper, and decide if ignoreFrame from aperture photometry
-            (foldername_aper, filename_aper, filename_full_aper, _,
-             _, _, _, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1', pldIgnoreFrames,
-                                                        pldAddStack)
+            foldername_aper = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1')[0]
             if len(ignoreFrames)==0:
                 pldIgnoreFrames = False
             else:
                 pldIgnoreFrames = True
+            foldername_psf = ''
+        elif 'psfx' in mode.lower():
+            foldername_psf = dh.findPhotometry(rootpath, planet, channel, 'PSFX')[0]
+            foldername_aper = ''
         else:
-            foldername_aper, filename_aper, filename_full_aper = '', '', ''
-        
+            foldername_aper, foldername_psf = '', ''
+
         (foldername, filename, filename_full, savepath,
         path_params, AOR_snip, aors, breaks, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel,
                                                                                mode, pldIgnoreFrames, pldAddStack)
-        
+
         with open(rootpath+planet+'/analysis/'+channel+'/cutFirstAOR.txt', 'r') as file:
             cutFirstAOR = file.readline().strip()=='True'
-        
+
         # For datasets where the first AOR is peak-up data
         if cutFirstAOR:
             rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aors[0]+'/'+channel+'/bcd/'))
@@ -206,61 +212,64 @@ for iterationNumber in range(len(planets)):
             cut = cut_tmp+len(rawfiles)
         else:
             cut = cut_tmp
-        
+
         # loading full data set for BIC calculation afterwards
         if 'pld' in mode.lower():
             # get data from unbinned photometry for chi2 on unbinned data calculation later
-            Pnorm_full, flux_full, time_full = helpers.get_full_data(foldername+filename_full, mode,
-                                                                     foldername_aper+filename_full_aper,
+            Pnorm_full, flux_full, time_full = helpers.get_full_data(foldername, filename_full, mode,
+                                                                     foldername_aper=foldername_aper,
                                                                      cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
-            Pnorm_0, flux0, time0 = helpers.get_data(foldername+filename, mode,
-                                                     foldername_aper+filename_aper)
-            Pnorm, flux, time = helpers.get_data(foldername+filename, mode,
-                                                 foldername_aper+filename_aper, cut=cut)
-            
+            Pnorm_0, flux0, time0 = helpers.get_data(foldername, filename, mode,
+                                                     foldername_aper=foldername_aper)
+            Pnorm, flux, time = helpers.get_data(foldername, filename, mode,
+                                                 foldername_aper=foldername_aper, cut=cut)
+
             pca = PCA(n_components=int(Pnorm_full.shape[0]-1))
             pca.fit(Pnorm_full.T)
             Pnorm_full = pca.transform(Pnorm_full.T).T
             Pnorm_full = np.append(np.ones_like(Pnorm_full[:1]), Pnorm_full, axis=0)
-            
+
             pca = PCA(n_components=int(Pnorm.shape[0]-1))
             pca.fit(Pnorm.T)
             Pnorm = pca.transform(Pnorm.T).T
             Pnorm = np.append(np.ones_like(Pnorm[:1]), Pnorm, axis=0)
-            
+
             if not oldPhotometry:
                 if 'pldaper' in mode.lower():
                     path_temp = foldername_aper+filename_aper
                 else:
                     path_temp = foldername+filename
                 sigF_photon_ppm = dh.get_photon_limit(path_temp, mode, nFrames, ignoreFrames)
-            
+
             # FIX: Add an initial PLD plot
         else:
             # get data from photometry
             (flux_full, time_full, xdata_full, ydata_full,
-             psfxw_full, psfyw_full) = helpers.get_full_data(foldername+filename_full, mode, cut=cut,
-                                                             nFrames=nFrames, ignore=ignoreFrames)
+             psfxw_full, psfyw_full) = helpers.get_full_data(foldername, filename_full, mode,
+                                                             foldername_psf=foldername_psf,
+                                                             cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
-            (flux0, time0, xdata0, ydata0, psfxw0, psfyw0) = helpers.get_data(foldername+filename, mode)
-            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername+filename, mode, cut=cut)
-            
+            (flux0, time0, xdata0, ydata0, psfxw0, psfyw0) = helpers.get_data(foldername, filename, mode,
+                                                                              foldername_psf=foldername_psf)
+            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername+filename, mode,
+                                                                        foldername_psf=foldername_psf, cut=cut)
+
             if not oldPhotometry:
                 sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)
-            
+
             ## FIX: peritime doesn't get made
             if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
                 # make photometry plots
                 make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath,
-                                           showPlot=False)
+                                           showPlot=True)
             else:
                 # plot raw data
                 make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath,
-                                           peritime, showPlot=False)
-        
+                                           peritime, showPlot=True)
+
         # Calculate the photon noise limit
         if oldPhotometry:
             # Fix the old, unhelpful units to electrons to compute photon noise limit

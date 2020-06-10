@@ -18,7 +18,7 @@ planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b
 subarray = [True, True, True, True, True, True, True, True, True, True, True, True, True, False]
 
 # The number of CPU threads you want to use for running photometry methods in parallel
-ncpu = 23
+ncpu = 50
 
 #folder containing data from each planet
 basepath = '/homes/picaro/bellt/research/'
@@ -47,8 +47,8 @@ nsigma = 4
 # An array-like object where each element is an array-like object with the RA and DEC coordinates of a nearby star which should be masked out when computing background subtraction.
 maskStars = None
 
-# Whether to use Aperture photometry or PLD photometry (PSF photometry currently not supported)
-photometryMethods = ['Aperture', 'PLD']
+# Whether to use Aperture photometry, PSF photometry, or PLD photometry
+photometryMethods = ['Aperture', 'PSF', 'PLD']
 
 #################
 # The purpose of this stack is to remove artifacts from bad background subtraction from the Spitzer data pipeline
@@ -140,18 +140,7 @@ for planetNum, planet in enumerate(planets):
 
                 # Try all of the different photometry methods
                 for photometryMethod in photometryMethods:
-                    if photometryMethod=='PLD':
-                        print('Starting PLD photometry!')
-                        PLDPhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
-                                                     stamp_sizes, True, bin_data, bin_size,
-                                                     False, True, addStack, ignoreFrames_temp,
-                                                     maskStars, ncpu)
-                        if ignoreFrames_temp==ignoreFrames:
-                            # Write down what frames should be ignored in case not doing PLDAper
-                            with open(basepath+planet+'/analysis/'+channel+'/PLD_ignoreFrames.txt', 'w') as file:
-                                file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
-
-                    elif photometryMethod=='Aperture':
+                    if photometryMethod.lower()=='aperture':
                         print('Starting Aperture photometry!')
                         APhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
                                                    True, onlyBest, highpassWidth,
@@ -159,5 +148,23 @@ for planetNum, planet in enumerate(planets):
                                                    oversamp, scale, True, True, radii, edges,
                                                    addStack, ignoreFrames_temp,
                                                    maskStars, moveCentroids, ncpu)
+
+                    elif photometryMethod.lower()=='psf':
+                        print('Starting PSF photometry!')
+                        PSFPhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
+                                                     True, bin_data, bin_size, False, True,
+                                                     oversamp, scale, True, True,
+                                                     addStack, ignoreFrames_temp, maskStars, ncpu)
+
+                    elif photometryMethod.lower()=='pld':
+                        print('Starting PLD photometry!')
+                        PLDPhotometry.get_lightcurve(basepath, AOR_snip, channel, planet,
+                                                     stamp_sizes, True, bin_data, bin_size,
+                                                     True, True, addStack, ignoreFrames_temp,
+                                                     maskStars, ncpu)
+                        if ignoreFrames_temp==ignoreFrames:
+                            # Write down what frames should be ignored in case not doing PLDAper
+                            with open(basepath+planet+'/analysis/'+channel+'/PLD_ignoreFrames.txt', 'w') as file:
+                                file.write('IgnoreFrames = '+str(ignoreFrames)[1:-1]+'\n')
 
 print('Done!')          

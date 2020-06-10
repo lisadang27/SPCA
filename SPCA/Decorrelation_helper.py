@@ -239,7 +239,14 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
 
     mainpath   = rootpath+planet+'/analysis/'+channel+'/'
     ignoreFrames = np.array([])
-    if 'pld' in mode.lower():
+    if 'psfx'==mode.lower():
+        if channel=='ch2':
+            foldername = '4um'
+        else:
+            foldername = '3um'
+        foldername += 'PSF/
+        
+    elif 'pld' in mode.lower():
         foldername = mainpath
 
         if pldIgnoreFrames:
