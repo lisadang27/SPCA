@@ -88,7 +88,6 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=[
     cx      = np.nansum(X*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lbx
     cy      = np.nansum(Y*starbox, axis=(1,2))/np.nansum(starbox, axis=(1,2)) + lby
     
-    # If not using full-frame photometry, sigma clip any really bad outlier centroids
     try:
         cx = sigma_clip(cx, sigma=5, maxiters=5, cenfunc=np.ma.median)
         cy = sigma_clip(cy, sigma=5, maxiters=5, cenfunc=np.ma.median)
@@ -114,6 +113,7 @@ def centroid_FWM(image_data, scale=1, bounds=(13, 18, 13, 18), defaultCentroid=[
     with np.errstate(invalid='ignore'):
         widx    = np.sqrt(np.nansum(X2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
         widy    = np.sqrt(np.nansum(Y2*starbox, axis=(1,2))/(np.nansum(starbox, axis=(1,2))))
+    
     try:
         widx    = sigma_clip(widx, sigma=5, maxiters=5, cenfunc=np.ma.median)
         widy    = sigma_clip(widy, sigma=5, maxiters=5, cenfunc=np.ma.median)
@@ -493,7 +493,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     pool.close()
     pool.join()
     pbar.close()
-    
     sys.stderr.flush()
     
     # Free up RAM now that we aren't using the stack of images anymore
@@ -602,35 +601,41 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         # Plot the photometry if requested
         if savePlots or showPlots:
             if bin_data:
-                (binned_flux, binned_flux_std, binned_time, binned_time_std,
-                 binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-                 binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-                 binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_datas[i].T
-                
                 plotx = binned_time
                 ploty0 = binned_flux
                 ploty1 = binned_xo
                 ploty2 = binned_yo
+                ploty3 = binned_xw
+                ploty4 = binned_yw
             else:
                 plotx = time
                 ploty0 = flux
                 ploty1 = xo
                 ploty2 = yo
+                ploty3 = xw
+                ploty4 = yw
 
-            fig, axes = plt.subplots(nrows=3, ncols=1, sharex=True, figsize=(15,5))
-            fig.suptitle(planet, fontsize="x-large")
+            fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15,15))
 
-            axes[0].plot(plotx, ploty0,'k+', color='black')
+            axes[0].set_title(planet, fontsize="x-large")
+            axes[0].plot(plotx, ploty0,'k+')
             axes[0].set_ylabel("Stellar Flux (electrons)")
 
-            axes[1].plot(plotx, ploty1, '+', color='black')
+            axes[1].plot(plotx, ploty1, 'k+')
             axes[1].set_ylabel("$x_0$")
 
-            axes[2].plot(plotx, ploty2, 'r+', color='black')
-            axes[2].set_xlabel("Time (BMJD))")
+            axes[2].plot(plotx, ploty2, 'k+')
             axes[2].set_ylabel("$y_0$")
+
+            axes[3].plot(plotx, ploty3, 'k+')
+            axes[3].set_ylabel("$x_w$")
+
+            axes[4].plot(plotx, ploty4, 'k+')
+            axes[4].set_ylabel("$y_w$")
+
             fig.subplots_adjust(hspace=0)
-            axes[2].ticklabel_format(useOffset=False)
+            axes[4].set_xlabel("Time (BMJD))")
+            axes[4].ticklabel_format(useOffset=False)
 
             if savePlots:
                 # Save the plot if requested
