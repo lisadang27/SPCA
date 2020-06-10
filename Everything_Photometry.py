@@ -12,7 +12,7 @@ from SPCA import Photometry_Companion as CPhotometry
 from SPCA import Photometry_PLD as PLDPhotometry
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 channels = ['ch2' for planet in planets]
 
 # Were the data taken in subarray mode?
