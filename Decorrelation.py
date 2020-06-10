@@ -80,7 +80,6 @@ compFactors = np.ones(len(planets))
 compFactors[planets=='WASP-12b'] += 0.8858*0.1196
 compFactors[planets=='WASP-12b_old'] += 0.8858*0.1196
 
-
 # Set this to non-zero if you want to remove some initial data points
 cuts = np.zeros(len(planets)).astype(int)
 
