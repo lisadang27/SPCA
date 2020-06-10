@@ -59,7 +59,7 @@ tryPSFW = False
 usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
-ncpu = 10                                # The number of cpu threads to be used when running MCMC
+ncpu = 12                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
 nIterScipy = 10                          # Number of iterative scipy runs used to locate best-fit before starting MCMCs
 nBurnInSteps2 = 7.5e5                    # number of steps to use for the second mcmc burn-in
