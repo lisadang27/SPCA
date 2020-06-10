@@ -22,9 +22,8 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 from SPCA import Decorrelation_helper as dh
 
 
-
-planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
-channels = ['ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2', 'ch2']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+channels = ['ch2' for planet in planets]
 
 rootpath = '/homes/picaro/bellt/research/'
 
@@ -48,15 +47,15 @@ uparams_limits_raw.extend([[-500,500] for i in range(1,26)])
 minPolys = 2*np.ones(len(planets)).astype(int)       # minimum polynomial order to consider
 maxPolys = 5*np.ones(len(planets)).astype(int)       # maximum polynomial order to consider (set < minPoly to not use polynomial models)
 PLDAper = True                           # whether to use aperture photometry when doing PLD (strongly recommended as this gives much cleaner photometry than the sum of the PLD stamp)
-tryPLD1_3x3 = True                      # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD2_3x3 = True                      # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
-tryPLD1_5x5 = True                      # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
-tryPLD2_5x5 = True                      # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD1_3x3 = True                       # whether to try 1st order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD2_3x3 = True                       # whether to try 2nd order PLD with a 3x3 stamp (must have run 3x3 PLD photometry)
+tryPLD1_5x5 = True                       # whether to try 1st order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
+tryPLD2_5x5 = True                       # whether to try 2nd order PLD with a 5x5 stamp (must have run 5x5 PLD photometry)
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
-usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
+usePSFX = True                           # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 12                                # The number of cpu threads to be used when running MCMC

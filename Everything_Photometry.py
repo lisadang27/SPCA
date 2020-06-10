@@ -12,10 +12,10 @@ from SPCA import Photometry_Companion as CPhotometry
 from SPCA import Photometry_PLD as PLDPhotometry
 
 # The names of all the planets you want analyzed (without spaces)
-planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar1b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 
 # Were the data taken in subarray mode?
-subarray = [True, True, True, True, True, True, True, True, True, True, True, True, True, False]
+subarray = [True, True, True, True, True, True, True, True, True, True, False, True, True, True, True, True]
 
 # The number of CPU threads you want to use for running photometry methods in parallel
 ncpu = 50
