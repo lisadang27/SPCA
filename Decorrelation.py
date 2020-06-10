@@ -253,7 +253,7 @@ for iterationNumber in range(len(planets)):
             # Get Data we'll analyze
             (flux0, time0, xdata0, ydata0, psfxw0, psfyw0) = helpers.get_data(foldername, filename, mode,
                                                                               foldername_psf=foldername_psf)
-            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername+filename, mode,
+            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername, filename, mode,
                                                                         foldername_psf=foldername_psf, cut=cut)
 
             if not oldPhotometry:
