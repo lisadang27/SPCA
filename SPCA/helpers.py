@@ -133,7 +133,7 @@ def get_data(foldername, filename, mode, foldername_aper='', foldername_psf='', 
         mask_aper = np.logical_not(MASK)
         
     if 'psfx' in mode.lower():
-        foldername_psf = '/'.join(foldername.split('/')[:-2])+foldername_psf
+        foldername_psf = '/'.join(foldername.split('/')[:-2])+'/'+foldername_psf
         xdata    = np.loadtxt(foldername_psf+filename, usecols=[4], skiprows=1) # pixel
         ydata    = np.loadtxt(foldername_psf+filename, usecols=[6], skiprows=1) # pixel
         psfxw = np.loadtxt(foldername_psf+filename, usecols=[8], skiprows=1)    # pixel
@@ -294,7 +294,7 @@ def get_full_data(foldername, filename, mode, foldername_aper='', foldername_psf
         mask_aper = np.logical_not(MASK)
     
     if 'psfx' in mode.lower():
-        foldername_psf = '/'.join(foldername.split('/')[:-2])+foldername_psf
+        foldername_psf = '/'.join(foldername.split('/')[:-2])+'/'+foldername_psf
         xdata    = np.loadtxt(foldername_psf+filename, usecols=[2], skiprows=1)     # pixels
         ydata    = np.loadtxt(foldername_psf+filename, usecols=[3], skiprows=1)     # pixels
         psfxw    = np.loadtxt(foldername_psf+filename, usecols=[4], skiprows=1)     # pixels
