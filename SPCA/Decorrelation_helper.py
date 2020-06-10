@@ -244,7 +244,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
             foldername = '4um'
         else:
             foldername = '3um'
-        foldername += 'PSF/
+        foldername += 'PSF/'
         
     elif 'pld' in mode.lower():
         foldername = mainpath
