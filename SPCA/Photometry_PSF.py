@@ -238,7 +238,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     
     
     if save or savePlots:
-        print('\tSaving... ', flush=True)
+        print('\tSaving... ', end='', flush=True)
         # create save folder
         if channel=='ch1':
             folder='3um'
