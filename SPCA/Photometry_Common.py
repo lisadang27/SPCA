@@ -78,13 +78,13 @@ def get_fnames(directory, AOR_snip):
     ch = directory.split('/')[-1]
     
     lst      = os.listdir(directory)
-    AOR_list = [k for k in lst if AOR_snip in k] 
+    AOR_list = [folder for folder in lst if AOR_snip==k[:len(AOR_snip)]]
     fnames   = []
     lens = []
     for i in range(len(AOR_list)):
         path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'
-        files = glob.glob(os.path.join(path, '*bcd.fits'))
-        fnames.extend(np.sort(files))
+        files = np.sort(glob.glob(os.path.join(path, '*bcd.fits'))
+        fnames.extend(files)
         lens.append(len(files))
     return fnames, lens
 
@@ -112,8 +112,8 @@ def get_stacks(calDir, dataDir, AOR_snip):
     offset = 11 #legth of the string "SPITZER_I#_"
     keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
     
-    data_list = os.listdir(dataDir)
-    AOR_list = [a for a in data_list if AOR_snip in a]
+    lst      = os.listdir(dataDir)
+    AOR_list = [folder for folder in lst if AOR_snip==k[:len(AOR_snip)]]
     calFiles = []
     for i in range(len(AOR_list)):
         path = dataDir + '/' + AOR_list[i] + '/' + ch +'/cal/'

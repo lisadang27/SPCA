@@ -358,7 +358,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                    save=True, onlyBest=True, highpassWidth=5*64, bin_data=True, bin_size=64,
                    showPlots=False, savePlots=True,
                    oversamp=False, scale=2, saveoversamp=True, reuse_oversamp=True,
-                   r = [2.5], edges=['hard'], addStack = False, ignoreFrames = None,
+                   r = [2.4], edges=['Exact'], addStack = False, ignoreFrames = None,
                    maskStars = None, moveCentroids=[True],
                    ncpu=4):
     """Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
