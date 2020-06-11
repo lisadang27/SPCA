@@ -83,7 +83,7 @@ def get_fnames(directory, AOR_snip):
     lens = []
     for i in range(len(AOR_list)):
         path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'
-        files = np.sort(glob.glob(os.path.join(path, '*bcd.fits'))
+        files = np.sort(glob.glob(os.path.join(path, '*bcd.fits')))
         fnames.extend(files)
         lens.append(len(files))
     return fnames, lens
