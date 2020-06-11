@@ -78,7 +78,7 @@ def get_fnames(directory, AOR_snip):
     ch = directory.split('/')[-1]
     
     lst      = os.listdir(directory)
-    AOR_list = [folder for folder in lst if AOR_snip==k[:len(AOR_snip)]]
+    AOR_list = [folder for folder in lst if AOR_snip==folder[:len(AOR_snip)]]
     fnames   = []
     lens = []
     for i in range(len(AOR_list)):
