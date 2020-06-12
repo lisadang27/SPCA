@@ -22,7 +22,7 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 from SPCA import Decorrelation_helper as dh
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-12b', 'WASP-12b_old', 'WASP-103b', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
 channels = ['ch2' for planet in planets]
 
 rootpath = '/homes/picaro/bellt/research/'
@@ -55,7 +55,7 @@ tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
 tryPSFW = False
-usePSFX = True                           # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
+usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 12                                # The number of cpu threads to be used when running MCMC

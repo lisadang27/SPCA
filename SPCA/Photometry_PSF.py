@@ -161,6 +161,8 @@ def fit_2DGaussian(image_stack, scale=1, bounds=(13, 18, 13, 18), defaultCentroi
     wx = widx/scale
     wy = widy/scale
     
+    flux = sigma_clip(flux, sigma=5, maxiters=3, cenfunc=np.ma.median)
+    
     return flux, xo, yo, wx, wy
 
 def get_lightcurve(basepath, AOR_snip, channel, planet,
@@ -235,7 +237,28 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
         binned_xw, binned_xw_std     = bin_array(xw, bin_size)
         binned_yw, binned_yw_std     = bin_array(yw, bin_size)
         binned_bg, binned_bg_std     = bin_array(bg, bin_size)
-    
+        
+        #sigma clip binned data to remove wildly unacceptable data
+        try:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=5, maxiters=3)
+        except TypeError:
+            binned_flux_mask = sigma_clip(binned_flux, sigma=5, iters=3)
+        if np.ma.is_masked(binned_flux_mask):
+            mask_pos = binned_flux_mask!=binned_flux
+            binned_time[mask_pos] = np.nan
+            binned_time_std[mask_pos] = np.nan
+            binned_xo[mask_pos] = np.nan
+            binned_xo_std[mask_pos] = np.nan
+            binned_yo[mask_pos] = np.nan
+            binned_yo_std[mask_pos] = np.nan
+            binned_xw[mask_pos] = np.nan
+            binned_xw_std[mask_pos] = np.nan
+            binned_yw[mask_pos] = np.nan
+            binned_yw_std[mask_pos] = np.nan
+            binned_bg[mask_pos] = np.nan
+            binned_bg_std[mask_pos] = np.nan
+            binned_flux_std[mask_pos] = np.nan
+            binned_flux[mask_pos] = np.nan
     
     if save or savePlots:
         print('\tSaving... ', end='', flush=True)
