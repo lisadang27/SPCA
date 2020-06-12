@@ -22,7 +22,7 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 from SPCA import Decorrelation_helper as dh
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'HD149026b']
 channels = ['ch2' for planet in planets]
 
 rootpath = '/homes/picaro/bellt/research/'
@@ -77,8 +77,8 @@ debug = False                            # True if user wants details about the 
 compFactors = np.ones(len(planets))
 
 # Adding companion dilution correction factor for WASP-12b
-compFactors[planets=='WASP-12b'] += 0.8858*0.1196
-compFactors[planets=='WASP-12b_old'] += 0.8858*0.1196
+compFactors[planets=='WASP-12b'] += 0.8608*0.1196
+compFactors[planets=='WASP-12b_old'] += 0.8147*0.1196
 
 # Set this to non-zero if you want to remove some initial data points
 cuts = np.zeros(len(planets)).astype(int)
