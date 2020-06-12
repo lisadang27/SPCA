@@ -304,20 +304,20 @@ for iterationNumber in range(len(planets)):
         # Setup detector, astrophysical, and full-signal functions
         
         # Get the astrophysical function
-        astro_func = freeze.make_lambdafunc(astro_models.ideal_lightcurve, dparams, p0_obj, debug=debug)
-        astro_labels = inspect.getfullargspec(astro_func).args[1:]
+        astro_func, astro_labels = freeze.make_lambdafunc(astro_models.ideal_lightcurve, p0_labels,
+                                                          dparams, p0_obj, debug=debug)
         astro_inputs = time
         astro_inputs_full = time_full
-        
+
         # Compute an initial guess for the astro model
         astro_guess = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels)
                                                        if label in astro_labels]))
-        
+
         # Get the function that checks whether the lightcurve is positive
         positivity_func = freeze.make_lambdafunc(astro_models.check_phase, np.append(dparams, 'checkPhasePhis'),
                                                  p0_obj, debug=debug)
         positivity_labels = np.array([label for label in ['A', 'B', 'C', 'D'] if label not in dparams])
-        
+
         # Get all of the detector functions used and freeze any requested parameters
         detec_funcs = []
         # Get the names of the fitted parameters for each function
@@ -326,29 +326,33 @@ for iterationNumber in range(len(planets)):
         detec_inputs = []
         detec_inputs_full = []
         if 'poly' in mode.lower():
-            func = freeze.make_lambdafunc(detec_models.detec_model_poly, dparams, p0_obj, debug=debug)
+            func = detec_models.detec_model_poly
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append([xdata, ydata, mode])
             detec_inputs_full.append([xdata_full, ydata_full, mode])
         if 'pld' in mode.lower():
-            func = freeze.make_lambdafunc(detec_models.detec_model_PLD, dparams, p0_obj, debug=debug)
+            func = detec_models.detec_model_PLD
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append([Pnorm, mode])
             detec_inputs_full.append([Pnorm_full, mode])
         if 'bliss' in mode.lower():
-            func = freeze.make_lambdafunc(detec_models.detec_model_bliss, dparams, p0_obj, debug=debug)
+            func = detec_models.detec_model_bliss
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append(bliss.precompute(flux, xdata, ydata, mode,
                                                 blissNBin, astro_guess, savepath, plot=True))
             detec_inputs_full.append(bliss.precompute(flux_full, xdata_full, ydata_full,
                                                      blissNBin))
         if 'gp' in mode.lower():
-            func = freeze.make_lambdafunc(detec_models.detec_model_GP, dparams, p0_obj, debug=debug)
+            func = detec_models.detec_model_GP
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append([flux, xdata, ydata, True])
             detec_inputs_full.append([flux_full, xdata_full, ydata_full, True])
         if 'hside' in mode.lower():
@@ -356,33 +360,36 @@ for iterationNumber in range(len(planets)):
                 # Set the break points for the heaviside function
                 p0_obj[f's{i}break'] = brk
                 dparams = np.append(dparams, [f's{i}break'])
-            func = freeze.make_lambdafunc(detec_models.hside, dparams, p0_obj, debug=debug)
+            func = detec_models.hside
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append(time)
             detec_inputs_full.append(time_full)
         if 'tslope' in mode.lower():
-            func = freeze.make_lambdafunc(detec_models.tslope, dparams, p0_obj, debug=debug)
+            func = detec_models.tslope
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append(time)
             detec_inputs_full.append(time_full)
         if 'psfw' in mode.lower():
-            func = freeze.make_lambdafunc(detec_model_PSFW, dparams, p0_obj, debug=debug)
+            func = detec_models.detec_model_PSFW
+            func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
-            detec_labels.append(inspect.getfullargspec(func).args[2:])
+            detec_labels.append(labels)
             detec_inputs.append(psfxw, psfyw)
             detec_inputs_full.append(psfxw_full, psfyw_full)
-        
+
         if len(detec_funcs)==0:
             raise NotImplementedError(f'mode=\'{mode}\' is not implemented.')
-        
+
         # Get the full-signal function that models the astrophysical and detector signals
         signal_func = detec_models.signal
         signal_inputs = [p0_labels, astro_func, astro_labels, astro_inputs, detec_funcs, detec_labels, detec_inputs]
         signal_inputs_full = [p0_labels, astro_func, astro_labels, astro_inputs_full,
                               detec_funcs, detec_labels, detec_inputs_full]
-        
+
         lnprob_inputs = [flux, mode, p0_labels, signal_func, signal_inputs,
                          gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd,
                          positivity_func, positivity_labels]

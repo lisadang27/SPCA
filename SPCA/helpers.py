@@ -30,7 +30,8 @@ def signal_params():
     p0_obj.update(dict([['p'+str(i)+'_1', 0.01] for i in range(10,26)]))
     p0_obj.update(dict([['p'+str(i)+'_2', 0.01] for i in range(1,26)]))
     p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0})
-    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 's1': 0.0, 's2': 0.0, 'm1': 0.0})
+    p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 'm1': 0.0})
+    p0_obj.update({'s0':0, 's0break':0, 's1':0, 's1break':0, 's2':0, 's2break':0, 's3':0, 's3break':0, 's4':0, 's4break':0})
     p0_obj.update({'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
     
     params = np.array(['t0', 'per', 'rp', 'a', 'inc', 'ecosw', 'esinw', 'q1', 'q2', 'fp', 
@@ -39,7 +40,8 @@ def signal_params():
     params = np.append(params, ['p'+str(i)+'_1' for i in range(1,26)])
     params = np.append(params, ['p'+str(i)+'_2' for i in range(1,26)])
     params = np.append(params, ['gpAmp', 'gpLx', 'gpLy'])
-    params = np.append(params, ['d1', 'd2', 'd3', 's1', 's2', 'm1'])
+    params = np.append(params, ['d1', 'd2', 'd3', 'm1'])
+    params = np.append(params, ['s0', 's0break', 's1', 's1break', 's2', 's2break', 's3', 's3break', 's4', 's4break'])
     params = np.append(params, ['sigF'])
  
     fancyParams = np.array([r'$t_0$', r'$P_{\rm orb}$', r'$R_p/R_*$', r'$a/R_*$', r'$i$',
@@ -49,7 +51,8 @@ def signal_params():
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-1}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$p_{'+str(i)+'-2}$' for i in range(1,26)])
     fancyParams = np.append(fancyParams, [r'$GP_{amp}$', r'$GP_{Lx}$', r'$GP_{Ly}$'])
-    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$S_1$', r'$S_2$', r'$M_1$'])
+    fancyParams = np.append(fancyParams, [r'$D_1$', r'$D_2$', r'$D_3$', r'$M_1$'])
+    fancyParams = np.append(fancyParams, [r'$S_0$', r'$S_{0, break}$', r'$S_1$', r'$S_{1, break}$', r'$S_2$', r'$S_{2, break}$', r'$S_3$', r'$S_{3, break}$', r'$S_4$', r'$S_{4, break}$'])
     fancyParams = np.append(fancyParams, [r'$\sigma_F$'])
     
     p0_obj.update({'params': params, 'fancyParams': fancyParams,
@@ -410,7 +413,7 @@ def expand_dparams(dparams, mode):
         dparams = np.append(dparams, ['d1', 'd2', 'd3'])
         
     if 'hside' not in modeLower:
-        dparams = np.append(dparams, ['s1', 's2'])
+        dparams = np.append(dparams, ['s0', 's0break', 's1', 's1break', 's2', 's2break', 's3', 's3break', 's4', 's4break'])
         
     if 'tslope' not in modeLower:
         dparams = np.append(dparams, ['m1'])

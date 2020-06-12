@@ -39,7 +39,7 @@ def load_past_params(path):
     
     return
 
-def make_lambdafunc(function, dparams=[], obj=[], debug=False):
+def make_lambdafunc(function, p0_labels, dparams=[], obj=[], debug=False):
     """Create a lambda function called dynamic_funk that will fix the parameters listed in dparams with the values in obj.
 
     Note: The module where the original function is needs to be loaded in this file.
@@ -63,4 +63,6 @@ def make_lambdafunc(function, dparams=[], obj=[], debug=False):
         print(inspect.getfullargspec(dynamic_funk).args)
         print()
     
-    return dynamic_funk
+    fittedArgs = [arg for arg in full_args if arg in p0_labels]
+    
+    return dynamic_funk, fittedArgs
