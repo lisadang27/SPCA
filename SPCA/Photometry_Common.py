@@ -360,11 +360,17 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     # get & write aor breaks
     index  = 0
     breaktimes = []
-    for length in lens:
-        with fits.open(fnames[index]) as rawImage:
-            header = rawImage[0].header
-            breaktimes.append(get_time(header, ignoreFrames).flatten()[0])
-        index += length
+    try:
+        for length in lens:
+            with fits.open(fnames[index]) as rawImage:
+                header = rawImage[0].header
+                breaktimes.append(get_time(header, ignoreFrames).flatten()[0])
+            index += length
+    except:
+        print()
+        print("Error, tried to access beyond the end of an array! This likely indicates that you have data at ch1 and ch2",
+              "\nfor the same AOR, and the automatic unzipping program failed to unpack the files properly. You may need to",
+              f"\nmanually move/delete some of the data files which can be found at {'/'.join(datapath.split('/')[:-1])}")
     breaktimes = np.sort(breaktimes)[1:]
     with open(breakpath, 'w') as f:
         f.write(str(breaktimes)[1:-1])    
