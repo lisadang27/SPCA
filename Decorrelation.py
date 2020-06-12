@@ -236,7 +236,7 @@ for iterationNumber in range(len(planets)):
 
             if not oldPhotometry:
                 if 'pldaper' in mode.lower():
-                    path_temp = foldername_aper+filename_aper
+                    path_temp = foldername_aper+filename
                 else:
                     path_temp = foldername+filename
                 sigF_photon_ppm = dh.get_photon_limit(path_temp, mode, nFrames, ignoreFrames)
