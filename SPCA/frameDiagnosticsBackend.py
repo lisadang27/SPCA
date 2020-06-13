@@ -10,7 +10,7 @@ from .Photometry_Common import create_folder
 import warnings
 warnings.filterwarnings('ignore')
 
-def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigma=3, showPlot=False, savePlot=True):
+def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, highpassWidth=5*64, nsigma=3, ncpu=4, showPlot=False, savePlot=True):
     """Run frame diagnostics and choose which frames within a datacube are consistently bad and should be discarded.
 
     Args:
@@ -32,7 +32,7 @@ def run_diagnostics(planet, channel, AOR_snip, basepath, addStack, ncpu=4, nsigm
                                                          showPlots=False, savePlots=False,
                                                          oversamp=False, r=[2.4], edges=['exact'],
                                                          addStack=addStack, moveCentroids=[True],
-                                                         ncpu=ncpu)[0].T
+                                                         highpassWidth=highpassWidth, ncpu=ncpu)[0].T
     # sigma clipping & reshape 
     try:
         flux  = sigma_clip(flux, sigma=5, maxiters=5).reshape(-1,64)

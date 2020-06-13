@@ -146,8 +146,9 @@ def get_time(header, ignoreFrames):
     sec2day = 1.0/(3600.0*24.0)
     step    = header['FRAMTIME']*sec2day
     t       = np.linspace(header['BMJD_OBS'] + step/2, header['BMJD_OBS'] + (h-1)*step, h, endpoint=True)
+    t = np.ma.masked_invalid(t)
     if ignoreFrames != []:
-        t[ignoreFrames] = np.nan
+        t[ignoreFrames].mask = True
     return t
 
 def oversampling(image_data, scale=2):
@@ -165,11 +166,11 @@ def oversampling(image_data, scale=2):
     
     l, h, w = image_data.shape
     gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
-    image_over = np.ones((l, h*a, w*a))*np.nan
+    image_over = np.zeros((l, h*a, w*a))
     for i in range(l):
         image_masked = np.ma.masked_invalid(image_data[i,:,:])
         if np.all(image_masked.mask):
-            # Data will already be masked as nan is its default value
+            image_over[i,:,:].mask = True
             continue
         points       = np.where(image_masked.mask == False)
         image_compre = np.ma.compressed(image_masked)
@@ -200,17 +201,53 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
     lbx, ubx, lby, uby = bounds
     
     try:
-        image_stack = sigma_clip(image_stack, sigma=sigma,
-                                 maxiters=maxiters, 
-                                 cenfunc=np.ma.median, axis = 0)
+        image_stack = sigma_clip(image_stack, sigma=sigma, maxiters=maxiters, 
+                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
     except TypeError:
-        image_stack = sigma_clip(image_stack, sigma=sigma, iters=maxiters, 
-                                 cenfunc=np.ma.median, axis = 0)
+        image_stack = sigma_clip(image_stack, sigma=sigma, iters=maxiters,
+                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
     
     # If any pixels near the target star are bad, mask the entire frame
     image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
     
     return image_stack
+
+def clip_data(arr, highpassWidth, sigma1=5, sigma2=5, maxiters=3):
+    try:
+        arr = sigma_clip(arr, sigma=sigma1, maxiters=maxiters, cenfunc=np.ma.median, stdfunc=np.ma.std)
+    except TypeError:
+        arr = sigma_clip(arr, sigma=sigma1, iters=maxiters, cenfunc=np.ma.median, stdfunc=np.ma.std)
+    arr = replace_clipped(arr)
+    arr = rolling_clip(arr, highpassWidth, sigma=sigma2, maxiters=maxiters)
+    arr = replace_clipped(arr)
+    
+    return arr
+
+def replace_clipped(arr):
+    for i in np.where(np.ma.getmaskarray(arr))[0]:
+        inds = np.array([i-2, i-1, i+1, i+2])
+        inds = inds[inds<len(arr)]
+        
+        if not np.all(arr[inds].mask):
+            arr[i] = np.ma.median(arr[inds])
+        else:
+            arr[i] = np.ma.median(arr)
+    
+    arr.mask = np.ma.nomask
+    
+    return arr
+
+def rolling_clip(arr, highpassWidth, sigma=5, maxiters=3):
+    smooth = highpassflist(arr, highpassWidth)
+    smoothed = (arr - smooth)
+    try:
+        smoothed = sigma_clip(smoothed, sigma=sigma, maxiters=maxiters,
+                              cenfunc=np.ma.median, stdfunc=np.ma.std)
+    except:
+        smoothed = sigma_clip(smoothed, sigma=sigma, iters=maxiters,
+                              cenfunc=np.ma.median, stdfunc=np.ma.std)
+    arr[np.ma.getmaskarray(smoothed)] = np.ma.masked
+    return arr
 
 def bgsubtract(bounds=(11, 19, 11, 19), i=0):
     """Measure the background level and subtracts the background from each frame.
@@ -258,13 +295,13 @@ def bin_array(data, size):
     
     """
     
-    data = np.ma.masked_invalid(data)
+    data = np.ma.masked_invalid(np.ma.copy(data))
     x = np.arange(data.shape[0])
     bins = size*np.arange(np.ceil(len(x)/size)+1)-0.5
     
-    binned_data = binned_statistic(x, data, statistic=np.nanmedian, bins=bins)[0]
+    binned_data = binned_statistic(x, data, statistic=np.ma.median, bins=bins)[0]
     
-    binned_data_std = binned_statistic(x, data, statistic=np.nanstd, bins=bins)[0]
+    binned_data_std = binned_statistic(x, data, statistic=np.ma.std, bins=bins)[0]
     
     return binned_data, binned_data_std
 
@@ -284,11 +321,9 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
         if len(hdu_list[0].data.shape)==2:
             # Reshape fullframe data so that it can be used with our routines
             # Getting just the stamp around the sweet spot
-            image = hdu_list[0].data[np.newaxis,217:249,9:41]
+            image = np.ma.masked_invalid(hdu_list[0].data[np.newaxis,217:249,9:41])
         else:
-            image = hdu_list[0].data
-            #ignore any consistently bad frames in datacubes
-            image[ignoreFrames] = np.nan
+            image = np.ma.masked_invalid(hdu_list[0].data)
     
     #add background correcting stack if requested
     if addStack:
@@ -296,11 +331,11 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
         while i > np.sum(lens[:j+1]):
             j+=1 #if we've moved onto a new AOR, increment j
         stackHDU = fits.open(stacks[j])
-        image += stackHDU[0].data
+        image += np.ma.masked_invalid(stackHDU[0].data)
     
     if image.shape[0]!=1:
-        # Sigma clipping within datacubes as well seems to be important
-        image = sigma_clipping(np.ma.masked_invalid(image), sigma=4.)
+        # Sigma clipping within datacubes
+        image = sigma_clipping(image, sigma=4.)
     
     # convert MJy/str to electron count
     convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
@@ -340,18 +375,27 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
             image.dump(savename)
     
+    #ignore any consistently bad frames in datacubes
+    image[ignoreFrames].mask = True
+    
     data = image.reshape(-1,np.product(image.shape[1:]))
     data = np.append(data, time[:,np.newaxis], axis=1)
     
     return data
 
-def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, ignoreFrames=[],
+def prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames=[],
                    oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
                    addStack=False, stackPath='', maskStars=[], ncpu=4):
     
+    savepath = basepath+planet+'/analysis/'+channel+'/'
+    if addStack:
+        savepath += 'addedStack/'
+    else:
+        savepath += 'addedBlank/'
+    
     print('\tGetting frames', end='', flush=True)
     if len(ignoreFrames)!=0:
-        print(', deleting bad frames', end='', flush=True)
+        print(', masking bad frames', end='', flush=True)
     print('... ', end='')
     # get list of filenames and number of files
     fnames, lens = get_fnames(datapath, AOR_snip)
@@ -364,7 +408,7 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     for length in lens:
         with fits.open(fnames[index]) as rawImage:
             header = rawImage[0].header
-            breaktimes.append(get_time(header, ignoreFrames).flatten()[0])
+            breaktimes.append(get_time(header, []).flatten()[0])
         index += length
     breaktimes = np.sort(breaktimes)[1:]
     with open(breakpath, 'w') as f:
@@ -381,7 +425,7 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
         func = partial(prepare_image, savepath, AOR_snip, fnames, lens, stacks, ignoreFrames,
                        oversamp, scale, reuse_oversamp, saveoversamp, addStack, stackPath, maskStars)
         inds = range(len(fnames))
-        results = np.array(pool.map(func, inds)).reshape(-1,int(32**2+1))
+        results = np.ma.masked_array(pool.map(func, inds)).reshape(-1,int(32**2+1))
     
     # Access global variable
     global image_stack
@@ -392,7 +436,10 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     results = None
     
     # Sort data into correct order
+    mask = np.copy(time.mask)
+    time.mask = np.ma.nomask
     order = np.argsort(time)
+    time.mask = mask
     time = time[order]
     image_stack = image_stack[order]
     # Free up a bit of RAM
@@ -403,11 +450,17 @@ def prepare_images(basepath, datapath, savepath, planet, channel, AOR_snip, igno
     image_stack = sigma_clipping(image_stack, sigma=5)
     
     print('Subtracting background... ', end='', flush=True)
+    # Remove mask so that even ignoreFrames get background subtracted
+    mask = np.copy(image_stack.mask)
+    image_stack.mask = np.ma.nomask
+    image_stack = np.ma.masked_invalid(image_stack)
     # background subtraction is done on global variable
     with Pool(ncpu) as pool:
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T
+    # Reapply mask
+    image_stack.mask = mask
     
     print('Frames loaded!', flush=True)
     
