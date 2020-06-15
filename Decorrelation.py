@@ -384,8 +384,8 @@ for iterationNumber in range(len(planets)):
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
             detec_labels.append(labels)
-            detec_inputs.append(psfxw, psfyw)
-            detec_inputs_full.append(psfxw_full, psfyw_full)
+            detec_inputs.append((psfxw, psfyw))
+            detec_inputs_full.append((psfxw_full, psfyw_full))
 
         if len(detec_funcs)==0:
             raise NotImplementedError(f'mode=\'{mode}\' is not implemented.')
