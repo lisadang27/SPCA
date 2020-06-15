@@ -324,6 +324,8 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             image = np.ma.masked_invalid(hdu_list[0].data[np.newaxis,217:249,9:41])
         else:
             image = np.ma.masked_invalid(hdu_list[0].data)
+            #ignore any consistently bad frames in datacubes
+            image[ignoreFrames].mask = True
     
     #add background correcting stack if requested
     if addStack:
@@ -375,23 +377,28 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
             image.dump(savename)
     
-    #ignore any consistently bad frames in datacubes
-    image[ignoreFrames].mask = True
-    
     data = image.reshape(-1,np.product(image.shape[1:]))
     data = np.append(data, time[:,np.newaxis], axis=1)
     
     return data
 
-def prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames=[],
+def prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames=[],
                    oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
-                   addStack=False, stackPath='', maskStars=[], ncpu=4):
+                   addStack=False, maskStars=[], ncpu=4):
     
+    #folder containing properly named correction stacks (will be automatically selected)
+    stackPath = basepath+'Calibration/'
+    datapath   = basepath+planet+'/data/'+channel
     savepath = basepath+planet+'/analysis/'+channel+'/'
     if addStack:
         savepath += 'addedStack/'
     else:
         savepath += 'addedBlank/'
+    
+    if maskStars is None:
+        maskStars = []
+    if ignoreFrames is None:
+        ignoreFrames = []
     
     print('\tGetting frames', end='', flush=True)
     if len(ignoreFrames)!=0:
@@ -436,10 +443,7 @@ def prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames=[
     results = None
     
     # Sort data into correct order
-    mask = np.copy(time.mask)
-    time.mask = np.ma.nomask
     order = np.argsort(time)
-    time.mask = mask
     time = time[order]
     image_stack = image_stack[order]
     # Free up a bit of RAM
@@ -450,17 +454,11 @@ def prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames=[
     image_stack = sigma_clipping(image_stack, sigma=5)
     
     print('Subtracting background... ', end='', flush=True)
-    # Remove mask so that even ignoreFrames get background subtracted
-    mask = np.copy(image_stack.mask)
-    image_stack.mask = np.ma.nomask
-    image_stack = np.ma.masked_invalid(image_stack)
     # background subtraction is done on global variable
     with Pool(ncpu) as pool:
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T
-    # Reapply mask
-    image_stack.mask = mask
     
     print('Frames loaded!', flush=True)
     

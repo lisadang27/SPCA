@@ -15,7 +15,7 @@ from functools import partial
 
 from collections import Iterable
 
-from .Photometry_Common import bin_array, create_folder, prepare_images, clip_data, sigma_clipping
+from .Photometry_Common import bin_array, create_folder, prepare_images, clip_data
 from .make_plots import plot_photometry
 
 import os, warnings
@@ -169,8 +169,8 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                    save=True, highpassWidth=5*64, bin_data=True, bin_size=64,
                    showPlots=False, savePlots=True,
                    oversamp=False, scale=2, saveoversamp=True, reuse_oversamp=True,
-                   addStack = False, ignoreFrames = None, allowIgnoreFrames=[True, False],
-                   maskStars = None, ncpu=4):
+                   addStack = False, ignoreFrames = None,
+                   maskStars = None, ncpu=4, image_stack_input=None, bg=None, bg_err=None, time=None):
     """Given a directory, looks for data (bcd.fits files), opens them and performs PSF photometry.
 
     Args:
@@ -195,10 +195,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     
     """
     
-    if ignoreFrames is None or len(ignoreFrames)==0:
-        ignoreFrames = []
-        allowIgnoreFrames = [False]
-    elif not np.any(allowIgnoreFrames):
+    if ignoreFrames is None:
         ignoreFrames = []
         
     if maskStars is None:
@@ -207,145 +204,134 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     if basepath[-1]!='/':
         basepath += '/'
     
-    stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
-    datapath   = basepath+planet+'/data/'+channel
-    
     # prepare filenames for saved data
     save_full = channel+'_datacube_full_AORs'+AOR_snip[1:]+'.dat'
     save_bin = channel+'_datacube_binned_AORs'+AOR_snip[1:]+'.dat'
     
     # Access the global variable
     global image_stack
-    # Prepare all of the images
-    image_stack, bg, bg_err, time, = prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames,
-                                                    oversamp, scale, reuse_oversamp, saveoversamp,
-                                                    addStack, stackPath, maskStars, ncpu)
+    if image_stack_input is None:
+        # Prepare all of the images
+        image_stack, bg, bg_err, time = prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames,
+                                                       oversamp, scale, reuse_oversamp, saveoversamp,
+                                                       addStack, maskStars, ncpu)
+    else:
+        image_stack = image_stack_input
     
     bg = clip_data(bg, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
     bg_err = clip_data(bg_err, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
     
-    # Make sure to allow ignoreFrames first
-    for allowIgnoreFrame in np.sort(allowIgnoreFrames)[::-1]:
-        if allowIgnoreFrame:
-            print('\t* Removing ignoreFrames', flush=True)
-        else:
-            print('\t* Not removing ignoreFrames', flush=True)
-            ignoreFrames = []
-            # Remove mask to allow for False in allowIgnoreFrames
-            image_stack.mask = False
-            image_stack = np.ma.masked_invalid(image_stack)
-            image_stack = sigma_clipping(image_stack, sigma=5)
+    print('\tFitting Gaussians...', flush=True)
+    flux, xo, yo, xw, yw = fit_2DGaussian(image_stack, scale = 1, bounds = (13, 18, 13, 18), ncpu=ncpu)
     
-        print('\tFitting Gaussians...', flush=True)
-        flux, xo, yo, xw, yw = fit_2DGaussian(image_stack, scale = 1, bounds = (13, 18, 13, 18), ncpu=ncpu)
-
-        flux[flux<0.1*np.ma.median(flux)] = np.nan
-        flux[flux<0.1*np.ma.median(flux)].mask = True
-        
-        flux = clip_data(flux, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        xo = clip_data(xo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        xw = clip_data(xw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        yo = clip_data(yo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        yw = clip_data(yw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        
-        if bin_data:
-            binned_flux, binned_flux_std = bin_array(flux, bin_size)
-            binned_time, binned_time_std = bin_array(time, bin_size)
-            binned_xo, binned_xo_std     = bin_array(xo, bin_size)
-            binned_yo, binned_yo_std     = bin_array(yo, bin_size)
-            binned_xw, binned_xw_std     = bin_array(xw, bin_size)
-            binned_yw, binned_yw_std     = bin_array(yw, bin_size)
-            binned_bg, binned_bg_std     = bin_array(bg, bin_size)
-
-            # Do a rolling median based sigma clipping to remove bad data
-            binned_flux = clip_data(binned_flux, highpassWidth/bin_size, sigma1=10, sigma2=5, maxiters=3)
-
-        if save or savePlots:
-            print('\tSaving... ', end='', flush=True)
-            # create save folder
-            if channel=='ch1':
-                folder='3um'
-            else:
-                folder='4um'
-            folder += 'PSF/'
-
-            savepath = basepath+planet+'/analysis/'+channel+'/'
-            if addStack:
-                savepath += 'addedStack/'
-            else:
-                savepath += 'addedBlank/'
-            if ignoreFrames != []:
-                savepath += 'ignore/'
-            else:
-                savepath += 'noIgnore/'
-
-            savepath = savepath+folder
-
-            savepath = create_folder(savepath, True, True)
-
-        if savePlots or showPlots:
-            if bin_data:
-                plotx = binned_time
-                ploty0 = binned_flux
-                ploty1 = binned_xo
-                ploty2 = binned_yo
-                ploty3 = binned_xw
-                ploty4 = binned_yw
-            else:
-                plotx = time
-                ploty0 = flux
-                ploty1 = xo
-                ploty2 = yo
-                ploty3 = xw
-                ploty4 = yw
-
-            fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15,15))
-
-            axes[0].set_title(planet, fontsize="x-large")
-            axes[0].plot(plotx, ploty0,'k+')
-            axes[0].set_ylabel("Stellar Flux (electrons)")
-
-            axes[1].plot(plotx, ploty1, 'k+')
-            axes[1].set_ylabel("$x_0$")
-
-            axes[2].plot(plotx, ploty2, 'k+')
-            axes[2].set_ylabel("$y_0$")
-
-            axes[3].plot(plotx, ploty3, 'k+')
-            axes[3].set_ylabel("$x_w$")
-
-            axes[4].plot(plotx, ploty4, 'k+')
-            axes[4].set_ylabel("$y_w$")
-
-            fig.subplots_adjust(hspace=0)
-            axes[4].set_xlabel("Time (BMJD))")
-            axes[4].ticklabel_format(useOffset=False)
-
-            if savePlots:
-                # Save the plot if requested
-                pathplot = savepath + 'Lightcurve.pdf'
-                fig.savefig(pathplot)
-            if showPlots:
-                plt.show()
-            plt.close()
-
-        # Save the data if requested
-        if save:
-            FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg]
-            FULL_head = 'Flux, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux'
-            pathFULL  = savepath+save_full
-            np.savetxt(pathFULL, FULL_data, header=FULL_head)
-            if bin_data:
-                BIN_data = np.c_[binned_flux, binned_flux_std, binned_time, binned_time_std,
-                                binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-                                binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-                                binned_bg, binned_bg_std]
-                BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
-                BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
-                pathBIN  = savepath+save_bin
-                np.savetxt(pathBIN, BIN_data, header=BIN_head)
-    
+    # Clear up some RAM
     image_stack = None
+    
+    flux[flux<0.1*np.ma.median(flux)] = np.nan
+    flux[flux<0.1*np.ma.median(flux)].mask = True
+
+    flux = clip_data(flux, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    xo = clip_data(xo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    xw = clip_data(xw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    yo = clip_data(yo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    yw = clip_data(yw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+
+    if bin_data:
+        binned_flux, binned_flux_std = bin_array(flux, bin_size)
+        binned_time, binned_time_std = bin_array(time, bin_size)
+        binned_xo, binned_xo_std     = bin_array(xo, bin_size)
+        binned_yo, binned_yo_std     = bin_array(yo, bin_size)
+        binned_xw, binned_xw_std     = bin_array(xw, bin_size)
+        binned_yw, binned_yw_std     = bin_array(yw, bin_size)
+        binned_bg, binned_bg_std     = bin_array(bg, bin_size)
+
+        # Do a rolling median based sigma clipping to remove bad data
+        binned_flux = clip_data(binned_flux, highpassWidth/bin_size, sigma1=10, sigma2=5, maxiters=3)
+
+    if save or savePlots:
+        print('\tSaving... ', end='', flush=True)
+        # create save folder
+        if channel=='ch1':
+            folder='3um'
+        else:
+            folder='4um'
+        folder += 'PSF/'
+
+        savepath = basepath+planet+'/analysis/'+channel+'/'
+        if addStack:
+            savepath += 'addedStack/'
+        else:
+            savepath += 'addedBlank/'
+        if ignoreFrames != []:
+            savepath += 'ignore/'
+        else:
+            savepath += 'noIgnore/'
+
+        savepath = savepath+folder
+
+        savepath = create_folder(savepath, True, True)
+
+    if savePlots or showPlots:
+        if bin_data:
+            plotx = binned_time
+            ploty0 = binned_flux
+            ploty1 = binned_xo
+            ploty2 = binned_yo
+            ploty3 = binned_xw
+            ploty4 = binned_yw
+        else:
+            plotx = time
+            ploty0 = flux
+            ploty1 = xo
+            ploty2 = yo
+            ploty3 = xw
+            ploty4 = yw
+
+        fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15,15))
+
+        axes[0].set_title(planet, fontsize="x-large")
+        axes[0].plot(plotx, ploty0,'k+')
+        axes[0].set_ylabel("Stellar Flux (electrons)")
+
+        axes[1].plot(plotx, ploty1, 'k+')
+        axes[1].set_ylabel("$x_0$")
+
+        axes[2].plot(plotx, ploty2, 'k+')
+        axes[2].set_ylabel("$y_0$")
+
+        axes[3].plot(plotx, ploty3, 'k+')
+        axes[3].set_ylabel("$x_w$")
+
+        axes[4].plot(plotx, ploty4, 'k+')
+        axes[4].set_ylabel("$y_w$")
+
+        fig.subplots_adjust(hspace=0)
+        axes[4].set_xlabel("Time (BMJD))")
+        axes[4].ticklabel_format(useOffset=False)
+
+        if savePlots:
+            # Save the plot if requested
+            pathplot = savepath + 'Lightcurve.pdf'
+            fig.savefig(pathplot)
+        if showPlots:
+            plt.show()
+        plt.close()
+
+    # Save the data if requested
+    if save:
+        FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg]
+        FULL_head = 'Flux, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux'
+        pathFULL  = savepath+save_full
+        np.savetxt(pathFULL, FULL_data, header=FULL_head)
+        if bin_data:
+            BIN_data = np.c_[binned_flux, binned_flux_std, binned_time, binned_time_std,
+                            binned_xo, binned_xo_std, binned_yo, binned_yo_std,
+                            binned_xw, binned_xw_std, binned_yw, binned_yw_std,
+                            binned_bg, binned_bg_std]
+            BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
+            BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
+            pathBIN  = savepath+save_bin
+            np.savetxt(pathBIN, BIN_data, header=BIN_head)
     
     print('Done.', flush=True)
     

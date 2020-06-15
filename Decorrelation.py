@@ -196,11 +196,12 @@ for iterationNumber in range(len(planets)):
             else:
                 pldIgnoreFrames = True
             foldername_psf = ''
-        elif 'psfx' in mode.lower():
-            foldername_psf = dh.findPhotometry(rootpath, planet, channel, 'PSFX')[0]
-            foldername_aper = ''
         else:
-            foldername_aper, foldername_psf = '', ''
+            foldername_aper = ''
+        if 'psfx' in mode.lower():
+            foldername_psf = dh.findPhotometry(rootpath, planet, channel, 'PSFX')[0]
+        else:
+            foldername_psf = ''
 
         (foldername, filename, filename_full, savepath,
         path_params, AOR_snip, aors, breaks, ignoreFrames) = dh.findPhotometry(rootpath, planet, channel,

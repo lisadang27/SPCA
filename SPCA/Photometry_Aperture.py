@@ -14,7 +14,7 @@ from functools import partial
 
 from collections import Iterable
 
-from .Photometry_Common import highpassflist, bin_array, create_folder, prepare_images, clip_data, sigma_clipping
+from .Photometry_Common import highpassflist, bin_array, create_folder, prepare_images, clip_data
 from .make_plots import plot_photometry
 
 import os, warnings
@@ -309,9 +309,9 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                    showPlots=False, savePlots=True,
                    oversamp=False, scale=2, saveoversamp=True, reuse_oversamp=True,
                    r = [2.4], edges=['Exact'], addStack = False,
-                   ignoreFrames = None, allowIgnoreFrames=[True, False],
+                   ignoreFrames = None,
                    maskStars = None, moveCentroids=[True],
-                   ncpu=4):
+                   ncpu=4, image_stack_input=None, bg=None, bg_err=None, time=None):
     """Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
 
     Args:
@@ -358,10 +358,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     if not oversamp:
         scale = 1
     
-    if ignoreFrames is None or len(ignoreFrames)==0:
-        ignoreFrames = []
-        allowIgnoreFrames = [False]
-    elif not np.any(allowIgnoreFrames):
+    if ignoreFrames is None:
         ignoreFrames = []
     
     if maskStars is None:
@@ -369,9 +366,6 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     
     if basepath[-1]!='/':
         basepath += '/'
-    
-    stackPath = basepath+'Calibration/' #folder containing properly named correction stacks (will be automatically selected)
-    datapath   = basepath+planet+'/data/'+channel
     
     savepath = basepath+planet+'/analysis/'+channel+'/'
     if addStack:
@@ -415,230 +409,226 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     
     # Access the global variable
     global image_stack
-    # Prepare all of the images
-    image_stack, bg, bg_err, time, = prepare_images(basepath, datapath, planet, channel, AOR_snip, ignoreFrames,
-                                                    oversamp, scale, reuse_oversamp, saveoversamp,
-                                                    addStack, stackPath, maskStars, ncpu)
+    if image_stack_input is None:
+        # Prepare all of the images
+        image_stack, bg, bg_err, time = prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames,
+                                                       oversamp, scale, reuse_oversamp, saveoversamp,
+                                                       addStack, maskStars, ncpu)
+    else:
+        image_stack = image_stack_input
+    
+#     image_stack, bg, bg_err, time = prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames,
+#                                                    oversamp, scale, reuse_oversamp, saveoversamp,
+#                                                    addStack, maskStars, ncpu)
 
     bg = clip_data(bg, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
     bg_err = clip_data(bg_err, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
     
-    # Make sure to allow ignoreFrames first
-    for allowIgnoreFrame in np.sort(allowIgnoreFrames)[::-1]:
-        if allowIgnoreFrame:
-            print('\t* Removing ignoreFrames', flush=True)
-        else:
-            print('\t* Not removing ignoreFrames', flush=True)
-            ignoreFrames = []
-            # Remove mask to allow for False in allowIgnoreFrames
-            image_stack.mask = False
-            image_stack = np.ma.masked_invalid(image_stack)
-            image_stack = sigma_clipping(image_stack, sigma=5)
+    # get centroids & PSF width
+    print('\tGetting centroids... ', end='', flush=True)
+    xo, yo, xw, yw = centroid_FWM(image_stack, highpassWidth=5*64, scale=scale)
 
-        # get centroids & PSF width
-        print('\tGetting centroids... ', end='', flush=True)
-        xo, yo, xw, yw = centroid_FWM(image_stack, highpassWidth=5*64, scale=scale)
+    # Compute noise pixel parameter for each frame
+    print('Getting noise pixel parameter... ', end='', flush=True)
+    npp = noisepixparam(image_stack)
 
-        # Compute noise pixel parameter for each frame
-        print('Getting noise pixel parameter... ', end='', flush=True)
-        npp = noisepixparam(image_stack)
+    npp = clip_data(npp, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    xo = clip_data(xo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    xw = clip_data(xw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    yo = clip_data(yo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    yw = clip_data(yw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
 
-        npp = clip_data(npp, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        xo = clip_data(xo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        xw = clip_data(xw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        yo = clip_data(yo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-        yw = clip_data(yw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    # perform aperture photometry
+    print('Starting photometry!', flush=True)
 
-        # perform aperture photometry
-        print('Starting photometry!', flush=True)
+    # Resorting to a bit of hackery to get tqdm to work with multiprocessing
+    global pbar
+    global results
+    global func
+    N = image_stack.shape[0]
+    pbar = tqdm(total=N)
+    results = [None] * N  # result list of correct size
+    func = partial(A_photometry, bg_err, xo, np.ma.median(xo), yo, np.ma.median(yo), r,
+                   [], [], [], [], [],
+                   scale, shape, methods, moveCentroids)
 
-        # Resorting to a bit of hackery to get tqdm to work with multiprocessing
-        global pbar
-        global results
-        global func
-        N = image_stack.shape[0]
-        pbar = tqdm(total=N)
-        results = [None] * N  # result list of correct size
-        func = partial(A_photometry, bg_err, xo, np.ma.median(xo), yo, np.ma.median(yo), r,
-                       [], [], [], [], [],
-                       scale, shape, methods, moveCentroids)
+    pool = Pool(ncpu)
+    for i in range(N):
+        pool.apply_async(wrapMyFunc, args=(i,), callback=update)
+    pool.close()
+    pool.join()
+    pbar.close()
+    sys.stderr.flush()
 
-        pool = Pool(ncpu)
-        for i in range(N):
-            pool.apply_async(wrapMyFunc, args=(i,), callback=update)
-        pool.close()
-        pool.join()
-        pbar.close()
-        sys.stderr.flush()
-
-        fluxes = np.ma.masked_invalid(np.array(results))
-        results = None
-
-        # removing outrageously bad flux outliers for each technique
-        print('\tSigma clipping fluxes... ', end='', flush=True)
-
-        # Sometimes we get points that are so close to zero that they break the code (even the sigma clipping)
-        fluxes[fluxes<0.1*np.ma.median(fluxes)] = np.nan
-        fluxes[fluxes<0.1*np.ma.median(fluxes)].mask = True
-
-        for i in range(fluxes.shape[1]):
-            fluxes[:,i] = clip_data(fluxes[:,i], highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-
-        # Make a folder name for each method
-        techniques = []
-        all_edges = []
-        all_rs = []
-        all_moveCentroids = []
-        for moveCentroid in moveCentroids:
-            for edge in edges:
-                for r_tmp in r:
-                    if channel=='ch1':
-                        folder='3um'
-                    else:
-                        folder='4um'
-                    folder += edge+shape+"_".join(str(np.round(r_tmp, 2)).split('.'))
-                    if moveCentroid:
-                        folder += '_movingCentroid'
-                    techniques.append(savepath+folder)
-                    all_moveCentroids.append(moveCentroid)
-                    all_edges.append(edge)
-                    all_rs.append(r_tmp)
-
-        BIN_datas = []
-        if bin_data:
-            RMS_fluxes = np.zeros((int(np.ceil(fluxes.shape[0]/bin_size)),0))
-            RMS_times = []
-            highpassWidth_tmp = highpassWidth/bin_size
-
-            print('Binning... ', end='', flush=True)
-            binned_time, binned_time_std = bin_array(time, bin_size)
-            binned_xo, binned_xo_std     = bin_array(xo, bin_size)
-            binned_yo, binned_yo_std     = bin_array(yo, bin_size)
-            binned_xw, binned_xw_std     = bin_array(xw, bin_size)
-            binned_yw, binned_yw_std     = bin_array(yw, bin_size)
-            binned_bg, binned_bg_std     = bin_array(bg, bin_size)
-            binned_npp, binned_npp_std   = bin_array(npp, bin_size)
-
-            for i in range(fluxes.shape[1]):
-                flux = fluxes[:,i]
-                BIN_data = bin_all_data(highpassWidth_tmp, flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
-                                        binned_yo, binned_yo_std, binned_xw, binned_xw_std,
-                                        binned_yw, binned_yw_std, binned_bg, binned_bg_std,
-                                        binned_npp, binned_npp_std, bin_size)
-
-                (binned_flux, binned_flux_std, binned_time, binned_time_std,
-                 binned_xo, binned_xo_std, binned_yo, binned_yo_std,
-                 binned_xw, binned_xw_std, binned_yw, binned_yw_std,
-                 binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_data.T
-
-                RMS_fluxes = np.append(RMS_fluxes, binned_flux[:,np.newaxis], axis=1)
-                RMS_times = binned_time
-                BIN_datas.append(BIN_data)
-        else:
-            RMS_fluxes = fluxes
-            RMS_times = time
-            highpassWidth_tmp = highpassWidth
-
-        # Choose the best photometry method, save diagnostic plot(s)
-        print('Choosing best photometry...', flush=True)
-        RMSs = compare_RMS(techniques, RMS_fluxes, np.array(all_rs), RMS_times, highpassWidth_tmp, basepath,
-                           planet, channel, ignoreFrames, addStack, save, onlyBest, showPlots, savePlots)
+    # Free up some RAM
+    image_stack = None
     
-        if onlyBest:
-            # Keep these as arrays so they can be indexed lated
-            # If the user only want's to save the best results, discard the rest
-            fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
-            BIN_datas = BIN_datas[np.argmin(RMSs):np.argmin(RMSs)+1]
-            all_moveCentroids = all_moveCentroids[np.argmin(RMSs):np.argmin(RMSs)+1]
-            all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
-            all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
+    fluxes = np.ma.masked_invalid(np.array(results))
+    # Free up some RAM
+    results = None
 
-        # Bin, save, and/or plot each of the methods depending on what was requested
-        FULL_datas = []
-        for i in range(fluxes.shape[1]):
-            flux = fluxes[:,i]
-            FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg, npp]
+    # removing outrageously bad flux outliers for each technique
+    print('\tSigma clipping fluxes... ', end='', flush=True)
 
-            if save or savePlots:
-                print('\tSaving... ', end='', flush=True)
-                # create save folder
+    # Sometimes we get points that are so close to zero that they break the code (even the sigma clipping)
+    fluxes[fluxes<0.1*np.ma.median(fluxes)] = np.nan
+    fluxes[fluxes<0.1*np.ma.median(fluxes)].mask = True
+
+    for i in range(fluxes.shape[1]):
+        fluxes[:,i] = clip_data(fluxes[:,i], highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+
+    # Make a folder name for each method
+    techniques = []
+    all_edges = []
+    all_rs = []
+    all_moveCentroids = []
+    for moveCentroid in moveCentroids:
+        for edge in edges:
+            for r_tmp in r:
                 if channel=='ch1':
                     folder='3um'
                 else:
                     folder='4um'
-                folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
-                if all_moveCentroids[i]:
+                folder += edge+shape+"_".join(str(np.round(r_tmp, 2)).split('.'))
+                if moveCentroid:
                     folder += '_movingCentroid'
-                folder += '/'
+                techniques.append(savepath+folder)
+                all_moveCentroids.append(moveCentroid)
+                all_edges.append(edge)
+                all_rs.append(r_tmp)
 
-                savepath_tmp = savepath+folder
+    BIN_datas = []
+    if bin_data:
+        RMS_fluxes = np.zeros((int(np.ceil(fluxes.shape[0]/bin_size)),0))
+        RMS_times = []
+        highpassWidth_tmp = highpassWidth/bin_size
 
-                savepath_tmp = create_folder(savepath_tmp, True, True)
+        print('Binning... ', end='', flush=True)
+        binned_time, binned_time_std = bin_array(time, bin_size)
+        binned_xo, binned_xo_std     = bin_array(xo, bin_size)
+        binned_yo, binned_yo_std     = bin_array(yo, bin_size)
+        binned_xw, binned_xw_std     = bin_array(xw, bin_size)
+        binned_yw, binned_yw_std     = bin_array(yw, bin_size)
+        binned_bg, binned_bg_std     = bin_array(bg, bin_size)
+        binned_npp, binned_npp_std   = bin_array(npp, bin_size)
 
-            # Plot the photometry if requested
-            if savePlots or showPlots:
-                if bin_data:
-                    plotx = binned_time
-                    ploty0 = binned_flux
-                    ploty1 = binned_xo
-                    ploty2 = binned_yo
-                    ploty3 = binned_xw
-                    ploty4 = binned_yw
-                else:
-                    plotx = time
-                    ploty0 = flux
-                    ploty1 = xo
-                    ploty2 = yo
-                    ploty3 = xw
-                    ploty4 = yw
+        for i in range(fluxes.shape[1]):
+            flux = fluxes[:,i]
+            BIN_data = bin_all_data(highpassWidth_tmp, flux, binned_time, binned_time_std, binned_xo, binned_xo_std,
+                                    binned_yo, binned_yo_std, binned_xw, binned_xw_std,
+                                    binned_yw, binned_yw_std, binned_bg, binned_bg_std,
+                                    binned_npp, binned_npp_std, bin_size)
 
-                fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15,15))
+            (binned_flux, binned_flux_std, binned_time, binned_time_std,
+             binned_xo, binned_xo_std, binned_yo, binned_yo_std,
+             binned_xw, binned_xw_std, binned_yw, binned_yw_std,
+             binned_bg, binned_bg_std, binned_npp, binned_npp_std) = BIN_data.T
 
-                axes[0].set_title(planet, fontsize="x-large")
-                axes[0].plot(plotx, ploty0,'k+')
-                axes[0].set_ylabel("Stellar Flux (electrons)")
+            RMS_fluxes = np.append(RMS_fluxes, binned_flux[:,np.newaxis], axis=1)
+            RMS_times = binned_time
+            BIN_datas.append(BIN_data)
+    else:
+        RMS_fluxes = fluxes
+        RMS_times = time
+        highpassWidth_tmp = highpassWidth
 
-                axes[1].plot(plotx, ploty1, 'k+')
-                axes[1].set_ylabel("$x_0$")
+    # Choose the best photometry method, save diagnostic plot(s)
+    print('Choosing best photometry...', flush=True)
+    RMSs = compare_RMS(techniques, RMS_fluxes, np.array(all_rs), RMS_times, highpassWidth_tmp, basepath,
+                       planet, channel, ignoreFrames, addStack, save, onlyBest, showPlots, savePlots)
 
-                axes[2].plot(plotx, ploty2, 'k+')
-                axes[2].set_ylabel("$y_0$")
+    if onlyBest:
+        # Keep these as arrays so they can be indexed lated
+        # If the user only want's to save the best results, discard the rest
+        fluxes = fluxes[:,np.argmin(RMSs):np.argmin(RMSs)+1]
+        BIN_datas = BIN_datas[np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_moveCentroids = all_moveCentroids[np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_edges = all_edges[np.argmin(RMSs):np.argmin(RMSs)+1]
+        all_rs = all_rs[np.argmin(RMSs):np.argmin(RMSs)+1]
 
-                axes[3].plot(plotx, ploty3, 'k+')
-                axes[3].set_ylabel("$x_w$")
+    # Bin, save, and/or plot each of the methods depending on what was requested
+    FULL_datas = []
+    for i in range(fluxes.shape[1]):
+        flux = fluxes[:,i]
+        FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg, npp]
 
-                axes[4].plot(plotx, ploty4, 'k+')
-                axes[4].set_ylabel("$y_w$")
-
-                fig.subplots_adjust(hspace=0)
-                axes[4].set_xlabel("Time (BMJD))")
-                axes[4].ticklabel_format(useOffset=False)
-
-                if savePlots:
-                    # Save the plot if requested
-                    pathplot = savepath_tmp + 'Lightcurve.pdf'
-                    fig.savefig(pathplot)
-                if showPlots:
-                    plt.show()
-                plt.close()
-
-            # Save the data if requested
-            if save:
-                FULL_head = 'Flux, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux'
-                FULL_head += ', Noise Pixel Parameter'
-                pathFULL  = savepath_tmp+save_full
-                np.savetxt(pathFULL, FULL_data, header=FULL_head)
-                if bin_data:
-                    BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
-                    BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
-                    BIN_head += ', Noise Pixel Parameter, Noise Pixel Parameter std'
-                    pathBIN  = savepath_tmp+save_bin
-                    np.savetxt(pathBIN, BIN_datas[i], header=BIN_head)
+        if save or savePlots:
+            print('\tSaving... ', end='', flush=True)
+            # create save folder
+            if channel=='ch1':
+                folder='3um'
             else:
-                FULL_datas.append(FULL_data)
-    
-    # Free up some RAM
-    image_stack = None
+                folder='4um'
+            folder += all_edges[i]+shape+"_".join(str(np.round(all_rs[i], 2)).split('.'))
+            if all_moveCentroids[i]:
+                folder += '_movingCentroid'
+            folder += '/'
+
+            savepath_tmp = savepath+folder
+
+            savepath_tmp = create_folder(savepath_tmp, True, True)
+
+        # Plot the photometry if requested
+        if savePlots or showPlots:
+            if bin_data:
+                plotx = binned_time
+                ploty0 = binned_flux
+                ploty1 = binned_xo
+                ploty2 = binned_yo
+                ploty3 = binned_xw
+                ploty4 = binned_yw
+            else:
+                plotx = time
+                ploty0 = flux
+                ploty1 = xo
+                ploty2 = yo
+                ploty3 = xw
+                ploty4 = yw
+
+            fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15,15))
+
+            axes[0].set_title(planet, fontsize="x-large")
+            axes[0].plot(plotx, ploty0,'k+')
+            axes[0].set_ylabel("Stellar Flux (electrons)")
+
+            axes[1].plot(plotx, ploty1, 'k+')
+            axes[1].set_ylabel("$x_0$")
+
+            axes[2].plot(plotx, ploty2, 'k+')
+            axes[2].set_ylabel("$y_0$")
+
+            axes[3].plot(plotx, ploty3, 'k+')
+            axes[3].set_ylabel("$x_w$")
+
+            axes[4].plot(plotx, ploty4, 'k+')
+            axes[4].set_ylabel("$y_w$")
+
+            fig.subplots_adjust(hspace=0)
+            axes[4].set_xlabel("Time (BMJD))")
+            axes[4].ticklabel_format(useOffset=False)
+
+            if savePlots:
+                # Save the plot if requested
+                pathplot = savepath_tmp + 'Lightcurve.pdf'
+                fig.savefig(pathplot)
+            if showPlots:
+                plt.show()
+            plt.close()
+
+        # Save the data if requested
+        if save:
+            FULL_head = 'Flux, Time, x-centroid, y-centroid, x-PSF width, y-PSF width, bg flux'
+            FULL_head += ', Noise Pixel Parameter'
+            pathFULL  = savepath_tmp+save_full
+            np.savetxt(pathFULL, FULL_data, header=FULL_head)
+            if bin_data:
+                BIN_head = 'Flux, Flux std, Time, Time std, x-centroid, x-centroid std, y-centroid, y-centroid std'
+                BIN_head += ', x-PSF width, x-PSF width std, y-PSF width, y-PSF width std, bg flux, bg flux std'
+                BIN_head += ', Noise Pixel Parameter, Noise Pixel Parameter std'
+                pathBIN  = savepath_tmp+save_bin
+                np.savetxt(pathBIN, BIN_datas[i], header=BIN_head)
+        else:
+            FULL_datas.append(FULL_data)
     
     print('Done.', flush=True)
     
