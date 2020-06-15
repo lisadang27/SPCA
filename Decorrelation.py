@@ -54,7 +54,9 @@ tryPLD2_5x5 = True                       # whether to try 2nd order PLD with a 5
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
-tryPSFW = False
+tryPSFW = True
+tryHside = False                          # whether to try Heaviside step function
+
 usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
@@ -167,6 +169,9 @@ for iterationNumber in range(len(planets)):
     
     if tryPSFW:
         modes.extend([mode+'_PSFW' for mode in modes])
+
+    if tryHside:
+        modes.extend([mode+'_HSIDE' for mode in modes])
     
     if usePSFX:
         mode_appendix = '_PSFX'+mode_appendix
