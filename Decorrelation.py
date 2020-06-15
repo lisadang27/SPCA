@@ -315,8 +315,8 @@ for iterationNumber in range(len(planets)):
                                                        if label in astro_labels]))
 
         # Get the function that checks whether the lightcurve is positive
-        positivity_func = freeze.make_lambdafunc(astro_models.check_phase, np.append(dparams, 'checkPhasePhis'),
-                                                 p0_obj, debug=debug)
+        positivity_func = freeze.make_lambdafunc(astro_models.check_phase, p0_labels,
+                                                 np.append(dparams, 'checkPhasePhis'), p0_obj, debug=debug)
         positivity_labels = np.array([label for label in ['A', 'B', 'C', 'D'] if label not in dparams])
 
         # Get all of the detector functions used and freeze any requested parameters
