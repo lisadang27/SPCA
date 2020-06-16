@@ -174,7 +174,7 @@ for iterationNumber in range(len(planets)):
         modes.extend([mode+'_HSIDE' for mode in modes])
     
     if usePSFX:
-        mode_appendix = '_PSFX'+mode_appendix
+        modes = [mode+'_PSFX' for mode in modes if 'PLD' not in mode]
     
     modes = [mode+mode_appendix for mode in modes]
     
