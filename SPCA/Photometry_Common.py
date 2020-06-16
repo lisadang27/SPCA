@@ -325,6 +325,7 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
         else:
             image = np.ma.masked_invalid(hdu_list[0].data)
             #ignore any consistently bad frames in datacubes
+            image[ignoreFrames] = np.nan
             image[ignoreFrames].mask = True
     
     #add background correcting stack if requested
