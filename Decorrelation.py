@@ -380,10 +380,10 @@ for iterationNumber in range(len(planets)):
             raise NotImplementedError(f'mode=\'{mode}\' is not implemented.')
 
         # Put gparams and uparams in the right order and remove any that aren't being fitted
-        gparams = np.array([parm for parm in p0_labels if parm in gparams])
-        uparams_unsorted = np.copy(uparams)
-        uparams = np.array([parm for parm in p0_labels if parm in uparams])
-        uparams_limits = np.array([uparams_limits[np.where(uparams_unsorted==uparams[i])[0][0]]
+        gparams = np.array([parm for parm in p0_labels if parm in gparams_raw])
+        uparams_unsorted = np.copy(uparams_raw)
+        uparams = np.array([parm for parm in p0_labels if parm in uparams_raw])
+        uparams_limits = np.array([uparams_limits_raw[np.where(uparams_unsorted==uparams[i])[0][0]]
                                    for i in range(len(uparams))])
 
         gpriorInds = np.array([np.where(p0_labels==gpar)[0][0] for gpar in gparams])
