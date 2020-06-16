@@ -289,26 +289,6 @@ for iterationNumber in range(len(planets)):
         
         p0, p0_labels, p0_fancyLabels = helpers.get_p0(dparams, p0_obj)
         
-        # Put gparams and uparams in the right order and remove any that aren't being fitted
-        gparams = np.array([parm for parm in p0_labels if parm in gparams_raw])
-        uparams_unsorted = np.copy(uparams_raw)
-        uparams = np.array([parm for parm in p0_labels if parm in uparams_raw])
-        uparams_limits = np.array([uparams_limits_raw[np.where(uparams_unsorted==uparams[i])[0][0]]
-                                   for i in range(len(uparams))])
-        
-        gpriorInds = np.array([np.where(p0_labels==gpar)[0][0] for gpar in gparams])
-        upriorInds = np.array([np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels])
-        if 'gp' in mode.lower():
-            gammaInd = np.where(p0_labels=='gpAmp')[0][0]
-        else:
-            gammaInd = None
-        
-        # set up Gaussian priors
-        priors, errs = dh.setup_gpriors(gparams, p0_obj)
-        
-        #########################
-        # Setup detector, astrophysical, and full-signal functions
-        
         # Get the astrophysical function
         astro_func, astro_labels = freeze.make_lambdafunc(astro_models.ideal_lightcurve, p0_labels,
                                                           dparams, p0_obj, debug=debug)
@@ -366,6 +346,15 @@ for iterationNumber in range(len(planets)):
                 # Set the break points for the heaviside function
                 p0_obj[f's{i}break'] = brk
                 dparams = np.append(dparams, [f's{i}break'])
+                p0_fancyLabels = p0_fancyLabels[p0_labels!=f's{i}break']
+                p0_labels = p0_labels[p0_labels!=f's{i}break']
+            for i in range(len(breaks), 5):
+                p0_fancyLabels = p0_fancyLabels[p0_labels!=f's{i}']
+                p0_labels = p0_labels[p0_labels!=f's{i}']
+                p0_fancyLabels = p0_fancyLabels[p0_labels!=f's{i}break']
+                p0_labels = p0_labels[p0_labels!=f's{i}break']
+                dparams = np.append(dparams, [f's{i}'])
+                dparams = np.append(dparams, [f's{i}break'])
             func = detec_models.hside
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
@@ -384,11 +373,28 @@ for iterationNumber in range(len(planets)):
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
             detec_labels.append(labels)
-            detec_inputs.append((psfxw, psfyw))
-            detec_inputs_full.append((psfxw_full, psfyw_full))
+            detec_inputs.append(psfxw, psfyw)
+            detec_inputs_full.append(psfxw_full, psfyw_full)
 
         if len(detec_funcs)==0:
             raise NotImplementedError(f'mode=\'{mode}\' is not implemented.')
+
+        # Put gparams and uparams in the right order and remove any that aren't being fitted
+        gparams = np.array([parm for parm in p0_labels if parm in gparams])
+        uparams_unsorted = np.copy(uparams)
+        uparams = np.array([parm for parm in p0_labels if parm in uparams])
+        uparams_limits = np.array([uparams_limits[np.where(uparams_unsorted==uparams[i])[0][0]]
+                                   for i in range(len(uparams))])
+
+        gpriorInds = np.array([np.where(p0_labels==gpar)[0][0] for gpar in gparams])
+        upriorInds = np.array([np.where(p0_labels==upar)[0][0] for upar in uparams if upar in p0_labels])
+        if 'gp' in mode.lower():
+            gammaInd = np.where(p0_labels=='gpAmp')[0][0]
+        else:
+            gammaInd = None
+
+        # set up Gaussian priors
+        priors, errs = dh.setup_gpriors(gparams, p0_obj)
 
         # Get the full-signal function that models the astrophysical and detector signals
         signal_func = detec_models.signal

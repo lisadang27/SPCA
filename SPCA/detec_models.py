@@ -245,7 +245,7 @@ def hside(time, astroModel, s0=0, s0break=0, s1=0, s1break=0, s2=0, s2break=0, s
         ndarray: The flux variations due to the detector systematics.
 
     """
-    model = 1
+    model = np.ones_like(time)
     amplitudes = [s0, s1, s2, s3, s4]
     breaks = [s0break, s1break, s2break, s3break, s4break]
     for i, amp in enumerate(amplitudes):
