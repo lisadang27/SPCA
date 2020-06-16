@@ -279,8 +279,10 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
             axes[i].xaxis.set_tick_params(labelsize=fontsize)
             axes[i].yaxis.set_tick_params(labelsize=fontsize)
             axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
-            for j in range(len(breaks)):
-                axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
+    
+    for i in range(len(axes)):
+        for j in range(len(breaks)):
+            axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
     
     fig.align_ylabels()
     
