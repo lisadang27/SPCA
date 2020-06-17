@@ -22,7 +22,7 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 from SPCA import Decorrelation_helper as dh
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'HD189733b', 'HD209458b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'HD149026b']
+planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'HD189733b', 'HD209458b', 'HD149026b']
 channels = ['ch2' for planet in planets]
 
 rootpath = '/homes/picaro/bellt/research/'
@@ -54,7 +54,7 @@ tryPLD2_5x5 = True                       # whether to try 2nd order PLD with a 5
 tryBliss = True                          # whether to try BLISS detector model
 tryGP = False                            # whether to try GP detector model
 tryEllipse = False                       # Whether to try an ellipsoidal variation astrophysical model
-tryPSFW = True
+tryPSFW = False
 tryHside = False                          # whether to try Heaviside step function
 
 usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
@@ -372,8 +372,8 @@ for iterationNumber in range(len(planets)):
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
             detec_labels.append(labels)
-            detec_inputs.append(psfxw, psfyw)
-            detec_inputs_full.append(psfxw_full, psfyw_full)
+            detec_inputs.append([psfxw, psfyw])
+            detec_inputs_full.append([psfxw_full, psfyw_full])
 
         if len(detec_funcs)==0:
             raise NotImplementedError(f'mode=\'{mode}\' is not implemented.')
