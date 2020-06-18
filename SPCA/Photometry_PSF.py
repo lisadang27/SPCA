@@ -125,45 +125,12 @@ def fit_2DGaussian(image_stack, scale=1, bounds=(13, 18, 13, 18), defaultCentroi
     cx = xmean+lbx
     cy = ymean+lby
     
-    try:
-        cx = sigma_clip(cx, sigma=5, maxiters=5, cenfunc=np.ma.median)
-        cy = sigma_clip(cy, sigma=5, maxiters=5, cenfunc=np.ma.median)
-    except TypeError:
-        cx = sigma_clip(cx, sigma=5, iters=5, cenfunc=np.ma.median)
-        cy = sigma_clip(cy, sigma=5, iters=5, cenfunc=np.ma.median)
-    
-    # Set masked centroids to default position
-    if defaultCentroid[0]=='median':
-        defaultCentroid[0] = np.ma.median(cx)
-    if defaultCentroid[1]=='median':
-        defaultCentroid[1] = np.ma.median(cy)
-    cx[np.ma.getmaskarray(cx)] = defaultCentroid[0]
-    cy[np.ma.getmaskarray(cy)] = defaultCentroid[1]
-    
     xo = cx/scale
     yo = cy/scale
+    xw = widx/scale
+    yw = widy/scale
     
-    try:
-        widx    = sigma_clip(widx, sigma=5, maxiters=5, cenfunc=np.ma.median)
-        widy    = sigma_clip(widy, sigma=5, maxiters=5, cenfunc=np.ma.median)
-    except TypeError:
-        widx    = sigma_clip(widx, sigma=5, iters=5, cenfunc=np.ma.median)
-        widy    = sigma_clip(widy, sigma=5, iters=5, cenfunc=np.ma.median)
-    
-    # Set masked PSF widths to default width
-    if defaultPSFW[0]=='median':
-        defaultPSFW[0] = np.ma.median(widx)
-    if defaultPSFW[1]=='median':
-        defaultPSFW[1] = np.ma.median(widy)
-    widx[np.ma.getmaskarray(widx)] = defaultPSFW[0]
-    widx[np.ma.getmaskarray(widx)] = defaultPSFW[1]
-    
-    wx = widx/scale
-    wy = widy/scale
-    
-    flux = sigma_clip(flux, sigma=5, maxiters=3, cenfunc=np.ma.median)
-    
-    return flux, xo, yo, wx, wy
+    return flux, xo, yo, xw, yw
 
 def get_lightcurve(basepath, AOR_snip, channel, planet,
                    save=True, highpassWidth=5*64, bin_data=True, bin_size=64,

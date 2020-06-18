@@ -89,6 +89,9 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
                                    np.abs(data['st_tefferr2'][nameIndex])])
     
+    if planet=='KELT-1b':
+        p0_obj['Tstar'], p0_obj['Tstar_err'] = (6518, 50)
+    
     p0_obj['logg'] = data['st_logg'][nameIndex]
     p0_obj['feh'] = data['st_metfe'][nameIndex]
 
@@ -178,6 +181,7 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     phoenixWavFile = phoenixPath+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits'
     if not os.path.exists(phoenixPath):
         os.mkdir(phoenixPath)
+        print('Downloading PHOENIX wavelength data.', flush=True)
         try:
             _ = urllib.request.urlretrieve(webfolder+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits', phoenixWavFile)
         except:
