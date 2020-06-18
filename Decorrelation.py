@@ -126,10 +126,6 @@ for iterationNumber in range(len(planets)):
     # p0_obj = loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh,
     #                         rp_err, a_err, t0_err, per_err, inc_err, e_err, argp_err, Tstar_err)
     
-    # if you want to use the best fit params from a previous MCMC run            
-    if initializeWithOld:
-        p0_obj = dh.reload_old_fit(path_params, p0_obj)
-    
     with open(rootpath+planet+'/analysis/'+channel+'/cutFirstAOR.txt', 'r') as file:
         cutFirstAOR = file.readline().strip()=='True'
     
@@ -287,6 +283,10 @@ for iterationNumber in range(len(planets)):
         # makes list of parameters that won't be fitted 
         dparams = helpers.expand_dparams(dparams_input, mode)
         
+        # if you want to use the best fit params from a previous MCMC run            
+        if initializeWithOld:
+            p0_obj = dh.reload_old_fit(path_params, p0_obj, dparams)
+
         p0, p0_labels, p0_fancyLabels = helpers.get_p0(dparams, p0_obj)
         
         # Get the astrophysical function
