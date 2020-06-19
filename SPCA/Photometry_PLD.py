@@ -141,15 +141,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
             binned_P, binned_P_std = bin_array2D(P, bin_size)
             binned_time, binned_time_std = bin_array(time, bin_size)
             binned_bg, binned_bg_std = bin_array(bg, bin_size)
-
-            #sigma clip binned data to remove wildly unacceptable data
-            binned_flux = binned_P.sum(axis=1)
-
-            # Do a rolling median based sigma clipping to remove bad data
-            binned_flux_fixed = clip_data(binned_flux, highpassWidth/bin_size, sigma1=10, sigma2=5, maxiters=3)
-
-            binned_P *= (binned_flux_fixed/binned_flux).reshape(-1,1)
-
+            
         if save or savePlots:
             print('Saving... ', end='', flush=True)
             if channel=='ch1':
