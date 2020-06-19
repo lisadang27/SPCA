@@ -403,7 +403,7 @@ def setup_gpriors(gparams, p0_obj):
     return priors, errs
 
 # FIX: Add a docstring for this function
-def reload_old_fit(path_params, p0_obj):
+def reload_old_fit(path_params, p0_obj, dparams):
     Table_par = np.load(path_params)                  # table of best-fit params from prev. run
     nparams   = p0_obj['params'][np.logical_not(np.in1d(p0_obj['params'], dparams))]   # get the name list of params to be fitted
     for name in nparams:
