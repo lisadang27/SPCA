@@ -531,7 +531,9 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     else:
         sigFMCMC = p0_obj['sigF']
     if 'bliss' in mode.lower():
-        nKnotsUsed = len(signal_inputs[-4][signal_inputs[-2]])
+        bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
+                              for partial_func in signal_inputs[-3]])[0][0]
+        nKnotsUsed = np.sum(signal_inputs[-1][bliss_ind][-1])
         ndim_eff = ndim+nKnotsUsed
     else:
         ndim_eff = ndim
@@ -563,7 +565,9 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
 
         N = len(data_full)
         if 'bliss' in mode.lower():
-            nKnotsUsed_full = len(signal_inputs_full[-4][signal_inputs_full[-2]])
+            bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
+                                  for partial_func in signal_inputs_full[-3]])[0][0]
+            nKnotsUsed = np.sum(signal_inputs_full[-1][bliss_ind][-1])
             ndim_eff_full = ndim+nKnotsUsed_full
         else:
             ndim_eff_full = ndim
