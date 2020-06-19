@@ -186,7 +186,7 @@ for iterationNumber in range(len(planets)):
         # Figure out where data is located
         if 'pldaper' in mode.lower():
             # Get separately aperture data for when running PLDAper, and decide if ignoreFrame from aperture photometry
-            foldername_aper = dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1')[0]
+            foldername_aper, ignoreFrames = np.array(dh.findPhotometry(rootpath, planet, channel, 'Poly2_v1'))[[0,-1]]
             if len(ignoreFrames)==0:
                 pldIgnoreFrames = False
             else:
