@@ -85,10 +85,12 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj['inc'] = data['pl_orbincl'][nameIndex]
     p0_obj['inc_err'] = np.mean([data['pl_orbinclerr1'][nameIndex],
                                  np.abs(data['pl_orbinclerr2'][nameIndex])])
+    if planet=='HD189733b':
+        p0_obj['inc'] = 85.710
+        p0_obj['inc_err'] = 0.024
     p0_obj['Tstar'] = data['st_teff'][nameIndex]
     p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
                                    np.abs(data['st_tefferr2'][nameIndex])])
-    
     if planet=='KELT-1b':
         p0_obj['Tstar'], p0_obj['Tstar_err'] = (6518, 50)
     
