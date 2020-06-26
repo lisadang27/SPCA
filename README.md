@@ -9,7 +9,7 @@ The full API can be found at [https://spca.readthedocs.io](https://spca.readthed
 To install SPCA, run the following in a terminal:
 
 ```
-        git clone git@github.com:lisadang27/SPCA.git
+        git clone https://github.com/lisadang27/SPCA.git
         cd SPCA
         pip install .
         # IF you want to install george to run GP analyses, also then run
