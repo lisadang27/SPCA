@@ -15,7 +15,7 @@ To install SPCA, run the following in a terminal:
 
 .. code-block:: bash
 
-        git clone git@github.com:lisadang27/SPCA.git
+        git clone https://github.com/lisadang27/SPCA.git
         cd SPCA
         pip install .
         # IF you want to install george to run GP analyses, also then run
