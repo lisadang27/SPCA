@@ -261,7 +261,7 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
         axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
-    axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro))
+    axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.max(astro)+3*np.nanstd(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
