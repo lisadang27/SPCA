@@ -233,7 +233,7 @@ def map_flux_avgQuick(flux, astroModel, knot_nrst_lin, nBin, knotNdata):
     return sensMap/knotNdata
 
 
-def precompute(flux, xdata, ydata, nBin=10, astroGuess=None, savepath=None, plot=False):
+def precompute(flux, xdata, ydata, nBin=8, astroGuess=None, savepath=None, plot=False):
     """Precompute all of the knot associations, etc. that are needed to run BLISS in a fitting routine.
 
     Args:
@@ -300,7 +300,7 @@ def precompute(flux, xdata, ydata, nBin=10, astroGuess=None, savepath=None, plot
                               tmask_good_knotNdata, knots_x, knots_y, 
                               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath)
     
-    return (flux, nBin, nData, knotNdata,
+    return (flux, nBin, nData, knotNdata, xdata, ydata,
             low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y, LL_dist, LR_dist, UL_dist, UR_dist,
             delta_xo, delta_yo, knot_nrst_x, knot_nrst_y, knot_nrst_lin, BLS, NNI,
             knots_x_mesh, knots_y_mesh, tmask_good_knotNdata)

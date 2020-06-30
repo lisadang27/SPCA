@@ -19,7 +19,7 @@ from astropy.io import fits
 import urllib.request
 
 # SPCA libraries
-from SPCA import helpers, astro_models, make_plots
+from SPCA import helpers, astro_models, make_plots, bliss
 
 # FIX: Add a docstring for this function
 def downloadExoplanetArchive():
@@ -646,7 +646,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         spyResult = scipy.optimize.minimize(minfunc, p0_detec, (p0_astro, lnprob_inputs), 'Nelder-Mead')
 
         p0 = np.append(p0_astro, spyResult.x)
-    
+        
     #########################
     
     print('Running iterative scipy.optimize on all parameters', flush=True)
@@ -692,6 +692,106 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
         p0 = np.copy(p0_optimized)
         
+    #########################
+    # Optimize BLISS Bin Size
+    
+    if 'bliss' in mode.lower():
+        print('Optimizing BLISS Bin Size', flush=True)
+        blissInd = np.where([partial_func.func.__name__=='detec_model_bliss'
+                             for partial_func in signal_inputs[-3]])[0][0]
+
+        bliss_SDNRs = []
+        bliss_fps = []
+        nni_SDNRs = []
+        nni_fps = []
+        flux = lnprob_inputs[0]
+        xdata = signal_inputs[-1][blissInd][4]
+        ydata = signal_inputs[-1][blissInd][5]
+        minBin = int(np.floor((np.max(xdata)-np.min(xdata))/0.050))
+        maxBin = int(np.ceil((np.max(xdata)-np.min(xdata))/0.020))
+        # Go in reverse order so initial tqdm ETA is a worst case estimate
+        nbins = np.unique(np.linspace(minBin, maxBin, 10, dtype=int))[::-1]
+        for blissNBin in tqdm(nbins):
+            for useNNI in [False, True]:
+                if useNNI:
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin))
+                    temp_inputs[19] = np.zeros_like(temp_inputs[17]).astype(bool)
+                    temp_inputs[20] = np.ones_like(temp_inputs[17]).astype(bool)
+                    signal_inputs[-1][blissInd] = tuple(temp_inputs)
+                    lnprob_inputs[4] = signal_inputs
+                else:
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin))
+                    signal_inputs[-1][blissInd] = tuple(temp_inputs)
+                    lnprob_inputs[4] = signal_inputs
+
+                # Optimize parameters again
+                p0_temp = scipy.optimize.minimize(minfunc, p0, lnprob_inputs, 'Nelder-Mead').x
+                SDNR = p0_temp[-1]
+                fp = p0_temp[p0_labels=='fp']
+
+                if useNNI:
+                    nni_SDNRs.append(SDNR)
+                    nni_fps.append(fp)
+                else:
+                    bliss_SDNRs.append(SDNR)
+                    bliss_fps.append(fp)
+
+        nbins = nbins[::-1]
+        bliss_SDNRs = np.array(bliss_SDNRs)[::-1]
+        bliss_fps = np.array(bliss_fps)[::-1]
+        nni_SDNRs = np.array(nni_SDNRs)[::-1]
+        nni_fps = np.array(nni_fps)[::-1]
+
+        badPos = np.where(bliss_SDNRs>nni_SDNRs)[0]
+        if len(badPos)==0:
+            for nbin in nbins[::-1]:
+                temp_inputs = list(bliss.precompute(flux, xdata, ydata, nbin))
+                if np.sum(temp_inputs[-1]) > 50:
+                    continue
+                else:
+                    blissNBin = nbin
+                    print('Defaulting to blissNBin =', blissNBin)
+                    break
+        else:
+            blissNBin = nbins[nbins>nbins[badPos[-1]]][0]
+            print('Using blissNBin =', blissNBin)
+            
+        # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
+        plt.plot(nbins, nni_SDNRs*1e6, label='NNI')
+        plt.plot(nbins, bliss_SDNRs*1e6, label='BLISS')
+        plt.xticks(nbins)
+        plt.axvline(blissNBin, c='k')
+        plt.ylabel('SDNR of Residuals (ppm)')
+        plt.xlabel('Number of bins per axis')
+        plt.legend(loc=1)
+        if savepath!=None:
+            plt.savefig(savepath+'BLISS_SDNR_vs_BinSize.pdf', bbox_inches='tight')
+        if showPlot:
+            plt.show()
+        plt.close()
+        
+        # Make a diagnostic plot showing eclipse depth vs bin size for NNI and BLISS
+        plt.plot(nbins, nni_fps*1e6, label='NNI')
+        plt.plot(nbins, bliss_fps*1e6, label='BLISS')
+        plt.xticks(nbins)
+        plt.axvline(blissNBin, c='k')
+        plt.ylabel('Eclipse Depth (ppm)')
+        plt.xlabel('Number of bins per axis')
+        plt.legend(loc='best')
+        if savepath!=None:
+            plt.savefig(savepath+'BLISS_EclipseDepth_vs_BinSize.pdf', bbox_inches='tight')
+        if showPlot:
+            plt.show()
+        plt.close()
+        
+        p0 = scipy.optimize.minimize(minfunc, p0, lnprob_inputs, 'Nelder-Mead').x
+        # Update the bliss inputs to the best blissNBin
+        astro_guess = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels)
+                                                       if label in astro_labels]))
+        temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin, astro_guess, savepath, plot=True))
+        signal_inputs[-1][blissInd] = tuple(temp_inputs)
+        lnprob_inputs[4] = signal_inputs
+    
     #########################
         
     print('Running first mini burn-ins', flush=True)

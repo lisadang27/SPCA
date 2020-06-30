@@ -66,7 +66,6 @@ nIterScipy = 10                          # Number of iterative scipy runs used t
 nBurnInSteps2 = 7.5e5                    # number of steps to use for the second mcmc burn-in
 nProductionSteps = 1.5e5                 # number of steps to use with mcmc production run
 usebestfit = True                        # used best-fit instead of median of chain
-blissNBin = 8                            # number of knots to allow in each direction
 secondOrderOffset = False                # should you use the second order sinusoid terms when calculating offset
 bestfitNbin = 50                         # the number of binned values to overplot on the bestfit 4-panel figure (use None if you don't want these overplotted)
 nFrames  = 64                            # number of frames per binned data point
@@ -330,9 +329,8 @@ for iterationNumber in range(len(planets)):
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
             detec_funcs.append(func)
             detec_labels.append(labels)
-            detec_inputs.append(bliss.precompute(flux, xdata, ydata, blissNBin, astro_guess, savepath, plot=True))
-            detec_inputs_full.append(bliss.precompute(flux_full, xdata_full, ydata_full,
-                                                     blissNBin))
+            detec_inputs.append(bliss.precompute(flux, xdata, ydata))
+            detec_inputs_full.append(bliss.precompute(flux_full, xdata_full, ydata_full))
         if 'gp' in mode.lower():
             func = detec_models.detec_model_GP
             func, labels = freeze.make_lambdafunc(func, p0_labels, dparams, p0_obj, debug=debug)
