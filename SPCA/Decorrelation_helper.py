@@ -313,14 +313,20 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                 else:
                     i += 3
     
-    
     # path where outputs are saved
     savepath   = foldername + mode + '/'
     if not os.path.exists(savepath):
         os.makedirs(savepath)
 
     aors = os.listdir(rootpath+planet+'/data/'+channel)
-    aors = np.sort([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
+    aors = np.array([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
+    firstTime = []
+    for i in range(len(aors)):
+        file = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aors[i]+'/'+channel+'/bcd/'))[0]
+        with fits.open(rootpath+planet+'/data/'+channel+'/'+aors[i]+'/'+channel+'/bcd/'+file) as img:
+            firstTime.append(img[0].header['BMJD_OBS'])
+    order = np.argsort(firstTime)
+    aors = aors[order]
     AOR_snip = AOR_snip[1:]
     
     # Figure out where there are AOR breaks
