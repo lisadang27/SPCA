@@ -20,8 +20,8 @@ from SPCA import astro_models, detec_models, bliss
 def signal_params():
     
     p0_obj = {'name': 'planet', 't0': 0.0, 't0_err': 0.0, 'per': 1.0, 'per_err': 0.0,
-              'rp': 0.1, 'a': 8.0, 'a_err': 0.0, 'inc': 90.0, 'inc_err': 0.0, 'ecosw': 0.0,
-              'esinw': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.003, 'A': 0.35, 'B': 0.0,
+              'rp': 0.1, 'rp_err': 0.0, 'a': 8.0, 'a_err': 0.0, 'inc': 90.0, 'inc_err': 0.0, 'ecosw': 0.0, 'ecosw_err': 0.0,
+              'esinw': 0.0, 'esinw_err': 0.0, 'q1': 0.01, 'q2': 0.01, 'fp': 0.003, 'fp_err': 0.0, 'A': 0.35, 'B': 0.0,
               'C': 0.0, 'D': 0.0, 'r2': None, 'r2off': 0.0, 'c1': 1.0}
     
     p0_obj.update(dict([['c'+str(i), 0.0] for i in range(2,22)]))
