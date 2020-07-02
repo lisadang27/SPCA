@@ -743,7 +743,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         nni_fps = np.array(nni_fps)[::-1]
 
         badPos = np.where(bliss_SDNRs>nni_SDNRs)[0]
-        if len(badPos)==0:
+        if len(badPos)==0 or len(badPos)==len(nbins):
             for nbin in nbins[::-1]:
                 temp_inputs = list(bliss.precompute(flux, xdata, ydata, nbin))
                 if np.sum(temp_inputs[-1]) > 50:
@@ -753,7 +753,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                     print('Defaulting to blissNBin =', blissNBin)
                     break
         else:
-            blissNBin = nbins[nbins>nbins[badPos[-1]]][0]
+            blissNBin = nbins[np.where(nbins>nbins[badPos[-1]])[0][0]]
             print('Using blissNBin =', blissNBin)
             
         # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
