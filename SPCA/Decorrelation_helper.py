@@ -407,7 +407,18 @@ def setup_gpriors(gparams, p0_obj):
     if 'inc' in gparams:
         priors.append(p0_obj['inc'])
         errs.append(p0_obj['inc_err'])
-        
+    if 'ecosw' in gparams:
+        priors.append(p0_obj['ecosw'])
+        errs.append(p0_obj['ecosw_err'])
+    if 'esinw' in gparams:
+        priors.append(p0_obj['esinw'])
+        errs.append(p0_obj['esinw_err'])
+    if 'fp' in gparams:
+        priors.append(p0_obj['fp'])
+        errs.append(p0_obj['fp_err'])
+    if 'rp' in gparams:
+        priors.append(p0_obj['rp'])
+        errs.append(p0_obj['rp_err'])    
     return priors, errs
 
 # FIX: Add a docstring for this function
