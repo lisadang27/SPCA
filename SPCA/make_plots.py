@@ -3,6 +3,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
+import pickle
 
 import os,sys
 lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
@@ -71,8 +72,15 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     fig.subplots_adjust(hspace=0)
     
     if savepath!=None:
+        # saving plot as pdf
         pathplot = savepath + '01_Raw_data.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: Time, Flux, xdata, ydata, psfwx, psfwy, Time0, Flux0, xdata0, ydata0, psfwx0, psfwy0'
+        data = [header, time0, flux0, xdata0, ydata0, psfxw0, psfyw0, time, flux, xdata, ydata, psfxw, psfyw]
+        pathdata = savepath + '01_Raw_data.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
     
     if showPlot:
         plt.show()
@@ -108,9 +116,16 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     fig.subplots_adjust(hspace=0)
     
     if savepath is not None:
+        # saving plot as pdf
         pathplot = savepath + 'Centroids.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-    
+        # saving data used in the plot as pkl file
+        header = 'HEADER: xdata0, ydata0, xdata, ydata'
+        data = [header, xdata0, ydata0, xdata, ydata]
+        pathdata = savepath + 'Centroids.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
         
@@ -157,6 +172,12 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     if savepath!=None:
         pathplot = savepath+'BLISS_Knots.pdf'
         plt.savefig(pathplot, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: xdata, ydata, flux, astroModel, knot_nrst_lin, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, nBin, knotNdata'
+        data = [header, xdata, ydata, flux, astroModel, knot_nrst_lin, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, nBin, knotNdata]
+        pathdata = savepath + 'BLISS_Knots.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
 
     if showPlot:
         plt.show()
@@ -291,6 +312,12 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
     if savepath is not None:
         plotname = savepath + plotName
         fig.savefig(plotname, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: time, flux, astro, detec, breaks'
+        data = [header, time, flux, astro, detec, breaks]
+        pathdata = savepath + plotName[:-3] + 'pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
         
     if showPlot:
         plt.show()
@@ -339,6 +366,13 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
         plt.savefig(plotname, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: residuals, minbins, ingrDuration, occDuration, intTime, mode'
+        data = [residuals, minbins, ingrDuration, occDuration, intTime, mode]
+        pathdata = savepath + 'MCMC_'+mode+'_RedNoise.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
         
@@ -419,7 +453,13 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
 
     if fname is not None:
         fig.savefig(fname, bbox_inches='tight')
-    
+        # saving data used in the plot as pkl file
+        header = 'HEADER: all_data, firstEcl_data, transit_data, secondEcl_data (structure of each list: xdata, ydata, psfxw, psfyw, flux, residuals)'
+        data = [all_data, firstEcl_data, transit_data, secondEcl_data]
+        pathdata = fname[:-3] +'pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
     
