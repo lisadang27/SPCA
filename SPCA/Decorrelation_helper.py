@@ -21,9 +21,14 @@ import urllib.request
 # SPCA libraries
 from SPCA import helpers, astro_models, make_plots, bliss
 
-# FIX: Add a docstring for this function
 def downloadExoplanetArchive():
-    #Download the most recent masterfile of the best data on each target
+    """Downloads the most recent masterfile of the best data on each target
+    Args:
+        None
+    Returns:
+        None
+    """
+
     try:
         _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', './masterfile.ecsv')
     except:
@@ -32,6 +37,15 @@ def downloadExoplanetArchive():
 
 # FIX: Add a docstring for this function
 def loadArchivalData(rootpath, planet, channel):
+    """Loads system parameters and respective uncertainties from the NASA Exoplanets Archives into p0_obj.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+    Returns:
+        p0_obj   (obj): object with initial parameters 
+    """
+
     if os.path.exists('./masterfile.ecsv'):
         data = Table.to_pandas(Table.read('./masterfile.ecsv'))
     else:
@@ -116,8 +130,35 @@ def loadArchivalData(rootpath, planet, channel):
     
     return p0_obj
 
-# FIX: Add a docstring for this function
 def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh, rp_err=np.inf, a_err=np.inf, t0_err=np.inf, per_err=np.inf, inc_err=np.inf, e_err=np.inf, argp_err=np.inf, Tstar_err=np.inf):
+    """Load custom parameters into p0_obj.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        rp     (float): radius of the planets in unit of stellar radius
+        a      (float): semi-major axis of the orbit of the planet in unit of stellar radius
+        per    (float): period of the orbit in days
+        t0     (float): time of transit in BMJD
+        inc    (float): inclination of the orbit in degrees (inc = 90 for edge-on orbit)
+        e      (float): eccentricity of the orbit
+        argp   (float): argument of periastron in degrees
+        Tstar  (float): Stellar temperature in Kelvins
+        logg   (float): Surface gravity in log_10(cm/s^2)
+        feh    (float): Stellar metallicity ratio [Fe/H]
+        rp_err   (float,optional): uncertainty on radius of the planets in unit of stellar radius
+        a_err    (float,optional): uncertainty on semi-major axis of the orbit of the planet in unit of stellar radius
+        per_err  (float,optional): uncertainty on period of the orbit in days
+        t0_err   (float,optional): uncertainty on time of transit in BMJD
+        inc_err  (float,optional): uncertainty on inclination of the orbit in degrees (inc = 90 for edge-on orbit)
+        e_err    (float,optional): uncertainty on eccentricity of the orbit
+        argp_err (float,optional): uncertainty on argument of periastron in degrees
+        Tstar_err(float,optional): uncertainty on Stellar temperature in Kelvins
+
+    Returns:
+        p0_obj (obj): object with initial parameters 
+    """
+
     # make params obj
     p0_obj  = helpers.signal_params() 
 
@@ -154,8 +195,19 @@ def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tsta
     
     return p0_obj
 
-# FIX: Add a docstring for this function
+# FIX: Add a docstring for this function (docstring not done)
 def getTstarBright(rootpath, planet, channel, p0_obj):
+    """Calculate the stellar brightness temperature based on phoenix spectrum.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        p0_obj (obj): object with initial parameters 
+    Returns:
+        tstar_b (): ???
+        p0_obj['Tstar_err'] (float): uncertainty on stellar temperature
+    """
+
     # Get the phoenix file ready to compute the stellar brightness temperature
     teffStr = p0_obj['Tstar']
     if teffStr <= 7000:
@@ -239,6 +291,26 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
 
 # FIX: Add a docstring for this function
 def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAddStack=False):
+    """Calculate the stellar brightness temperature based on phoenix spectrum.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        mode     (str): decorrelation mode chosen
+        pldIgnoreFrames (bool, optional): True if you want PLD to also ignore the first AOR. Default is True.
+        pldAddStack     (bool, optional): True is you want to apply (and already have) custom Spitzer correction to your data when using PLD. Default is False.
+    Returns:
+        foldername (str): path to folder containing 
+        filename
+        filename_full
+        savepath
+        path_params
+        AOR_snip
+        aors
+        breaks
+        ignoreFrames
+        p0_obj['Tstar_err'] (float): uncertainty on stellar temperature
+    """
     AOR_snip = ''
     with open(rootpath+planet+'/analysis/aorSnippet.txt') as f:
         AOR_snip = f.readline().strip()
