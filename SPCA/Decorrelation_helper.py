@@ -721,6 +721,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         xdata = signal_inputs[-1][blissInd][4]
         ydata = signal_inputs[-1][blissInd][5]
         minBin = int(np.floor((np.max(xdata)-np.min(xdata))/0.060))
+        minBin = np.max([2, minBin])
         maxBin = int(np.ceil((np.max(xdata)-np.min(xdata))/0.010))
         # Go in reverse order so initial tqdm ETA is a worst case estimate
         nbins = np.unique(np.linspace(minBin, maxBin, maxBin-minBin+1, dtype=int))[::2][::-1]
