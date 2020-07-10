@@ -879,6 +879,9 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                     p0 = p0_temps[i]
                     print('Defaulting to blissNBin =', blissNBin)
                     break
+        if blissNBin == 0:
+            blissNBin = np.min(nbins)
+            print('Hard defaulting to blissNBin =', blissNBin)
             
         # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
         plt.plot(nbins, nni_SDNRs*1e6, label='NNI')
@@ -890,6 +893,13 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         plt.legend(loc=1)
         if savepath!=None:
             plt.savefig(savepath+'BLISS_SDNR_vs_BinSize.pdf', bbox_inches='tight')
+            # saving data used in the plot as pkl file
+            header = 'HEADER: Number of bins per axis, BLISS SDNR of Residuals (ppm), NNI SDNR of Residuals (ppm)'
+            data = [header, nbins, bliss_SDNRs*1e6, nni_SDNRs*1e6]
+            pathdata = savepath + 'BLISS_SDNR_vs_BinSize.pkl'
+            with open(pathdata, 'wb') as outfile:
+                pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+            
         if showPlot:
             plt.show()
         plt.close()
@@ -904,6 +914,12 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         plt.legend(loc='best')
         if savepath!=None:
             plt.savefig(savepath+'BLISS_EclipseDepth_vs_BinSize.pdf', bbox_inches='tight')
+            # saving data used in the plot as pkl file
+            header = 'HEADER: Number of bins per axis, BLISS Eclipse Depth (ppm), NNI Eclipse Depth (ppm)'
+            data = [header, nbins, bliss_fps*1e6, nni_fps*1e6]
+            pathdata = savepath + 'BLISS_EclipseDepth_vs_BinSize.pkl'
+            with open(pathdata, 'wb') as outfile:
+                pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
         if showPlot:
             plt.show()
         plt.close()
