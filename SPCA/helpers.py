@@ -12,6 +12,8 @@ import os, sys
 lib_path = os.path.abspath(os.path.join('../'))
 sys.path.append(lib_path)
 
+from copy import deepcopy
+
 # SPCA libraries
 import SPCA
 from SPCA import astro_models, detec_models, bliss
@@ -515,11 +517,11 @@ def lnlike(p0, flux, mode, signal_func, signal_inputs):
     """
     
     if 'gp' in mode.lower():
-        temp_signal_inputs = signal_inputs.copy()
+        temp_signal_inputs = deepcopy(signal_inputs)
         gpInd = np.where([partial_func.func.__name__=='detec_model_GP'
-                          for partial_func in signal_inputs[-3]])[0][0]
+                          for partial_func in temp_signal_inputs[-3]])[0][0]
         temp_signal_inputs[-1][gpInd][-1]=False
-        model, gp = signal_func(p0, *signal_inputs)
+        model, gp = signal_func(p0, *temp_signal_inputs)
         
         return gp.log_likelihood(flux-model)
     else:
