@@ -18,6 +18,8 @@ from astropy.io import fits
 
 import urllib.request
 
+import pickle
+
 # SPCA libraries
 from SPCA import helpers, astro_models, make_plots, bliss
 
