@@ -759,9 +759,6 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
             # Assignment to non-existent indices is safely ignored, so this is fine for all modes
             p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
             p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
-            p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
-            p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
-            p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 
             spyResult = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead')
             lnprob_temp = helpers.lnprob(spyResult.x, *lnprob_inputs)
@@ -831,9 +828,6 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                     # Assignment to non-existent indices is safely ignored, so this is fine for all modes
                     p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
                     p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
-                    p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
-                    p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
-                    p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 
                     p0_temp = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead').x
                     lnprob_temp = helpers.lnprob(p0_temp, *lnprob_inputs)
@@ -958,7 +952,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         # Assignment to non-existent indices is safely ignored, so this is fine for all modes
         p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
         p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
-        p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
+        p0_temp[p0_labels=='gpAmp'] = np.random.uniform(0.05,0.135)
         p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
         p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 

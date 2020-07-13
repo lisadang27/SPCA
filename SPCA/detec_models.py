@@ -204,7 +204,7 @@ def detec_model_GP(input_data, astroModel, gpAmp, gpLx, gpLy, sigF):
     
     flux, xdata, ydata, predictGp = input_data
     
-    gp = george.GP(np.exp(gpAmp)*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2, axes=[0, 1]))#, solver=george.HODLRSolver, tol=1e-8)
+    gp = george.GP(gpAmp**2*george.kernels.ExpSquaredKernel(np.exp([gpLx, gpLy]), ndim=2, axes=[0, 1]))#, solver=george.HODLRSolver, tol=1e-8)
     
     gp.compute(np.array([xdata, ydata]).T, sigF)
     

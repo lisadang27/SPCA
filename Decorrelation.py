@@ -37,7 +37,7 @@ gparams_raw = ['t0', 'per', 'a', 'inc']
 
 # parameters you want to place a uniform prior on
 uparams_raw = ['rp', 'fp', 'q1', 'q2', 'inc', 'ecosw', 'esinw', 'sigF', 'gpLx', 'gpLy']
-uparams_limits_raw = [[0,1], [0,1], [0,1], [0,1], [70,90], [-1,1], [-1,1], [0,1], [0,-3],[0,-3]]
+uparams_limits_raw = [[0,1], [0,1], [0,1], [0,1], [70,90], [-1,1], [-1,1], [0,1], [-3,0],[-3,0]]
 uparams_raw.extend(['p'+str(i)+'_1' for i in range(1,26)]) # First order PLD terms
 uparams_raw.extend(['p'+str(i)+'_2' for i in range(1,26)]) # Second order PLD terms
 uparams_limits_raw.extend([[-3,3] for i in range(1,26)])

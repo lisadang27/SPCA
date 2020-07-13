@@ -29,7 +29,7 @@ def signal_params():
     p0_obj.update(dict([['p'+str(i)+'_1', 0.03] for i in range(2,10)]))
     p0_obj.update(dict([['p'+str(i)+'_1', 0.01] for i in range(10,26)]))
     p0_obj.update(dict([['p'+str(i)+'_2', 0.01] for i in range(1,26)]))
-    p0_obj.update({'gpAmp': -2.0, 'gpLx': -2.0, 'gpLy': -2.0})
+    p0_obj.update({'gpAmp': 0.35, 'gpLx': -1.0, 'gpLy': -1.0})
     p0_obj.update({'d1': 1.0, 'd2': 0.0, 'd3': 0.0, 'm1': 0.0})
     p0_obj.update({'s0':0, 's0break':0, 's1':0, 's1break':0, 's2':0, 's2break':0, 's3':0, 's3break':0, 's4':0, 's4break':0})
     p0_obj.update({'sigF': 0.0003, 'mode': '', 'Tstar': None, 'Tstar_err': None})
@@ -470,7 +470,7 @@ def lnprior_gaussian(p0, priorInds, priors, errs):
 
 # FIX: Add a docstring for this function
 def lnprior_uniform(p0, priorInds, limits):
-    if len(priorInds)==0:
+    if priorInds is None or len(priorInds)==0:
         # Need to evaluate this first, otherwise the next line would fail
         return 0
     elif np.any(np.logical_or(np.array(limits)[:,0] > p0[priorInds],
@@ -482,7 +482,7 @@ def lnprior_uniform(p0, priorInds, limits):
 # FIX: Add a docstring for this function
 def lnprior_gamma(p0, priorInd, shape, rate):
     if priorInd is not None:
-        x = np.exp(p0[priorInd])
+        x = p0[priorInd]**2
         alpha = shape
         beta = rate
         return np.log(beta**alpha * x**(alpha-1) * np.exp(-beta*x) / np.math.factorial(alpha-1))
@@ -515,7 +515,11 @@ def lnlike(p0, flux, mode, signal_func, signal_inputs):
     """
     
     if 'gp' in mode.lower():
-        model, gp = signalfunc(p0, *signal_inputs)
+        temp_signal_inputs = signal_inputs.copy()
+        gpInd = np.where([partial_func.func.__name__=='detec_model_GP'
+                          for partial_func in signal_inputs[-3]])[0][0]
+        temp_signal_inputs[-1][gpInd][-1]=False
+        model, gp = signal_func(p0, *signal_inputs)
         
         return gp.log_likelihood(flux-model)
     else:
