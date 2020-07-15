@@ -406,7 +406,11 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     # Figure out where there are AOR breaks
     breakpath = rootpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
     with open(breakpath, 'r') as file:
-        breaks = np.array(file.readline().strip().split(' ')).astype(float)
+        breaks = file.readline().strip()
+        if len(breaks)==0:
+            breaks = np.array([])
+        else:
+            breaks = np.array(breaks.split(' ')).astype(float)
     
     # path to photometry outputs
     filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
