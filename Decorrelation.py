@@ -59,6 +59,7 @@ tryHside = False                          # whether to try Heaviside step functi
 
 usePSFX = False                          # Whether or not to use PSF photometry centroids and psf widths (otherwise aperture's)
 
+binnedPhotometry = True                  # Whether or not to use the binned photometry
 oldPhotometry = False                    # Whether photometry was computed before May 1, 2020 when flux conversion was patched
 ncpu = 12                                # The number of cpu threads to be used when running MCMC
 runMCMC = True                           # whether to run MCMC or just load-in past results
@@ -93,6 +94,8 @@ cuts = np.zeros(len(planets)).astype(int)
 
 if rootpath[-1]!='/':
     rootpath += '/'
+if not binnedPhotometry:
+    nFrames = 1
 
 
 ## Download the most recent exoplanet archive data, and select the best constrained value for each parameter
@@ -171,6 +174,9 @@ for iterationNumber in range(len(planets)):
     if usePSFX:
         modes = [mode+'_PSFX' for mode in modes if 'PLD' not in mode]
     
+    if not binnedPhotometry:
+        mode_appendix = '_unbinnned'+mode_appendix
+    
     modes = [mode+mode_appendix for mode in modes]
     
     for mode in modes:
@@ -219,11 +225,18 @@ for iterationNumber in range(len(planets)):
             Pnorm_full, flux_full, time_full = helpers.get_full_data(foldername, filename_full, mode,
                                                                      foldername_aper=foldername_aper,
                                                                      cut=cut, nFrames=nFrames, ignore=ignoreFrames)
+            
             # Get Data we'll analyze
-            Pnorm_0, flux0, time0 = helpers.get_data(foldername, filename, mode,
-                                                     foldername_aper=foldername_aper)
-            Pnorm, flux, time = helpers.get_data(foldername, filename, mode,
-                                                 foldername_aper=foldername_aper, cut=cut)
+            if binnedPhotometry:
+                Pnorm_0, flux0, time0 = helpers.get_data(foldername, filename, mode,
+                                                         foldername_aper=foldername_aper)
+                Pnorm, flux, time = helpers.get_data(foldername, filename, mode,
+                                                     foldername_aper=foldername_aper, cut=cut)
+            else:
+                Pnorm, flux, time = Pnorm_full, flux_full, time_full
+                Pnorm0, flux0, time0 = helpers.get_full_data(foldername, filename_full, mode,
+                                                             foldername_aper=foldername_aper,
+                                                             nFrames=nFrames, ignore=ignoreFrames)
 
             pca = PCA(n_components=int(Pnorm_full.shape[0]-1))
             pca.fit(Pnorm_full.T)
@@ -250,10 +263,18 @@ for iterationNumber in range(len(planets)):
                                                              foldername_psf=foldername_psf,
                                                              cut=cut, nFrames=nFrames, ignore=ignoreFrames)
             # Get Data we'll analyze
-            (flux0, time0, xdata0, ydata0, psfxw0, psfyw0) = helpers.get_data(foldername, filename, mode,
-                                                                              foldername_psf=foldername_psf)
-            (flux, time, xdata, ydata, psfxw, psfyw) = helpers.get_data(foldername, filename, mode,
-                                                                        foldername_psf=foldername_psf, cut=cut)
+            if binnedPhotometry:
+                flux0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.get_data(foldername, filename, mode,
+                                                                                  foldername_psf=foldername_psf)
+                flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername, filename, mode,
+                                                                            foldername_psf=foldername_psf, cut=cut)
+            else:
+                flux, time, xdata, ydata, psfxw, psfyw = (flux_full, time_full, xdata_full, ydata_full,
+                                                          psfxw_full, psfyw_full)
+                flux0, time0, xdata0, ydata0, psfxw0, psfyw0 = helpers.get_full_data(foldername, filename_full, mode,
+                                                                                     foldername_psf=foldername_psf,
+                                                                                     cut=cut, nFrames=nFrames,
+                                                                                     ignore=ignoreFrames)
 
             if not oldPhotometry:
                 sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)

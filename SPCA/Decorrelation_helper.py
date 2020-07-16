@@ -706,7 +706,7 @@ Unbinned data:
     ResultMCMC_Params['evidenceB'] = [EB]
     ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
-    if 'gp' not in mode.lower():
+    if 'gp' not in mode.lower() and nFrames!=1:
         ResultMCMC_Params['chi2'] = [chis]
         ResultMCMC_Params['logL'] = [logL]
         ResultMCMC_Params['evidence'] = [E]
