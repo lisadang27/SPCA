@@ -122,10 +122,10 @@ def loadArchivalData(rootpath, planet, channel):
             print('Randomly generating an argument of periastron...', flush=True)
             argp = np.random.uniform(0.,360.,1)
 
-        p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
+        p0_obj['ecosw'] = e*np.cos(argp*np.pi/180.)
         if 90 < argp < 270:
             p0_obj['ecosw']*=-1
-        p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
+        p0_obj['esinw'] = np.sin(argp*np.pi/180.)
         
     # Get the stellar brightness temperature to allow us to invert Plank equation later
     p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
@@ -473,30 +473,10 @@ def get_photon_limit_oldData(rootpath, datapath, datapath_aper, planet, channel,
 def setup_gpriors(gparams, p0_obj):
     priors = []
     errs = []
-    if 't0' in gparams:
-        priors.append(p0_obj['t0'])
-        errs.append(p0_obj['t0_err'])
-    if 'per' in gparams:
-        priors.append(p0_obj['per'])
-        errs.append(p0_obj['per_err'])
-    if 'a' in gparams:
-        priors.append(p0_obj['a'])
-        errs.append(p0_obj['a_err'])
-    if 'inc' in gparams:
-        priors.append(p0_obj['inc'])
-        errs.append(p0_obj['inc_err'])
-    if 'ecosw' in gparams:
-        priors.append(p0_obj['ecosw'])
-        errs.append(p0_obj['ecosw_err'])
-    if 'esinw' in gparams:
-        priors.append(p0_obj['esinw'])
-        errs.append(p0_obj['esinw_err'])
-    if 'fp' in gparams:
-        priors.append(p0_obj['fp'])
-        errs.append(p0_obj['fp_err'])
-    if 'rp' in gparams:
-        priors.append(p0_obj['rp'])
-        errs.append(p0_obj['rp_err'])    
+    for par in gparams:
+        priors.append(p0_obj[par])
+        errs.append(p0_obj[par+'_err'])
+    
     return priors, errs
 
 # FIX: Add a docstring for this function
