@@ -193,7 +193,8 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
     
     # Clear up some RAM
     image_stack = None
-    
+   
+    flux = np.ma.masked_invalid(flux)
     flux[flux<0.1*np.ma.median(flux)] = np.nan
     flux[flux<0.1*np.ma.median(flux)].mask = True
 
