@@ -51,9 +51,14 @@ for planet, channel in zip(planets, channels):
                 else:
                     i += 3
     
+    # Figure out where there are AOR breaks
     breakpath = rootpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
     with open(breakpath, 'r') as file:
-        breaks = np.array(file.readline().strip().split(' ')).astype(float)
+        breaks = file.readline().strip()
+        if len(breaks)==0:
+            breaks = np.array([])
+        else:
+            breaks = np.array(breaks.split(' ')).astype(float)
 
     filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
     flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername, filename, 'Poly2_v1')
