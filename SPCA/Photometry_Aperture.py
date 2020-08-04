@@ -104,7 +104,7 @@ def centroid_FWM(image_stack, highpassWidth=5*64, scale=1, bounds=(13, 18, 13, 1
     return xo, yo, xw, yw
 
 def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5], b=[5], w_r=[5], h_r=[5], theta=[0],
-                 scale = 1, shape='Circular', methods=['center', 'exact'], moveCentroids=[True], i=0):
+                 scale = 1, shape='Circular', methods=['center', 'exact'], moveCentroids=[True], i=0, img_data=None):
     """Performs aperture photometry, first by creating the aperture then summing the flux within the aperture.
 
     Note that this will implicitly use the global variable image_stack (3D array) to allow for parallel computing
@@ -114,17 +114,17 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
         bg_err (1D array): Array of uncertainties on pixel value.
         cx (int/array, optional): x-coordinate(s) of the center of the aperture. Default is 15.
         cy (int/array, optional): y-coordinate(s) of the center of the aperture. Default is 15.
-        r (iterable, optional): If shape is 'Circular', the radii to try for aperture photometry
+        r (int/array, optional): If shape is 'Circular', the radii to try for aperture photometry
             in units of pixels. Default is just 2.5 pixels.
-        a (iterable, optional): If shape is 'Elliptical', the semi-major axes to try for elliptical aperture
+        a (int/array, optional): If shape is 'Elliptical', the semi-major axes to try for elliptical aperture
             in units of pixels. Default is 5.
-        b (iterable, optional): If shape is 'Elliptical', the semi-minor axes to try for elliptical aperture
+        b (int/array, optional): If shape is 'Elliptical', the semi-minor axes to try for elliptical aperture
             in units of pixels. Default is 5.
-        w_r (iterable, optional): If shape is 'Rectangular', the full widths to try for rectangular aperture (x-axis).
+        w_r (int/array, optional): If shape is 'Rectangular', the full widths to try for rectangular aperture (x-axis).
             Default is 5.
-        h_r (iterable, optional): If shape is 'Rectangular', the full heights to try for rectangular aperture (y-axis).
+        h_r (int/array, optional): If shape is 'Rectangular', the full heights to try for rectangular aperture (y-axis).
             Default is 5.
-        theta (iterable, optional): If shape is 'Elliptical' or 'Rectangular', the rotation angles in radians
+        theta (int/array, optional): If shape is 'Elliptical' or 'Rectangular', the rotation angles in radians
             of the semimajor axis from the positive x axis. The rotation angle increases counterclockwise. Default is 0.
         scale (int, optional): If the image is oversampled, scaling factor for centroid and bounds,
             i.e, give centroid in terms of the pixel value of the initial image.
@@ -132,6 +132,8 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
             'Elliptical', 'Rectangular'. Default is 'Circular'.
         methods (iterable, optional): The methods used to determine the overlap of the aperture on the pixel grid. Possible 
             methods are 'exact', 'subpixel', 'center'. Default is ['center', 'exact'].
+        i (int, optional): The current frame number being examined.
+        img_data (3D array): The image stack being analyzed if not using the global variable to allow for parallel computing.
 
     Returns:
         tuple: results (2D array) Array of flux and flux errors, of shape (nMethods*nSizes, 2), where the nSizes loop
@@ -140,7 +142,29 @@ def A_photometry(bg_err, cx = 15, cx_med=15, cy = 15, cy_med=15, r=[2.5], a=[5],
     """
     
     # Access the global variable
-    global image_stack
+    if img_data is None:
+        global image_stack
+    else:
+        image_stack = img_data
+        
+    if not isinstance(r, Iterable):
+        r = [r]
+    if not isinstance(cx, Iterable):
+        cx = [cx]
+    if not isinstance(cy, Iterable):
+        cy = [cy]
+    if not isinstance(a, Iterable):
+        a = [a]
+    if not isinstance(b, Iterable):
+        b = [b]
+    if not isinstance(w_r, Iterable):
+        w_r = [w_r]
+    if not isinstance(h_r, Iterable):
+        h_r = [h_r]
+    if not isinstance(theta, Iterable):
+        theta = [theta]
+    if not isinstance(methods, Iterable):
+        methods = [methods]
     
     data_error = calc_total_error(image_stack[i,:,:], bg_err[i], effective_gain=1)
     
