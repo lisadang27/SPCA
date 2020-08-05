@@ -194,14 +194,14 @@ def get_lightcurve(basepath, AOR_snip, channel, planet, stamp_sizes=[3,5], save=
             fig, axes = plt.subplots(nrows = nrows, ncols = 1, sharex = True, figsize=(nrows*5,10))
             fig.suptitle(planet, fontsize="x-large")
             for i in range(int(stamp_size**2)):
-                axes[0].plot(binned_time, binned_P[:,i], '+', label = '$P_'+str(i+1)+'$')
+                axes[0].plot(plotx, ploty0[:,i], '+', label = '$P_'+str(i+1)+'$')
             axes[0].set_ylabel("Pixel Flux (electrons)")
             axes[0].legend()
             axes[1].set_ylabel('Sum Flux (electrons)')
-            axes[1].plot(binned_time, np.sum(binned_P, axis = 1), '+')
+            axes[1].plot(plotx, np.sum(ploty0, axis = 1), '+')
             if bin_data:
                 for i in range(int(stamp_size**2)):
-                    axes[2].plot(binned_time, binned_P_std[:,i], '+', label = '$Pstd_'+str(i+1)+'$')
+                    axes[2].plot(plotx, ploty2[:,i], '+', label = '$Pstd_'+str(i+1)+'$')
                 axes[2].set_xlabel("Time (BMJD)")
             fig.subplots_adjust(hspace=0)
 
