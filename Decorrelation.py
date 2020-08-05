@@ -78,9 +78,11 @@ debug = False                            # True if user wants details about the 
 #non-unity multiplicative factors if you have dilution from a nearby companion
 compFactors = np.ones(len(planets))
 
-# Adding companion dilution correction factor for WASP-12b
-compFactors[planets=='WASP-12b'] += 0.8608*0.1196
-compFactors[planets=='WASP-12b_old'] += 0.8147*0.1196
+# Adding companion dilution correction factor for CoRoT-2b, WASP-12b, and WASP-103b
+compFactors[planets=='WASP-12b'] += 0.09976
+compFactors[planets=='WASP-12b_old'] += 0.09085
+compFactors[planets=='WASP-103b'] += 0.1234
+compFactors[planets=='CoRoT-2b'] += 0.2046
 
 # Set this to non-zero if you want to remove some initial data points
 cuts = np.zeros(len(planets)).astype(int)
@@ -250,9 +252,13 @@ for iterationNumber in range(len(planets)):
 
             if not oldPhotometry:
                 if 'pldaper' in mode.lower():
-                    path_temp = foldername_aper+filename
+                    path_temp = foldername_aper
                 else:
-                    path_temp = foldername+filename
+                    path_temp = foldername
+                if binnedPhotometry:
+                    path_temp += filename_full
+                else:
+                    path_temp += filename
                 sigF_photon_ppm = dh.get_photon_limit(path_temp, mode, nFrames, ignoreFrames)
 
             # FIX: Add an initial PLD plot
@@ -268,6 +274,9 @@ for iterationNumber in range(len(planets)):
                                                                                   foldername_psf=foldername_psf)
                 flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername, filename, mode,
                                                                             foldername_psf=foldername_psf, cut=cut)
+
+                if not oldPhotometry:
+                    sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)
             else:
                 flux, time, xdata, ydata, psfxw, psfyw = (flux_full, time_full, xdata_full, ydata_full,
                                                           psfxw_full, psfyw_full)
@@ -276,8 +285,8 @@ for iterationNumber in range(len(planets)):
                                                                                      cut=cut, nFrames=nFrames,
                                                                                      ignore=ignoreFrames)
 
-            if not oldPhotometry:
-                sigF_photon_ppm = dh.get_photon_limit(foldername+filename, mode, nFrames, ignoreFrames)
+                if not oldPhotometry:
+                    sigF_photon_ppm = dh.get_photon_limit(foldername+filename_full, mode, nFrames, ignoreFrames)
 
             ## FIX: peritime doesn't get made
             if True:#'ecosw' in dparams_input and 'esinw' in dparams_input:
@@ -294,8 +303,12 @@ for iterationNumber in range(len(planets)):
         # Calculate the photon noise limit
         if oldPhotometry:
             # Fix the old, unhelpful units to electrons to compute photon noise limit
-            sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename_aper,
-                                                          planet, channel, mode, aors, nFrames, ignoreFrames)
+            if binnedPhotometry:
+                sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename_full,foldername_aper+filename_full,
+                                                              planet, channel, mode, aors, nFrames, ignoreFrames)
+            else:
+                sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename,
+                                                              planet, channel, mode, aors, nFrames, ignoreFrames)
         
         #########################
         # Initialize the guessed parameters and prepare priors
