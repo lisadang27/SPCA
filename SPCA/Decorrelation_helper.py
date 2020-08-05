@@ -576,7 +576,7 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     else:
         rp_MCMC = p0_obj['rp']
 
-    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'])
+    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'], As.shape[0])
 
     tday = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC/rp_MCMC**2)))**-1
     tnight = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC*(1-2*As[:,0])/rp_MCMC**2)))**-1
