@@ -256,9 +256,9 @@ for iterationNumber in range(len(planets)):
                 else:
                     path_temp = foldername
                 if binnedPhotometry:
-                    path_temp += filename_full
-                else:
                     path_temp += filename
+                else:
+                    path_temp += filename_full
                 sigF_photon_ppm = dh.get_photon_limit(path_temp, mode, nFrames, ignoreFrames)
 
             # FIX: Add an initial PLD plot
