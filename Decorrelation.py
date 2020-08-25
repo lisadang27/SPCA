@@ -310,6 +310,8 @@ for iterationNumber in range(len(planets)):
                 sigF_photon_ppm = dh.get_photon_limit_oldData(rootpath, foldername+filename, foldername_aper+filename,
                                                               planet, channel, mode, aors, nFrames, ignoreFrames)
         
+        sigF_photon_ppm *= compFactor
+        
         #########################
         # Initialize the guessed parameters and prepare priors
         
