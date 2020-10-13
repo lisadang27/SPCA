@@ -29,23 +29,23 @@ Update Log
 Version 0.3
 -----------
 As of version 0.3, we have made some important changes. These include:
-- Added the ability to perform full-frame photometry
-- Added the ability to fit unbinned photometry
-- Added the ability to decorrelate using PSF-fitted centroids using the "\_PSFX" mode suffix
-- Added sigma-clipping along full time axis (not just within data cube). This comes at the cost of needing to load all frames into RAM at the same time which can be quite RAM intensive for some phase curves. Will consider allowing user to switch to using dask in the future to reduce RAM cost when performing photometry at the cost of slower run speeds.
-- Changed BLISS knot density selection algorithm to be more like POET's algorithm
-- Added a progress bar for when running photometry
-- No updates on emcee freezing, but it now rarely ever occurs for me (Taylor). Perhaps the better initialization routine is helping here.
+* Added the ability to perform full-frame photometry
+* Added the ability to fit unbinned photometry
+* Added the ability to decorrelate using PSF-fitted centroids using the "\_PSFX" mode suffix
+* Added sigma-clipping along full time axis (not just within data cube). This comes at the cost of needing to load all frames into RAM at the same time which can be quite RAM intensive for some phase curves. Will consider allowing user to switch to using dask in the future to reduce RAM cost when performing photometry at the cost of slower run speeds.
+* Changed BLISS knot density selection algorithm to be more like POET's algorithm
+* Added a progress bar for when running photometry
+* No updates on emcee freezing, but it now rarely ever occurs for me (Taylor). Perhaps the better initialization routine is helping here.
 
 Version 0.2
 -----------
 As of version 0.2, we have made some important changes and some bug fixes. These include:
-- Renamed decorrelation and fitting file to Decorrelation (.py and .ipynb)
-- Full integration of PLD and PLDAper models
-- Reduced the amount of static code that the user sees and placed this in separate files instead.
-- Changed how photometry is saved. This will not be noticeable unless you want to use PLDAper models which cannot be run with the old photometry.
-- Also changed the units in which the photometry is saved so that it is easy to compute the photon noise limit - a calculation that was previously done incorrectly.
-- The emcee fitting routine sometimes freezing still seems to be an issue as of v0.2. This seems to be caused by the combination of a large dataset and either a large model or a poorly initialized model. Previous attempts at forcing a timeout have failed without directly editing emcee or multiprocessing code. If this occurs to you and you need to analyze your data soon, I'd recommend removing the few lines that use multiprocessing - contact us if you have a hard time doing this. We are looking into different samplers (such as PyMC3) to resolve this issue.
+* Renamed decorrelation and fitting file to Decorrelation (.py and .ipynb)
+* Full integration of PLD and PLDAper models
+* Reduced the amount of static code that the user sees and placed this in separate files instead.
+* Changed how photometry is saved. This will not be noticeable unless you want to use PLDAper models which cannot be run with the old photometry.
+* Also changed the units in which the photometry is saved so that it is easy to compute the photon noise limit - a calculation that was previously done incorrectly.
+* The emcee fitting routine sometimes freezing still seems to be an issue as of v0.2. This seems to be caused by the combination of a large dataset and either a large model or a poorly initialized model. Previous attempts at forcing a timeout have failed without directly editing emcee or multiprocessing code. If this occurs to you and you need to analyze your data soon, I'd recommend removing the few lines that use multiprocessing - contact us if you have a hard time doing this. We are looking into different samplers (such as PyMC3) to resolve this issue.
 
 Package Usage
 =============
