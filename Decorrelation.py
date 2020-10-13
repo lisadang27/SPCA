@@ -22,8 +22,8 @@ from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_mod
 from SPCA import Decorrelation_helper as dh
 
 
-planets = ['CoRoT-2b', 'HAT-P-7b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'HD189733b', 'HD209458b', 'HD149026b']
-channels = ['ch2' for planet in planets]
+planets = np.array(['CoRoT-2b', 'HAT-P-7b', 'KELT-1b', 'KELT-16b', 'KELT-9b', 'MASCARA-1b', 'Qatar-1b', 'WASP-103b', 'WASP-12b', 'WASP-12b_old', 'WASP-14b', 'WASP-18b', 'WASP-19b', 'WASP-33b', 'WASP-43b', 'HD189733b', 'HD209458b', 'HD149026b'])
+channels = np.array(['ch2' for planet in planets])
 
 rootpath = '/homes/picaro/bellt/research/'
 
