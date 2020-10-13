@@ -1,8 +1,65 @@
 import os, glob
 import numpy as np
-from astropy.stats import sigma_clip
+from multiprocessing import Pool
+from functools import partial
 
-def get_fnames(directory, AOR_snip, ch):
+from astropy.stats import sigma_clip
+from astropy.convolution import convolve, Box1DKernel
+from astropy.wcs import WCS
+from astropy.wcs.utils import skycoord_to_pixel
+from astropy.coordinates import SkyCoord
+from astropy.io import fits
+
+import scipy.interpolate
+from scipy.stats import binned_statistic
+
+import warnings
+warnings.filterwarnings('ignore')
+
+image_stack = np.zeros((0,32,32))
+
+def create_folder(fullname, auto=False, overwrite=False):
+    """Create a folder unless it exists.
+
+    Args:
+        fullname (string): Full path to the folder to be created.
+        auto (bool, optional): If the folder already exists, should the folder just be skipped (True)
+            or should the user be asked whether they want to overwrite the folder or change the folder name (False, Default).
+        overwrite (bool, optional): Whether you want to overwrite the folder if it already exists
+
+    Returns:
+        string: The final name used for the folder.
+
+    """
+    
+    solved = 'no'
+    while(solved == 'no'):
+        if not os.path.exists(fullname):
+            # Folder doesn't exist yet and can be safely written to
+            os.makedirs(fullname)
+            solved = 'yes'
+        elif len(os.listdir(fullname))==0:
+            # Folder exists but is empty and can be safely written to
+            solved = 'yes'
+        else:
+            if overwrite:
+                solved = 'yes'
+            elif auto:
+                fullname = None
+                solved = 'yes'
+            else:
+                folder = fullname.split('/')[-1]
+                print('Warning:', folder, 'already exists! Are you sure you want to overwrite this folder? (y/n)')
+                answer = input()
+                if (answer=='y'):
+                    solved = 'yes'
+                else:
+                    print('What would you like the new folder name to be?')
+                    folder = input()
+                    fullname = '/'.join(fullname.split('/')[0:-1])+'/'+folder
+    return fullname
+
+def get_fnames(directory, AOR_snip):
     """Find paths to all the fits files.
 
     Args:
@@ -16,19 +73,23 @@ def get_fnames(directory, AOR_snip, ch):
     
     """
     
+    while directory[-1]=='/':
+        directory=directory[:-1]
+    ch = directory.split('/')[-1]
+    
     lst      = os.listdir(directory)
-    AOR_list = [k for k in lst if AOR_snip in k] 
+    AOR_list = [folder for folder in lst if AOR_snip==folder[:len(AOR_snip)]]
     fnames   = []
     lens = []
     for i in range(len(AOR_list)):
-        path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'	
-        files = glob.glob(os.path.join(path, '*bcd.fits'))
-        fnames.extend(files)
-        lens.append(len(files))
-    #fnames.sort()
+        path = directory + '/' + AOR_list[i] + '/' + ch +'/bcd'
+        files = np.sort(glob.glob(os.path.join(path, '*bcd.fits')))
+        if len(files)!=0:
+            fnames.extend(files)
+            lens.append(len(files))
     return fnames, lens
 
-def get_stacks(calDir, dataDir, AOR_snip, ch):
+def get_stacks(calDir, dataDir, AOR_snip):
     """Find paths to all the background subtraction correction stacks FITS files.
 
     Args:
@@ -42,14 +103,18 @@ def get_stacks(calDir, dataDir, AOR_snip, ch):
     
     """
     
+    while dataDir[-1]=='/':
+        dataDir=dataDir[:-1]
+    ch = dataDir.split('/')[-1]
+    
     stacks = np.array(os.listdir(calDir))
     locs = np.array([stacks[i].find('SPITZER_I') for i in range(len(stacks))])
     good = np.where(locs!=-1)[0] #filter out all files that don't fit the correct naming convention for correction stacks
     offset = 11 #legth of the string "SPITZER_I#_"
     keys = np.array([stacks[i][locs[i]+offset:].split('_')[0] for i in good]) #pull out just the key that says what sdark this stack is for
-
-    data_list = os.listdir(dataDir)
-    AOR_list = [a for a in data_list if AOR_snip in a]
+    
+    lst      = os.listdir(dataDir)
+    AOR_list = [folder for folder in lst if AOR_snip==folder[:len(AOR_snip)]]
     calFiles = []
     for i in range(len(AOR_list)):
         path = dataDir + '/' + AOR_list[i] + '/' + ch +'/cal/'
@@ -60,14 +125,13 @@ def get_stacks(calDir, dataDir, AOR_snip, ch):
         loc = fname.find('SPITZER_I')+offset
         key = fname[loc:].split('_')[0]
         calFiles.append(os.path.join(calDir, stacks[list(good)][np.where(keys == key)[0][0]]))
-    return calFiles
+    return np.array(calFiles)
 
-def get_time(hdu_list, time, ignoreFrames):
+def get_time(header, ignoreFrames):
     """Gets the time stamp for each image.
 
     Args:
-        hdu_list (list): content of fits file.
-        time (ndarray): Array of existing time stamps.
+        header (astropy.io.fits.header.Header): Header of fits file.
         ignoreFrames (ndarray): Array of frames to ignore (consistently bad frames).
 
     Returns:
@@ -75,22 +139,25 @@ def get_time(hdu_list, time, ignoreFrames):
     
     """
     
-    h, w, l = hdu_list[0].data.shape
+    if header['NAXIS']==2:
+        h = 1
+    else:
+        h = header['NAXIS3']
     sec2day = 1.0/(3600.0*24.0)
-    step    = hdu_list[0].header['FRAMTIME']*sec2day
-    t       = np.linspace(hdu_list[0].header['BMJD_OBS'] + step/2, hdu_list[0].header['BMJD_OBS'] + (h-1)*step, h)
+    step    = header['FRAMTIME']*sec2day
+    t       = np.linspace(header['BMJD_OBS'] + step/2, header['BMJD_OBS'] + (h-1)*step, h, endpoint=True)
+    t = np.ma.masked_invalid(t)
     if ignoreFrames != []:
-        t[ignoreFrames] = np.nan
-    time.extend(t)
-    return time
+        t[ignoreFrames].mask = True
+    return t
 
-def oversampling(image_data, a = 2):
+def oversampling(image_data, scale=2):
     """First, substitutes all invalid/sigma-clipped pixels by interpolating the value, then linearly oversamples the image.
 
     Args:
         image_data (ndarray): Data cube of images (2D arrays of pixel values).
-        a (int, optional):  Sampling factor, e.g. if a = 2, there will be twice as much data points in the x and y axis.
-            Default is 2. (Do not recommend larger than 2)
+        scale (int, optional):  Sampling factor, e.g. if scale = 2, there will be twice as many data points in the x
+            and y axis. Default is 2. (Do not recommend larger than 2)
 
     Returns:
         ndarray: Data cube of oversampled images (2D arrays of pixel values).
@@ -99,62 +166,93 @@ def oversampling(image_data, a = 2):
     
     l, h, w = image_data.shape
     gridy, gridx = np.mgrid[0:h:1/a, 0:w:1/a]
-    image_over = np.empty((l, h*a, w*a))
+    image_over = np.zeros((l, h*a, w*a))
     for i in range(l):
         image_masked = np.ma.masked_invalid(image_data[i,:,:])
+        if np.all(image_masked.mask):
+            image_over[i,:,:].mask = True
+            continue
         points       = np.where(image_masked.mask == False)
         image_compre = np.ma.compressed(image_masked)
-        image_over[i,:,:] = interpolate.griddata(points, image_compre, (gridx, gridy), method = 'linear')
-    return image_over/(a**2)
+        image_over[i,:,:] = scipy.interpolate.griddata(points, image_compre,
+                                                       (gridx, gridy), 
+                                                       method = 'linear')
+    
+    # Mask any bad values
+    image_masked = np.ma.masked_invalid(image_over)
+    
+    # conserve flux
+    return image_masked/(a**2)
 
-def sigma_clipping(image_data, filenb = 0 , fname = ['not provided'], tossed = 0, badframetable = None, bounds = (13, 18, 13, 18), sigma=4, maxiters=2):
+def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
     """Sigma clips bad pixels and mask entire frame if the sigma clipped pixel is too close to the target.
 
     Args:
-        image_data (ndarray): Data cube of images (2D arrays of pixel values).
-        filenb (int, optional): Index of current file in the 'fname' list (list of names of files) to keep track of the files that were tossed out. Default is 0.
-        fname (list, optional): List of names of files to keep track of the files that were tossed out. 
-        tossed (int, optional): Total number of image tossed out. Default is 0 if none provided.
-        badframetable (list, optional): List of file names and frame number of images tossed out from 'fname'.
+        image_stack (3D array): Data cube of images (2D arrays of pixel values).
         bounds (tuple, optional): Bounds of box around the target. Default is (13, 18, 13, 18).
+        sigma (float, optional): How many sigma should something differ by to be clipped. Default is 5 which shouldn't trim any real data for Ndata=64*1000.
+        maxiters (int, optional): How many iterations of sigma clipping should be done.
 
     Returns:
-        tuple: sigma_clipped_data (3D array) - Data cube of sigma clipped images (2D arrays of pixel values).
-            tossed (int) - Updated total number of image tossed out.
-            badframetable (list) - Updated list of file names and frame number of images tossed out from 'fname'.
+        3D array: sigma_clipped_data - Data cube of sigma clipped images (2D arrays of pixel values).
     
     """
     
-    if badframetable is None:
-        badframetable = []
-    
     lbx, ubx, lby, uby = bounds
-    h, w, l = image_data.shape
-    # mask invalids
-    image_data2 = np.ma.masked_invalid(image_data)
-    # make mask to mask entire bad frame
-    x = np.ones((w, l))
-    mask = np.ma.make_mask(x)
+    
     try:
-        sig_clipped_data = sigma_clip(image_data2, sigma=sigma, maxiters=maxiters, 
-                                      cenfunc=np.ma.median, axis = 0)
+        image_stack = sigma_clip(image_stack, sigma=sigma, maxiters=maxiters, 
+                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
     except TypeError:
-        sig_clipped_data = sigma_clip(image_data2, sigma=sigma, iters=maxiters, 
-                                      cenfunc=np.ma.median, axis = 0)
-    for i in range (h):
-        if np.ma.is_masked(sig_clipped_data[i, lbx:ubx, lby:uby]):
-            sig_clipped_data[i,:,:] = np.ma.masked_array(sig_clipped_data[i,:,:], mask = mask)
-            badframetable.append([i,filenb,fname])
-            tossed += 1
-    return sig_clipped_data, tossed, badframetable
+        image_stack = sigma_clip(image_stack, sigma=sigma, iters=maxiters,
+                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
+    
+    # If any pixels near the target star are bad, mask the entire frame
+    image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
+    
+    return image_stack
 
-def bgsubtract(img_data, bg_flux=None, bg_err=None, bounds=(11, 19, 11, 19)):
+def clip_data(arr, highpassWidth, sigma1=5, sigma2=5, maxiters=3):
+    try:
+        arr = sigma_clip(arr, sigma=sigma1, maxiters=maxiters, cenfunc=np.ma.median, stdfunc=np.ma.std)
+    except TypeError:
+        arr = sigma_clip(arr, sigma=sigma1, iters=maxiters, cenfunc=np.ma.median, stdfunc=np.ma.std)
+    arr = replace_clipped(arr)
+    arr = rolling_clip(arr, highpassWidth, sigma=sigma2, maxiters=maxiters)
+    arr = replace_clipped(arr)
+    
+    return arr
+
+def replace_clipped(arr):
+    for i in np.where(np.ma.getmaskarray(arr))[0]:
+        inds = np.array([i-2, i-1, i+1, i+2])
+        inds = inds[inds<len(arr)]
+        
+        if not np.all(arr[inds].mask):
+            arr[i] = np.ma.median(arr[inds])
+        else:
+            arr[i] = np.ma.median(arr)
+    
+    arr.mask = np.ma.nomask
+    
+    return arr
+
+def rolling_clip(arr, highpassWidth, sigma=5, maxiters=3):
+    smooth = highpassflist(arr, highpassWidth)
+    smoothed = (arr - smooth)
+    try:
+        smoothed = sigma_clip(smoothed, sigma=sigma, maxiters=maxiters,
+                              cenfunc=np.ma.median, stdfunc=np.ma.std)
+    except:
+        smoothed = sigma_clip(smoothed, sigma=sigma, iters=maxiters,
+                              cenfunc=np.ma.median, stdfunc=np.ma.std)
+    arr[np.ma.getmaskarray(smoothed)] = np.ma.masked
+    return arr
+
+def bgsubtract(bounds=(11, 19, 11, 19), i=0):
     """Measure the background level and subtracts the background from each frame.
 
     Args:
-        img_data (ndarray): Data cube of images (2D arrays of pixel values).
-        bg_flux (ndarray, optional): Array of background measurements for previous images. Default is None.
-        bg_err (ndarray, optional): Array of uncertainties on background measurements for previous images. Default is None.
         bounds (tuple, optional): Bounds of box around the target. Default is (11, 19, 11, 19).
 
     Returns:
@@ -164,32 +262,32 @@ def bgsubtract(img_data, bg_flux=None, bg_err=None, bounds=(11, 19, 11, 19)):
     
     """
     
-    if bg_flux is None:
-        bg_flux = []
-    if bg_err is None:
-        bg_err = []
+    # Access global variable
+    global image_stack
     
     lbx, ubx, lby, uby = bounds
-    image_data = np.ma.copy(img_data)
-    h, w, l = image_data.shape
-    x = np.zeros(image_data.shape)
-    x[:, lbx:ubx,lby:uby] = 1
-    mask   = np.ma.make_mask(x)
-    masked = np.ma.masked_array(image_data, mask = mask)
-    masked = np.reshape(masked, (h, w*l))
-    bg_med = np.reshape(np.ma.median(masked, axis=1), (h, 1, 1))
-    bgsub_data = image_data - bg_med
-    bgsub_data = np.ma.masked_invalid(bgsub_data)
-    bg_flux.extend(bg_med.ravel())
-    bg_err.extend(np.ma.std(masked, axis=1))
-    return bgsub_data, bg_flux, bg_err
+    
+    # Get the initial mask
+    image = np.ma.masked_invalid(image_stack[i])
+    
+    # Mask out the target star
+    image[lbx:ubx,lby:uby] = np.ma.masked
+    
+    # Compute background and error
+    bg = np.ma.median(image)
+    bg_err = np.ma.std(image)
+    
+    # Subtract background
+    image_stack[i] -= bg
+    
+    return np.array([bg, bg_err])
 
-def binning_data(data, size):
+def bin_array(data, size):
     """Median bin an array.
 
     Args:
         data (1D array): Array of data to be binned.
-        size (int): Size of bins.
+        size (int): Number of data points in each bin.
 
     Returns:
         tuple: binned_data (1D array) Array of binned data.
@@ -197,8 +295,172 @@ def binning_data(data, size):
     
     """
     
-    data = np.ma.masked_invalid(data)
-    reshaped_data   = data.reshape(int(len(data)/size), size)
-    binned_data     = np.ma.median(reshaped_data, axis=1)
-    binned_data_std = np.std(reshaped_data, axis=1)
+    data = np.ma.masked_invalid(np.ma.copy(data))
+    x = np.arange(data.shape[0])
+    bins = size*np.arange(np.ceil(len(x)/size)+1)-0.5
+    
+    binned_data = binned_statistic(x, data, statistic=np.ma.median, bins=bins)[0]
+    
+    binned_data_std = binned_statistic(x, data, statistic=np.ma.std, bins=bins)[0]
+    
     return binned_data, binned_data_std
+
+def highpassflist(signal, highpassWidth):
+    g = Box1DKernel(highpassWidth)
+    return convolve(signal, g, boundary='extend')
+
+def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
+                  oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
+                  addStack=False, stackPath='', maskStars=[], i=0):
+    
+    # open fits file
+    with fits.open(fnames[i]) as hdu_list:
+        header = hdu_list[0].header
+        time = get_time(header, ignoreFrames)
+
+        if len(hdu_list[0].data.shape)==2:
+            # Reshape fullframe data so that it can be used with our routines
+            # Getting just the stamp around the sweet spot
+            image = np.ma.masked_invalid(hdu_list[0].data[np.newaxis,217:249,9:41])
+        else:
+            image = np.ma.masked_invalid(hdu_list[0].data)
+            #ignore any consistently bad frames in datacubes
+            image[ignoreFrames] = np.nan
+            image[ignoreFrames].mask = True
+    
+    #add background correcting stack if requested
+    if addStack:
+        j=0 #counter to keep track of which correction stack we're using
+        while i > np.sum(lens[:j+1]):
+            j+=1 #if we've moved onto a new AOR, increment j
+        stackHDU = fits.open(stacks[j])
+        image += np.ma.masked_invalid(stackHDU[0].data)
+    
+    if image.shape[0]!=1:
+        # Sigma clipping within datacubes
+        image = sigma_clipping(image, sigma=4.)
+    
+    # convert MJy/str to electron count
+    convfact = (header['GAIN']*header['EXPTIME']/header['FLUXCONV'])
+    image = convfact*image
+    
+    # Mask any other stars in the frame to avoid them influencing the background subtraction
+    if maskStars != []:
+        header['CTYPE3'] = 'Time-SIP' #Just need to add a type so astropy doesn't complain
+        w = WCS(header, naxis=[1,2])
+        mask = np.ma.getmaskarray(image)
+        for st in maskStars:
+            coord = SkyCoord(st[0], st[1])
+            x,y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
+            x = x+np.arange(-1,2)
+            y = y+np.arange(-1,2)
+            x,y = np.meshgrid(x,y)
+            mask[:,x,y] = True
+        image = np.ma.masked_array(image, mask=mask)
+    
+    # oversampling
+    if oversamp:
+        if reuse_oversamp:
+            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+            if os.path.isfile(savename):
+                image = np.load(savename)
+            else:
+                print('Warning: Oversampled images were not previously saved! Making new ones now...')
+                image = np.ma.masked_invalid(oversampling(image, scale))
+                if (saveoversamp == True):
+                    # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+                    image.dump(savename)
+        else:
+            image = np.ma.masked_invalid(oversampling(image))
+        
+        if saveoversamp:
+            # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
+            savename = savepath + 'Oversampled/' + fnames[i].split('/')[-1].split('_')[-4] + '.pkl'
+            image.dump(savename)
+    
+    data = image.reshape(-1,np.product(image.shape[1:]))
+    data = np.append(data, time[:,np.newaxis], axis=1)
+    
+    return data
+
+def prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames=[],
+                   oversamp=False, scale=2, reuse_oversamp=True, saveoversamp=True,
+                   addStack=False, maskStars=[], ncpu=4):
+    
+    #folder containing properly named correction stacks (will be automatically selected)
+    stackPath = basepath+'Calibration/'
+    datapath   = basepath+planet+'/data/'+channel
+    savepath = basepath+planet+'/analysis/'+channel+'/'
+    if addStack:
+        savepath += 'addedStack/'
+    else:
+        savepath += 'addedBlank/'
+    
+    if maskStars is None:
+        maskStars = []
+    if ignoreFrames is None:
+        ignoreFrames = []
+    
+    print('\tGetting frames', end='', flush=True)
+    if len(ignoreFrames)!=0:
+        print(', masking bad frames', end='', flush=True)
+    print('... ', end='')
+    # get list of filenames and number of files
+    fnames, lens = get_fnames(datapath, AOR_snip)
+    
+    # get path where the aor breaks will be saved
+    breakpath = basepath+planet+'/analysis/'+channel+'/aorBreaks.txt'
+    # get & write aor breaks
+    index  = 0
+    breaktimes = []
+    for length in lens:
+        with fits.open(fnames[index]) as rawImage:
+            header = rawImage[0].header
+            breaktimes.append(get_time(header, []).flatten()[0])
+        index += length
+    breaktimes = np.sort(breaktimes)[1:]
+    with open(breakpath, 'w') as f:
+        f.write(str(breaktimes)[1:-1])    
+    
+    # if need to add correction stack
+    if addStack:
+        stacks = get_stacks(stackPath, datapath, AOR_snip)
+    else:
+        stacks = []
+    
+    # Load all of the images using multiprocessing to speed things up
+    with Pool(ncpu) as pool:
+        func = partial(prepare_image, savepath, AOR_snip, fnames, lens, stacks, ignoreFrames,
+                       oversamp, scale, reuse_oversamp, saveoversamp, addStack, stackPath, maskStars)
+        inds = range(len(fnames))
+        results = np.ma.masked_array(pool.map(func, inds)).reshape(-1,int(32**2+1))
+    
+    # Access global variable
+    global image_stack
+    
+    time = results[:,-1].flatten()
+    image_stack = results[:,:-1].reshape(-1, 32, 32)
+    # Free up a bit of RAM
+    results = None
+    
+    # Sort data into correct order
+    order = np.argsort(time)
+    time = time[order]
+    image_stack = image_stack[order]
+    # Free up a bit of RAM
+    order = None
+    
+    print('Sigma clipping... ', end='', flush=True)
+    # sigma clip bad pixels along full time axis
+    image_stack = sigma_clipping(image_stack, sigma=5)
+    
+    print('Subtracting background... ', end='', flush=True)
+    # background subtraction is done on global variable
+    with Pool(ncpu) as pool:
+        func = partial(bgsubtract, (11, 19, 11, 19))
+        inds = range(image_stack.shape[0])
+        bg, bg_err = np.array(pool.map(func, inds)).T
+    
+    print('Frames loaded!', flush=True)
+    
+    return image_stack, bg, bg_err, time

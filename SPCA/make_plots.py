@@ -3,19 +3,16 @@ import matplotlib.pyplot as plt
 import matplotlib.cm
 from matplotlib.ticker import MaxNLocator
 from matplotlib import gridspec
+import pickle
 
 import os,sys
 lib_path = os.path.abspath(os.path.join('../MCcubed/rednoise/'))
 sys.path.append(lib_path)
 
-try:
-    from mc3.stats import time_avg
-except ImportError:
-    print('Warning: time_avg from mc3.stats failed to import. To install it, run the getMCcubed.sh script.')
+from mc3.stats import time_avg
 
 # SPCA libraries
-from . import bliss
-from . import helpers
+from . import bliss, helpers, astro_models
 
 
 def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
@@ -49,7 +46,7 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
     axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
     axes[0].set_ylabel("Relative Flux $F$")
-    axes[0].set_xlim((np.min(time0), np.max(time0)))
+    axes[0].set_xlim((np.nanmin(time0), np.nanmax(time0)))
 
     axes[1].plot(time0, xdata0,  'r.', markersize=1, alpha = 0.7)
     axes[1].plot(time, xdata,  'k.', markersize=2, alpha = 1.0)
@@ -75,8 +72,15 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     fig.subplots_adjust(hspace=0)
     
     if savepath!=None:
+        # saving plot as pdf
         pathplot = savepath + '01_Raw_data.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: Time, Flux, xdata, ydata, psfwx, psfwy, Time0, Flux0, xdata0, ydata0, psfwx0, psfwy0'
+        data = [header, time0, flux0, xdata0, ydata0, psfxw0, psfyw0, time, flux, xdata, ydata, psfxw, psfyw]
+        pathdata = savepath + '01_Raw_data.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
     
     if showPlot:
         plt.show()
@@ -112,9 +116,16 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     fig.subplots_adjust(hspace=0)
     
     if savepath is not None:
+        # saving plot as pdf
         pathplot = savepath + 'Centroids.pdf'
         fig.savefig(pathplot, bbox_inches='tight')
-    
+        # saving data used in the plot as pkl file
+        header = 'HEADER: xdata0, ydata0, xdata, ydata'
+        data = [header, xdata0, ydata0, xdata, ydata]
+        pathdata = savepath + 'Centroids.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
         
@@ -122,12 +133,11 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     return
 
 
-def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
+def plot_knots(xdata, ydata, 
                tmask_good_knotNdata, knots_x, knots_y, 
-               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath=None, showPlot=False):
+               knots_x_mesh, knots_y_mesh, knotNdata, savepath=None, showPlot=False):
     '''Plot the Bliss map'''
     
-    fB_avg = bliss.map_flux_avgQuick(flux, astroModel, knot_nrst_lin, nBin, knotNdata)
     delta_xo, delta_yo = knots_x[1] - knots_x[0], knots_y[1] - knots_y[0]
     
     star_colrs = knotNdata[tmask_good_knotNdata]
@@ -135,10 +145,10 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     plt.figure(figsize=(12,6))
 
     plt.subplot(121)
-    plt.scatter(xdata, ydata,color=(0,0,0),alpha=0.2,s=2,marker='.')
+    plt.scatter(xdata, ydata, color=(0,0,0), alpha=0.2, s=2, marker='.')
     plt.gca().set_aspect((knots_x[-1]-knots_x[0])/(knots_y[-1]-knots_y[0]))
-    plt.xlabel('Pixel x',size='x-large');
-    plt.ylabel('Pixel y',size='x-large');
+    plt.xlabel('Pixel x', size='x-large');
+    plt.ylabel('Pixel y', size='x-large');
     plt.title('Knot Mesh',size='large')
     plt.xlim([knots_x[0] - 0.5*delta_xo, knots_x[-1] + 0.5*delta_xo])
     plt.ylim([knots_y[0] - 0.5*delta_yo, knots_y[-1] + 0.5*delta_yo])
@@ -161,6 +171,12 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     if savepath!=None:
         pathplot = savepath+'BLISS_Knots.pdf'
         plt.savefig(pathplot, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: xdata, ydata, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, knotNdata'
+        data = [header, xdata, ydata, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, knotNdata]
+        pathdata = savepath + 'BLISS_Knots.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
 
     if showPlot:
         plt.show()
@@ -168,77 +184,27 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     plt.close()
     return
 
-def plot_init_guess(time, data, astro, detec_full, savepath=None, showPlot=False):
-    """Makes a multi-panel plots for the initial light curve guesses.
-    
-    Args:
-        time (1D array): Time stamps.
-        data (1D array): Flux values for each time stamps.
-        astro (1D array): Initial modelled astrophysical flux variation for each time stamps.
-        detec_full (1D array): Initial modelled flux variation due to the detector for each time stamps.
-        savepath (str): Path to directory where the plot will be saved.
-    
-    Returns:
-        None
-    
-    """
-    
-    fig, axes = plt.subplots(nrows=4, ncols=1, sharex=True, figsize=(10,9))
-    
-    axes[0].plot(time, data, '.', label='data')
-    axes[0].plot(time, astro*detec_full, '.', label='guess')
-    
-    axes[1].plot(time, data/detec_full, '.', label='Corrected')
-    axes[1].plot(time, astro, '.', label='Astrophysical')
-    
-    axes[2].plot(time, data/detec_full, '.', label='Corrected')
-    axes[2].plot(time, astro, '.', label='Astrophysical')
-    axes[2].set_ylim(0.998, 1.005)
-    
-    axes[3].plot(time, data/detec_full-astro, '.', label='residuals')
-    axes[3].axhline(y=0, linewidth=2, color='black')
-    
-    axes[0].set_ylabel('Relative Flux')
-    axes[2].set_ylabel('Relative Flux')
-    axes[2].set_xlabel('Time (BMJD)')
-    
-    axes[0].legend(loc=3)
-    axes[1].legend(loc=3)
-    axes[2].legend(loc=3)
-    axes[3].legend(loc=3)
-    axes[3].set_xlim(np.min(time), np.max(time))
-    
-    fig.subplots_adjust(hspace=0)
-    if savepath is not None:
-        pathplot = savepath + '02_Initial_Guess.pdf'
-        fig.savefig(pathplot, bbox_inches='tight')
-        
-    if showPlot:
-        plt.show()
-        
-    plt.close()
-    return
-
-def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPlot=False):
+def walk_style(chain, labels, interv=10, fname=None, showPlot=False):
     """Make a plot showing the evolution of the walkers throughout the emcee sampling.
 
     Args:
-        ndim (int): Number of free parameters
-        nwalk (int): Number of walkers
-        samples (ndarray): The ndarray accessed by calling sampler.chain when using emcee
-        interv (int): Take every 'interv' element to thin out the plot
-        subsamp (int): Only show the last 'subsamp' steps
+        chain (ndarray): The ndarray accessed by calling sampler.chain when using emcee
         labels (ndarray): The fancy labels for each dimension
-        fname (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+        interv (int): Take every 'interv' element to thin out the plot
+        name (string, optional): The savepath for the plot (or None if you want to return the figure instead).
+        showPlot (bool, optional): Whether or not you want to show the plotted figure.
 
     Returns:
         None
     
     """
     
+    nwalk = chain.shape[0]
+    ndim = chain.shape[-1]
+    
     # get first index
-    beg   = len(samples[0,:,0]) - subsamp
-    end   = len(samples[0,:,0]) 
+    beg   = 0
+    end   = len(chain[0,:,0]) 
     step  = np.arange(beg,end)
     step  = step[::interv] 
     
@@ -255,7 +221,8 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPl
         sig2 = (0.9545)/2.*100
         sig3 = (0.9973)/2.*100
         percentiles = [50-sig3, 50-sig2, 50-sig1, 50, 50+sig1, 50+sig2, 50+sig3]
-        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(samples[:,:,ind][:,beg:end:interv], percentiles, axis=0)
+        neg3sig, neg2sig, neg1sig, mu_param, pos1sig, pos2sig, pos3sig = np.percentile(chain[:,:,ind][:,beg:end:interv],
+                                                                                       percentiles, axis=0)
         plt.plot(step, mu_param)
         plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
         plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
@@ -276,29 +243,17 @@ def walk_style(ndim, nwalk, samples, interv, subsamp, labels, fname=None, showPl
     return
     
 # FIX - add docstring for this function
-def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_inputs, astrofunc, signalfunc,
-                 breaks, savepath, plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24,plot_peritime=False):
+def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initial_Guess.pdf',
+               plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24, plot_peritime=False):
     
-    ind_a = len(p0_astro) # index where the astro params end
-
-    # generate the models from best-fit parameters
-    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_labels))]))
-    astro = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
-    detec = mcmc_signal/astro
-
-#     time2 = np.linspace(np.min(time), np.max(time), 1000)
-    
-#     #for higher-rez red curve
-#     astro  = astrofunc(time2, **dict([[p0_astro[i], p0_mcmc[:ind_a][i]] for i in range(len(p0_astro))]))
+    mcmc_signal = astro*detec
     
     if plotTrueAnomaly:
         # FIX: convert time to true anomaly for significantly eccentric planets!!
         # Use p0_mcmc if there, otherwise p0_obj
         x = time
-#         x2 = time2
     else:
         x = time
-#         x2 = time2
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -326,7 +281,7 @@ def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_
         axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
     axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
-    axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro))
+    axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.max(astro)+3*np.nanstd(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
     axes[3].axhline(y=0, color='r', linewidth = 2)
@@ -344,16 +299,24 @@ def plot_bestfit(p0_mcmc, time, flux, mode, p0_obj, p0_astro, p0_labels, signal_
             axes[i].xaxis.set_tick_params(labelsize=fontsize)
             axes[i].yaxis.set_tick_params(labelsize=fontsize)
             axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
-            for j in range(len(breaks)):
-                axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
+    
+    for i in range(len(axes)):
+        for j in range(len(breaks)):
+            axes[i].axvline(x=(breaks[j]), color ='k', alpha=0.3, linestyle = 'dashed')
     
     fig.align_ylabels()
     
     fig.subplots_adjust(hspace=0)
     
     if savepath is not None:
-        plotname = savepath + 'MCMC_'+mode+'_2.pdf'
+        plotname = savepath + plotName
         fig.savefig(plotname, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: time, flux, astro, detec, breaks'
+        data = [header, time, flux, astro, detec, breaks]
+        pathdata = savepath + plotName[:-3] + 'pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
         
     if showPlot:
         plt.show()
@@ -402,6 +365,13 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'
         plt.savefig(plotname, bbox_inches='tight')
+        # saving data used in the plot as pkl file
+        header = 'HEADER: residuals, minbins, ingrDuration, occDuration, intTime, mode'
+        data = [residuals, minbins, ingrDuration, occDuration, intTime, mode]
+        pathdata = savepath + 'MCMC_'+mode+'_RedNoise.pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
         
@@ -425,7 +395,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     outStr += str(sreal/s0)
 
     if showtxt:
-        print(outStr)
+        print(outStr, flush=True)
     if savetxt:
         fname = savepath + 'MCMC_'+mode+'_RedNoise.txt'
         with open(fname,'w') as file:
@@ -482,10 +452,91 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
 
     if fname is not None:
         fig.savefig(fname, bbox_inches='tight')
-    
+        # saving data used in the plot as pkl file
+        header = 'HEADER: all_data, firstEcl_data, transit_data, secondEcl_data (structure of each list: xdata, ydata, psfxw, psfyw, flux, residuals)'
+        data = [all_data, firstEcl_data, transit_data, secondEcl_data]
+        pathdata = fname[:-3] +'pkl'
+        with open(pathdata, 'wb') as outfile:
+            pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+
     if showPlot:
         plt.show()
     
     plt.close()
     return
 
+def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
+                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False):
+    if 't0' in p0_labels:
+        t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
+    else:
+        t0MCMC = p0_obj['t0']
+    if 'per' in p0_labels:
+        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
+    else:
+        perMCMC = p0_obj['per']
+    if 'rp' in p0_labels:
+        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
+    else:
+        rpMCMC = p0_obj['rp']
+    if 'a' in p0_labels:
+        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
+    else:
+        aMCMC = p0_obj['a']
+    if 'inc' in p0_labels:
+        incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
+    else:
+        incMCMC = p0_obj['inc']
+    if 'ecosw' in p0_labels:
+        ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
+    else:
+        ecoswMCMC = p0_obj['ecosw']
+    if 'esinw' in p0_labels:
+        esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
+    else:
+        esinwMCMC = p0_obj['esinw']
+    if 'q1' in p0_labels:
+        q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
+    else:
+        q1MCMC = p0_obj['q1']
+    if 'q2' in p0_labels:
+        q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
+    else:
+        q2MCMC = p0_obj['q2']
+    if 'fp'in p0_labels:
+        fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
+    else:
+        fpMCMC = p0_obj['fp']
+
+    eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
+    wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
+    u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
+    u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
+
+    trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
+                                                         aMCMC, incMCMC, eccMCMC, wMCMC,
+                                                         u1MCMC, u2MCMC)
+    # generating secondary eclipses model
+    eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
+                                 fpMCMC, t_sec)
+
+    # get in-transit indices
+    ind_trans  = np.where(trans!=1)
+    # get in-eclipse indices
+    ind_eclip  = np.where((eclip!=(1+fpMCMC)))
+    # seperating first and second eclipse
+    ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
+    ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
+
+    data1 = [xdata, ydata, psfxw, psfyw, flux, residuals]
+    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residuals[ind_ecli1]]
+    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residuals[ind_trans]]
+    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residuals[ind_ecli2]]
+
+    if savepath is not None:
+        plotname = savepath + 'MCMC_'+mode+'_7.pdf'
+    else:
+        plotname = None
+    triangle_colors(data1, data2, data3, data4, plotname, showPlot)
+    
+    return

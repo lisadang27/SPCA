@@ -285,7 +285,7 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
 
 
 
-def check_phase(phis, A, B, C=0, D=0):
+def check_phase(checkPhasePhis, A, B, C=0, D=0):
     """Check if the phasecurve ever dips below zero, implying non-physical negative flux coming from the planet.
 
     Args:
@@ -300,8 +300,17 @@ def check_phase(phis, A, B, C=0, D=0):
     
     """
     
+    if not (-90 < np.arctan2(B, A)*180/np.pi < 90):
+        return -np.inf
+    
     if C==0 and D==0:
         #avoid wasting time by multiplying by a bunch of zeros
-        return np.any(1 + A*(np.cos(phis)-1) + B*np.sin(phis) < 0)
+        negative = np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis) < 0)
     else: 
-        return np.any(1 + A*(np.cos(phis)-1) + B*np.sin(phis) + C*(np.cos(2*phis)-1) + D*np.sin(2*phis) < 0)
+        negative =  np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis)
+                            + C*(np.cos(2*checkPhasePhis)-1) + D*np.sin(2*checkPhasePhis) < 0)
+        
+    if negative:
+        return -np.inf
+    else:
+        return 0

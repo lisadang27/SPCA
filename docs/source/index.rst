@@ -15,14 +15,26 @@ To install SPCA, run the following in a terminal:
 
 .. code-block:: bash
 
-        git clone git@github.com:lisadang27/SPCA.git
+        git clone https://github.com/lisadang27/SPCA.git
         cd SPCA
         pip install .
+        # IF you want to install george to run GP analyses, also then run
+        pip install .[GP]
 
-Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects like PSF fitting and nearby companion removal using PSF subtraction.
+Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects like PSF fitting with aperture photometry or nearby companion removal using PSF subtraction.
 
 Update Log
 ==========
+
+Version 0.3
+-----------
+As of version 0.3, we have made some important changes. These include:
+- Added the ability to perform full-frame photometry
+- Added the ability to fit unbinned photometry
+- Added the ability to decorrelate using PSF-fitted centroids using the "\_PSFX" mode suffix
+- Added sigma-clipping along full time axis (not just within data cube). This comes at the cost of needing to load all frames into RAM at the same time which can be quite RAM intensive for some phase curves. Will consider allowing user to switch to using dask in the future to reduce RAM cost when performing photometry at the cost of slower run speeds.
+- Changed BLISS knot density selection algorithm to be more like POET's algorithm
+- No updates on emcee freezing, but it now rarely ever occurs for me (Taylor). Perhaps the better initialization routine is helping here.
 
 Version 0.2
 -----------
@@ -37,17 +49,19 @@ As of version 0.2, we have made some important changes and some bug fixes. These
 Package Usage
 =============
 
-1. To use SPCA, you must first download your data from the Spitzer Heritage Archive: https://sha.ipac.caltech.edu/applications/Spitzer/SHA/. Place the downloaded zip files in a directory with the same name as the planet (exluding spaces).
+0. Follow the installation instructions at the top of this page to ensure you have all of the necessary dependencies.
+
+1. To use SPCA, you must first download your Spitzer data from the Spitzer Heritage Archive: https://sha.ipac.caltech.edu/applications/Spitzer/SHA/. Place the downloaded zip files in a directory with the same name as the planet (exluding spaces).
 
 Most of the following commands have an .ipynb ending and .py ending option available, where the .py version is optimized for analyzing many data sets and the .ipynb file is optimized for viewing the analysis of a single data set. Each file has a portion at the top where you can set parameters which will determine the techniques.
 
 2. Next, use the Make_Directory_Structure file to extract the data and setup the required directories.
 
-3. Then use the Everything_Photometry file to perform a suite of different photometries on your data and have the code automatically select the best photometry (selecting the photometry that gives the lowest scatter after smoothing the raw flux by a boxcar filter of a width provided by the user).
+3. Then use the Everything_Photometry file to perform a suite of different photometries on your data. The code will automatically select the best aperture photometry method which gives the lowest scatter after smoothing the raw flux by a boxcar filter of a width provided by the user.
 
-4. Then use the QuickLook file to ensure that you have looked at the raw data and to determine whether you want to remove the first AOR (in case it is a short AOR before PCRS peak-up was used). By looking at the raw data, you can gain some insight into how successful different decorrelation models might be.
+4. Then use the QuickLook file to ensure that you have looked at the raw data (to ensure it looks reasonable) and to determine whether you want to remove the first AOR (in case it is a short AOR to be discarded). By looking at the raw data, you can gain some insight into how successful different decorrelation models might be.
 
-5. Then decorrelate the data using the Decorrelation file. Most parameters here are explained with a nearby comment. One key parameter though is the "mode" which sets the decorrelation method used. Modes that contain "Poly#" use a 2-dimentionsal polynomial of order #, modes that contain "BLISS" use BiLinearly-Interpolated Subpixel Sensitivity mapping, modes that contain "GP" use a Gaussian Process using x and y centroid positions as covariates, and modes that contain "PLD#_$x$" use Pixel Level Decorrelation of order # (1 or 2) and use a pixel stamp size of $ by $ (3x3 or 5x5). PLD performed using aperture photometry (the recommended PLD technique) can be accessed using "PLDAper#_$x$". Each mode is then followed by an underscore and either "v1" or "v2" indicating the use of either a 1st or 2nd order sinusoidal model for the phase variations. If "ellipse" is present in the mode string, phase variations due to the elliptical shape of the planet are modelled. Any other text can be added to the mode keyword for your own convenience (e.g. "Poly2_v1_run2" or "PLDAper2_5x5_v1_testingFit").
+5. Then decorrelate the data using the Decorrelation file. Most parameters here are explained with a nearby comment. One key parameter though is the "mode" which sets the decorrelation method used. Modes that contain "Poly#" use a 2-dimentionsal polynomial of order #, modes that contain "BLISS" use BiLinearly-Interpolated Subpixel Sensitivity mapping, modes that contain "GP" use a Gaussian Process using x and y centroid positions as covariates, and modes that contain "PLD#_$x$" use Pixel Level Decorrelation of order # (1 or 2) and use a pixel stamp size of $ by $ (3x3 or 5x5). PLD performed using aperture photometry (the recommended PLD technique) can be accessed using "PLDAper#_$x$". Each mode is then followed by an underscore and either "v1" or "v2" indicating the use of either a 1st or 2nd order sinusoidal model for the phase variations. If "PSFX" is present in the mode string for non-PLD models, the data are decorrelated using the PSF-fitted centroids rather than the flux-weighted mean centroids. If "ellipse" is present in the mode string, phase variations due to the elliptical shape of the planet are modelled. Any other text can be added to the mode keyword for your own convenience (e.g. "Poly2_v1_run2" or "PLDAper2_5x5_v1_testingFit").
 
 6. Finally, some tables containing a selection of the fitted parameters from each model run can be made using the MakeTables file. These tables will also highlight the best decorrelation method for each analysis, determined using delta-BIC (selecting your model is actually quite a challenging and complicated step, and user discretion is absolutely recommended).
 
@@ -74,7 +88,7 @@ Contributions
 
 Both authors worked extensively to debug the code and simplify the user experience.
 
-`Taylor James Bell <https://github.com/taylorbell57>`_ further generalized and streamlined SPCA, allowing it to be run quickly and easily for any given planet with minimal effort. Taylor also contributed much of the documentation, and the GP decorrelation method.
+`Taylor James Bell <https://github.com/taylorbell57>`_ further generalized and streamlined SPCA, allowing it to be run quickly and easily for any given planet with minimal effort. Taylor also contributed most of the documentation, and the GP decorrelation method.
 
 Acknowledgements
 ================

@@ -1,18 +1,11 @@
-import scipy
-import scipy.stats as sp
-import scipy.optimize as spopt
-
-import emcee
-import corner
-
-from astropy import constants as const
-from astropy import units
-
 import numpy as np
-import time as t
-import os, sys, errno
-import csv
+import matplotlib.pyplot as plt
+import os, errno
 from tqdm import tqdm
+
+import scipy.optimize
+import emcee
+from astropy import constants as const
 
 from multiprocessing import Pool
 from threadpoolctl import threadpool_limits
@@ -20,38 +13,47 @@ from threadpoolctl import threadpool_limits
 import warnings
 warnings.filterwarnings("ignore")
 
-import matplotlib.pyplot as plt
-
-from mpl_toolkits.axes_grid1 import make_axes_locatable
-
-import astropy.time
-from astropy.stats import sigma_clip
 from astropy.table import Table
 from astropy.io import fits
 
 import urllib.request
 
+import pickle
+
 # SPCA libraries
-from SPCA import helpers, astro_models, make_plots, make_plots_custom, detec_models, bliss, freeze
+from SPCA import helpers, astro_models, make_plots, bliss
 
-
-# FIX: Add a docstring for this function
 def downloadExoplanetArchive():
-    #Download the most recent masterfile of the best data on each target
+    """Downloads the most recent masterfile of the best data on each target
+    Args:
+        None
+    Returns:
+        None
+    """
+
     try:
         _ = urllib.request.urlretrieve('http://www.astro.umontreal.ca/~adb/masterfile.ecsv', './masterfile.ecsv')
     except:
-        print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.')
+        print('Unable to download the most recent Exoplanet Archive data - analyses will resort to a previously downloaded version if available.', flush=True)
     return
 
 # FIX: Add a docstring for this function
 def loadArchivalData(rootpath, planet, channel):
+    """Loads system parameters and respective uncertainties from the NASA Exoplanets Archives into p0_obj.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+    Returns:
+        p0_obj   (obj): object with initial parameters 
+    """
+
     if os.path.exists('./masterfile.ecsv'):
         data = Table.to_pandas(Table.read('./masterfile.ecsv'))
     else:
         # Fix: throw a proper error
         print('ERROR: No previously downloaded Exoplanet Archive data - try again when you are connected to the internet.')
-        print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), './masterfile.ecsv'))
+        print(FileNotFoundError(errno.ENOENT, os.strerror(errno.ENOENT), './masterfile.ecsv'), flush=True)
         return
 
     names = np.array(data['pl_hostname'])+np.array(data['pl_letter'])
@@ -67,7 +69,7 @@ def loadArchivalData(rootpath, planet, channel):
     indices = np.where(names==planet.replace(' ','').replace('-', '').split('_')[0])[0]
     if len(indices)==0:
         # Fix: throw a proper error
-        print('ERROR: Planet', planet, 'not found in the Exoplanet Archive - please load your own prior values.')
+        print('ERROR: Planet', planet, 'not found in the Exoplanet Archive - please load your own prior values.', flush=True)
         return
     
     nameIndex = indices[0]
@@ -99,9 +101,14 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj['inc'] = data['pl_orbincl'][nameIndex]
     p0_obj['inc_err'] = np.mean([data['pl_orbinclerr1'][nameIndex],
                                  np.abs(data['pl_orbinclerr2'][nameIndex])])
+    if planet=='HD189733b':
+        p0_obj['inc'] = 85.710
+        p0_obj['inc_err'] = 0.024
     p0_obj['Tstar'] = data['st_teff'][nameIndex]
     p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
                                    np.abs(data['st_tefferr2'][nameIndex])])
+    if planet=='KELT-1b':
+        p0_obj['Tstar'], p0_obj['Tstar_err'] = (6518, 50)
     
     p0_obj['logg'] = data['st_logg'][nameIndex]
     p0_obj['feh'] = data['st_metfe'][nameIndex]
@@ -112,21 +119,48 @@ def loadArchivalData(rootpath, planet, channel):
     if e != 0 and np.isfinite(e):
 
         if not np.isfinite(argp):
-            print('Randomly generating an argument of periastron...')
+            print('Randomly generating an argument of periastron...', flush=True)
             argp = np.random.uniform(0.,360.,1)
 
-        p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
+        p0_obj['ecosw'] = e*np.cos(argp*np.pi/180.)
         if 90 < argp < 270:
             p0_obj['ecosw']*=-1
-        p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
+        p0_obj['esinw'] = np.sin(argp*np.pi/180.)
         
     # Get the stellar brightness temperature to allow us to invert Plank equation later
     p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
     
     return p0_obj
 
-# FIX: Add a docstring for this function
 def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tstar, logg, feh, rp_err=np.inf, a_err=np.inf, t0_err=np.inf, per_err=np.inf, inc_err=np.inf, e_err=np.inf, argp_err=np.inf, Tstar_err=np.inf):
+    """Load custom parameters into p0_obj.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        rp     (float): radius of the planets in unit of stellar radius
+        a      (float): semi-major axis of the orbit of the planet in unit of stellar radius
+        per    (float): period of the orbit in days
+        t0     (float): time of transit in BMJD
+        inc    (float): inclination of the orbit in degrees (inc = 90 for edge-on orbit)
+        e      (float): eccentricity of the orbit
+        argp   (float): argument of periastron in degrees
+        Tstar  (float): Stellar temperature in Kelvins
+        logg   (float): Surface gravity in log_10(cm/s^2)
+        feh    (float): Stellar metallicity ratio [Fe/H]
+        rp_err   (float,optional): uncertainty on radius of the planets in unit of stellar radius
+        a_err    (float,optional): uncertainty on semi-major axis of the orbit of the planet in unit of stellar radius
+        per_err  (float,optional): uncertainty on period of the orbit in days
+        t0_err   (float,optional): uncertainty on time of transit in BMJD
+        inc_err  (float,optional): uncertainty on inclination of the orbit in degrees (inc = 90 for edge-on orbit)
+        e_err    (float,optional): uncertainty on eccentricity of the orbit
+        argp_err (float,optional): uncertainty on argument of periastron in degrees
+        Tstar_err(float,optional): uncertainty on Stellar temperature in Kelvins
+
+    Returns:
+        p0_obj (obj): object with initial parameters 
+    """
+
     # make params obj
     p0_obj  = helpers.signal_params() 
 
@@ -150,7 +184,7 @@ def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tsta
     if e != 0:
 
         if not np.isfinite(argp):
-            print('Randomly generating an argument of periastron...')
+            print('Randomly generating an argument of periastron...', flush=True)
             argp = np.random.uniform(0.,360.,1)
 
         p0_obj['ecosw'] = e/np.sqrt(1+np.tan(argp*np.pi/180.)**2)
@@ -163,8 +197,19 @@ def loadCustomData(rootpath, planet, channel, rp, a, per, t0, inc, e, argp, Tsta
     
     return p0_obj
 
-# FIX: Add a docstring for this function
+# FIX: Add a docstring for this function (docstring not done)
 def getTstarBright(rootpath, planet, channel, p0_obj):
+    """Calculate the stellar brightness temperature based on phoenix spectrum.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        p0_obj (obj): object with initial parameters 
+    Returns:
+        tstar_b (): ???
+        p0_obj['Tstar_err'] (float): uncertainty on stellar temperature
+    """
+
     # Get the phoenix file ready to compute the stellar brightness temperature
     teffStr = p0_obj['Tstar']
     if teffStr <= 7000:
@@ -192,13 +237,15 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     phoenixWavFile = phoenixPath+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits'
     if not os.path.exists(phoenixPath):
         os.mkdir(phoenixPath)
+        print('Downloading PHOENIX wavelength data.', flush=True)
         try:
             _ = urllib.request.urlretrieve(webfolder+'WAVE_PHOENIX-ACES-AGSS-COND-2011.fits', phoenixWavFile)
         except:
             # Fix: throw a proper error
-            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.')
+            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.',
+                  flush=True)
             exit()
-        print('Done download.')
+        print('Done download.', flush=True)
 
     webfolder += 'PHOENIX-ACES-AGSS-COND-2011/Z'+("{0:+.01f}".format(feh) if feh!=0 else '-0.0')+'/'
 
@@ -210,14 +257,15 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
     phoenixSpectraFile = phoenixPath+webfile
 
     if not os.path.exists(phoenixSpectraFile):
-        print('Downloading relevant PHOENIX spectra...')
+        print('Downloading relevant PHOENIX spectra...', flush=True)
         try:
             _ = urllib.request.urlretrieve(webfolder+webfile, phoenixSpectraFile)
         except:
             # Fix: throw a proper error
-            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.')
+            print('ERROR: No previously downloaded PHOENIX data - try again when you are connected to the internet.',
+                  flush=True)
             exit()
-        print('Done download.')
+        print('Done download.', flush=True)
     
     
     with fits.open(phoenixSpectraFile) as f:
@@ -245,13 +293,40 @@ def getTstarBright(rootpath, planet, channel, p0_obj):
 
 # FIX: Add a docstring for this function
 def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAddStack=False):
+    """Calculate the stellar brightness temperature based on phoenix spectrum.
+    Args:
+        rootpath (str): Path to data
+        planet   (str): name of the planet
+        channel  (str): Spitzer channel used to obtain the observation (ch1 or ch2) 
+        mode     (str): decorrelation mode chosen
+        pldIgnoreFrames (bool, optional): True if you want PLD to also ignore the first AOR. Default is True.
+        pldAddStack     (bool, optional): True is you want to apply (and already have) custom Spitzer correction to your data when using PLD. Default is False.
+    Returns:
+        foldername (str): path to folder containing 
+        filename
+        filename_full
+        savepath
+        path_params
+        AOR_snip
+        aors
+        breaks
+        ignoreFrames
+        p0_obj['Tstar_err'] (float): uncertainty on stellar temperature
+    """
     AOR_snip = ''
     with open(rootpath+planet+'/analysis/aorSnippet.txt') as f:
         AOR_snip = f.readline().strip()
 
     mainpath   = rootpath+planet+'/analysis/'+channel+'/'
     ignoreFrames = np.array([])
-    if 'pld' in mode.lower():
+    if 'psfx'==mode.lower():
+        if channel=='ch2':
+            foldername = '4um'
+        else:
+            foldername = '3um'
+        foldername += 'PSF/'
+        
+    elif 'pld' in mode.lower():
         foldername = mainpath
 
         if pldIgnoreFrames:
@@ -290,7 +365,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                 foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                 phoption = lines[i].split('/')[-1].strip()
                 i += 1
-                ignoreFrames = np.array(lines[i].strip().split('=')[1].replace(' ','').split(','))
+                ignoreFrames = np.array(lines[i].strip().split('=')[1].strip().replace(' ','').split(','))
                 if np.all(ignoreFrames==['']):
                     ignoreFrames = np.array([]).astype(int)
                 else:
@@ -302,7 +377,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                     foldername = rootpath+lines[i][lines[i].find(planet):].strip()+'/'
                     phoption = lines[i].split('/')[-1].strip()
                     i += 1
-                    ignoreFrames = np.array(lines[i].split('=')[1].replace(' ','').split(','))
+                    ignoreFrames = np.array(lines[i].split('=')[1].strip().replace(' ','').split(','))
                     if np.all(ignoreFrames==['']):
                         ignoreFrames = np.array([]).astype(int)
                     else:
@@ -312,15 +387,30 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
                 else:
                     i += 3
     
-    
     # path where outputs are saved
     savepath   = foldername + mode + '/'
     if not os.path.exists(savepath):
         os.makedirs(savepath)
 
     aors = os.listdir(rootpath+planet+'/data/'+channel)
-    aors = np.sort([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
+    aors = np.array([aor for aor in aors if AOR_snip==aor[:len(AOR_snip)]])
+    firstTime = []
+    for i in range(len(aors)):
+        file = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aors[i]+'/'+channel+'/bcd/'))[0]
+        with fits.open(rootpath+planet+'/data/'+channel+'/'+aors[i]+'/'+channel+'/bcd/'+file) as img:
+            firstTime.append(img[0].header['BMJD_OBS'])
+    order = np.argsort(firstTime)
+    aors = aors[order]
     AOR_snip = AOR_snip[1:]
+    
+    # Figure out where there are AOR breaks
+    breakpath = rootpath+planet+'/analysis/'+channel+'/aorBreaks.txt'
+    with open(breakpath, 'r') as file:
+        breaks = file.readline().strip()
+        if len(breaks)==0:
+            breaks = np.array([])
+        else:
+            breaks = np.array(breaks.split(' ')).astype(float)
     
     # path to photometry outputs
     filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
@@ -328,24 +418,7 @@ def findPhotometry(rootpath, planet, channel, mode, pldIgnoreFrames=True, pldAdd
     # Path to previous mcmc results (optional)
     path_params = foldername + mode + '/ResultMCMC_'+mode+'_Params.npy'
     
-    return foldername, filename, filename_full, savepath, path_params, AOR_snip, aors, ignoreFrames
-
-# FIX: Add a docstring for this function
-def find_breaks(rootpath, planet, channel, aors):
-    breaks = []
-    for aor in aors:
-        rawfiles = np.sort(os.listdir(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'))
-        rawfiles  = [rawfile for rawfile in rawfiles if '_bcd.fits' in rawfile]
-        rawImage = fits.open(rootpath+planet+'/data/'+channel+'/'+aor+'/'+channel+'/bcd/'+rawfiles[0])
-
-        # Get the time of the first exposure of each AOR after the first
-        #     - this allows us to plot dashed lines where AOR breaks happen and where jump discontinuities happen
-        breaks.append(rawImage[0].header['BMJD_OBS'] + rawImage[0].header['FRAMTIME']/2/3600/24)
-        rawHeader = rawImage[0].header
-        rawImage.close()
-    
-    # Remove the first break which is just the start of observations
-    return np.sort(breaks)[1:]
+    return foldername, filename, filename_full, savepath, path_params, AOR_snip, aors, breaks, ignoreFrames
 
 # FIX: Add a docstring for this function
 def get_photon_limit(path, mode, nFrames, ignoreFrames):
@@ -357,7 +430,7 @@ def get_photon_limit(path, mode, nFrames, ignoreFrames):
             npix = 5
         else:
             # FIX, throw an actual error
-            print('Error: only 3x3 and 5x5 boxes for PLD are supported.')
+            print('Error: only 3x3 and 5x5 boxes for PLD are supported.', flush=True)
             return np.nan
         stamp = np.loadtxt(path, usecols=np.arange(int(npix**2)), skiprows=1).T
         flux = np.nansum(stamp, axis=0)
@@ -397,43 +470,17 @@ def get_photon_limit_oldData(rootpath, datapath, datapath_aper, planet, channel,
     return 1/np.sqrt(np.median(flux))/np.sqrt(nFrames-len(ignoreFrames))*1e6
 
 # FIX: Add a docstring for this function
-def get_detector_functions(mode):
-    signalfunc = detec_models.signal
-
-    if 'poly' in mode.lower():
-        detecfunc = detec_models.detec_model_poly
-    elif 'pld' in mode.lower():
-        detecfunc = detec_models.detec_model_PLD
-    elif 'bliss' in mode.lower():
-        detecfunc = detec_models.detec_model_bliss
-    elif 'gp' in mode.lower():
-        detecfunc = detec_models.detec_model_GP
-    else:
-        raise NotImplementedError('Only Polynomial, PLD, BLISS, and GP models are currently implemented! \nmode=\''+mode+'\' does not include \'poly\', \'Poly\', \'PLD\', \'pld\', \'bliss\', \'BLISS\', \'gp\', or \'GP\'.')
-        
-    return signalfunc, detecfunc
-
-# FIX: Add a docstring for this function
 def setup_gpriors(gparams, p0_obj):
     priors = []
     errs = []
-    if 't0' in gparams:
-        priors.append(p0_obj['t0'])
-        errs.append(p0_obj['t0_err'])
-    if 'per' in gparams:
-        priors.append(p0_obj['per'])
-        errs.append(p0_obj['per_err'])
-    if 'a' in gparams:
-        priors.append(p0_obj['a'])
-        errs.append(p0_obj['a_err'])
-    if 'inc' in gparams:
-        priors.append(p0_obj['inc'])
-        errs.append(p0_obj['inc_err'])
-        
+    for par in gparams:
+        priors.append(p0_obj[par])
+        errs.append(p0_obj[par+'_err'])
+    
     return priors, errs
 
 # FIX: Add a docstring for this function
-def reload_old_fit(path_params, p0_obj):
+def reload_old_fit(path_params, p0_obj, dparams):
     Table_par = np.load(path_params)                  # table of best-fit params from prev. run
     nparams   = p0_obj['params'][np.logical_not(np.in1d(p0_obj['params'], dparams))]   # get the name list of params to be fitted
     for name in nparams:
@@ -441,12 +488,15 @@ def reload_old_fit(path_params, p0_obj):
             p0_obj[name]  = Table_par[name][0]
         except Exception as e:
             # FIX: throw a more meaningful error message
-            print("type error: " + str(e))            # catch errors if you use values from fun with less params
+            print("type error: " + str(e), flush=True)            # catch errors if you use values from fun with less params
 
-    return
+    return p0_obj
 
 # FIX: Add a docstring for this function
-def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_labels, p0_astro, mode, channel, p0_obj, signal_inputs, signal_inputs_full, signalfunc, astrofunc, usebestfit, savepath, sigF_photon_ppm, nFrames, secondOrderOffset, compFactor=0):
+def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
+                       signal_func, signal_inputs, signal_inputs_full, p0_labels, p0_obj,
+                       astro_func, astro_inputs, astro_inputs_full, astro_labels,
+                       usebestfit, savepath, sigF_photon_ppm, nFrames, secondOrderOffset, compFactor=1):
     #print the results
 
     ndim = chain.shape[-1]
@@ -475,8 +525,7 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
     if np.any(p0_labels == 'r2'):
         for i in range(3):
             MCMC_Results[np.where(p0_labels == 'r2')[0][0]][i] *= np.sqrt(compFactor)
-            
-            
+    
     # printing output from MCMC
     out = "MCMC result:\n\n"
     for i in range(len(p0_mcmc)):
@@ -527,7 +576,7 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
     else:
         rp_MCMC = p0_obj['rp']
 
-    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'])
+    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'], As.shape[0])
 
     tday = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC/rp_MCMC**2)))**-1
     tnight = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC*(1-2*As[:,0])/rp_MCMC**2)))**-1
@@ -536,13 +585,14 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
     out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Night: ', np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16))
     out += 'For T_{*,b} = '+str(p0_obj['tstar_b'])+'\n'
 
-    print(out)
+    print(out, flush=True)
     with open(savepath+'MCMC_RESULTS_'+mode+'.txt','w') as file:
         file.write(out) 
     
     
-    mcmc_signal = signalfunc(signal_inputs, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
-    mcmc_lightcurve = astrofunc(time, **dict([[p0_astro[i], p0_mcmc[:len(p0_astro)][i]] for i in range(len(p0_astro))]))
+    mcmc_signal = signal_func(p0_mcmc, *signal_inputs)
+    mcmc_lightcurve = astro_func(astro_inputs, **dict([[label, p0_mcmc[i]] for i, label in enumerate(p0_labels)
+                                                       if label in astro_labels]))
     mcmc_detec = mcmc_signal/mcmc_lightcurve
     residuals = flux/mcmc_detec - mcmc_lightcurve
     
@@ -558,7 +608,9 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
     else:
         sigFMCMC = p0_obj['sigF']
     if 'bliss' in mode.lower():
-        nKnotsUsed = len(signal_inputs[-4][signal_inputs[-2]])
+        bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
+                              for partial_func in signal_inputs[-3]])[0][0]
+        nKnotsUsed = np.sum(signal_inputs[-1][bliss_ind][-1])
         ndim_eff = ndim+nKnotsUsed
     else:
         ndim_eff = ndim
@@ -578,18 +630,10 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
         #Unbinned data
         '''Get model'''
         
-        astro_full   = astrofunc(time_full, **dict([[p0_astro[i], p0_mcmc[:len(p0_astro)][i]] for i in range(len(p0_astro))]))
-
-        if 'bliss' in mode.lower():
-            flux_full, time_full, xdata_full, ydata_full, psfxw_full, psfyw_full, mode, blissNBin, savepath = signal_inputs_full
-            signal_inputs_full = bliss.precompute(flux_full, time_full, xdata_full, ydata_full,
-                                                  psfxw_full, psfyw_full, mode,
-                                                  astro_full, blissNBin, savepath, False)
-        elif 'gp' in mode.lower():
-            flux_full, xdata_full, ydata_full, time_full = signal_inputs_full
-            signal_inputs_full = [flux_full, xdata_full, ydata_full, time_full, True, astro_full]
+        astro_full   = astro_func(astro_inputs_full, **dict([[label, p0_mcmc[i]] for i, label in enumerate(p0_labels)
+                                                            if label in astro_labels]))
         
-        signal_full = signalfunc(signal_inputs_full, **dict([[p0_labels[i], p0_mcmc[i]] for i in range(len(p0_mcmc))]))
+        signal_full = signal_func(p0_mcmc, *signal_inputs_full)
         detec_full = signal_full/astro_full
         data_full = flux_full/detec_full
         
@@ -598,7 +642,9 @@ def print_MCMC_results(time, flux, time_full, flux_full, chain, lnprobchain, p0_
 
         N = len(data_full)
         if 'bliss' in mode.lower():
-            nKnotsUsed_full = len(signal_inputs_full[-4][signal_inputs_full[-2]])
+            bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
+                                  for partial_func in signal_inputs_full[-3]])[0][0]
+            nKnotsUsed_full = np.sum(signal_inputs_full[-1][bliss_ind][-1])
             ndim_eff_full = ndim+nKnotsUsed_full
         else:
             ndim_eff_full = ndim
@@ -619,7 +665,7 @@ Unbinned data:
 
     with open(savepath+'EVIDENCE_'+mode+'.txt','w') as file:
         file.write(out)
-    print(out)
+    print(out, flush=True)
     
     ###########################
     # Save computed parameters to be used later in table generation
@@ -640,7 +686,7 @@ Unbinned data:
     ResultMCMC_Params['evidenceB'] = [EB]
     ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
-    if 'gp' not in mode.lower():
+    if 'gp' not in mode.lower() and nFrames!=1:
         ResultMCMC_Params['chi2'] = [chis]
         ResultMCMC_Params['logL'] = [logL]
         ResultMCMC_Params['evidence'] = [E]
@@ -651,238 +697,275 @@ Unbinned data:
     return p0_mcmc, MCMC_Results, residuals
 
 # FIX: Add a docstring for this function
-def plot_walkers(savepath, mode, p0_astro, p0_fancyLabels, chain, plotCorner, showPlot=False):
-    # FIX - show plots if requested
+def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_func, signal_inputs, lnprob_inputs, 
+           gparams, gpriorInds, priors, errs, time, flux, breaks, bestfitNbin,
+           ncpu, savepath=None, showPlot=False, nIterScipy=10):
     
-    ndim = chain.shape[-1]
-    samples = chain.reshape((-1, ndim))
-    
-    ind_a = len(p0_astro) # index where the astro params end
-    labels = p0_fancyLabels[:ind_a]
+    if 'gp' not in mode.lower() and 'bliss' not in mode.lower():
+        print('Optimizing detector parameters first...', flush=True)
+        def minfunc(p0_detec, p0_astro, lnprob_inputs):
+            # Add back in the astrophysical parameters
+            p0_full = np.append(p0_astro, p0_detec)
+            return -helpers.lnprob(p0_full, *lnprob_inputs)
 
-    fname = savepath+'MCMC_'+mode+'_astroWalkers.pdf'
-    make_plots.walk_style(ind_a, chain.shape[0], chain, 10, chain.shape[1], labels, fname, showPlot)
+        # Pull aside the astrophysical parameters
+        p0_astro = p0[np.where(np.in1d(p0_labels,astro_labels))]
+        p0_detec = p0[np.where(np.logical_not(np.in1d(p0_labels,astro_labels)))]
 
-    if 'bliss' not in mode.lower() or r'$\sigma_F$' in p0_fancyLabels:
-        labels = p0_fancyLabels[ind_a:]
-        fname = savepath+'MCMC_'+mode+'_detecWalkers.pdf'
-        make_plots.walk_style(len(p0_fancyLabels)-ind_a, chain.shape[0], chain[:,:,ind_a:], 10, chain.shape[1], labels, fname, showPlot)
+        spyResult = scipy.optimize.minimize(minfunc, p0_detec, (p0_astro, lnprob_inputs), 'Nelder-Mead')
+
+        p0 = np.append(p0_astro, spyResult.x)
+        
+    #########################
+    # Optimize BLISS Bin Size
     
-    if plotCorner:
-        fig = corner.corner(samples[:,:ind_a], labels=p0_fancyLabels, quantiles=[0.16, 0.5, 0.84], show_titles=True, 
-                            plot_datapoints=True, title_kwargs={"fontsize": 12})
-        plotname = savepath + 'MCMC_'+mode+'_corner.pdf'
-        fig.savefig(plotname, bbox_inches='tight')
+    if 'bliss' in mode.lower():
+        print('Running iterative scipy.optimize on all parameters', flush=True)
+        def minfunc(p0, lnprob_inputs):
+            return -helpers.lnprob(p0, *lnprob_inputs)
+
+        initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
+        final_lnprob = -np.inf
+        p0_optimized = []
+        p0_temps = []
+        lnprob_temps = []
+        for i in tqdm(range(nIterScipy)):
+            p0_rel_errs = 1e-1*np.ones_like(p0)
+            gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
+            p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
+            p0_temp = p0*(1+p0_rel_errs*np.random.randn(len(p0)))+p0_rel_errs/10.*np.abs(np.random.randn(len(p0)))
+
+            amp = np.random.uniform(0.2,0.5)
+            offset = np.random.uniform(-30,10)*np.pi/180
+
+            p0_temp[p0_labels=='A'] = amp*np.cos(offset)
+            p0_temp[p0_labels=='B'] = amp*np.sin(offset)
+            # Assignment to non-existent indices is safely ignored, so this is fine for all modes
+            p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
+            p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
+
+            spyResult = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead')
+            lnprob_temp = helpers.lnprob(spyResult.x, *lnprob_inputs)
+
+            p0_temps.append(np.copy(spyResult.x))
+            lnprob_temps.append(lnprob_temp)
+
+        for p0_temp, lnprob_temp in zip(p0_temps, lnprob_temps):
+            if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
+                final_lnprob = lnprob_temp
+                p0_optimized = np.copy(p0_temp)
+
+        if final_lnprob > initial_lnprob:
+            print('Improved ln-likelihood!')
+            print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
+            p0 = np.copy(p0_optimized)
+        
+        print('Optimizing BLISS Bin Size', flush=True)
+        blissInd = np.where([partial_func.func.__name__=='detec_model_bliss'
+                             for partial_func in signal_inputs[-3]])[0][0]
+
+        def minfunc(p0, lnprob_inputs):
+            return -helpers.lnprob(p0, *lnprob_inputs)
+        
+        bliss_SDNRs = []
+        bliss_fps = []
+        nni_SDNRs = []
+        nni_fps = []
+        p0_temps = []
+        flux = signal_inputs[-1][blissInd][0]
+        xdata = signal_inputs[-1][blissInd][1]
+        ydata = signal_inputs[-1][blissInd][2]
+        
+        xSpread = np.max(xdata)-np.min(xdata)
+        ySpread = np.max(ydata)-np.min(ydata)
+        spreads = np.array([xSpread, ySpread])
+        spread = np.max(spreads)
+        knotSizes = np.linspace(0.010, 0.060, int(np.round(spread/0.010-spread/0.060)/2))
+        
+        # Go in reverse order so initial tqdm ETA is a worst case estimate
+        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes], axis=0)[::-1]
+        
+        for blissNBinX, blissNBinY in tqdm(nbins):
+            for useNNI in [False, True]:
+                if useNNI:
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBinX, blissNBinY))
+                    temp_inputs[-2] = np.zeros_like(temp_inputs[0]).astype(bool)
+                    temp_inputs[-1] = np.ones_like(temp_inputs[0]).astype(bool)
+                    signal_inputs[-1][blissInd] = tuple(temp_inputs)
+                    lnprob_inputs[4] = signal_inputs
+                else:
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBinX, blissNBinY))
+                    signal_inputs[-1][blissInd] = tuple(temp_inputs)
+                    lnprob_inputs[4] = signal_inputs
+
+                # Optimize parameters again
+                initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
+                final_lnprob = -np.inf
+                p0_optimized = []
+                for i in range(int(nIterScipy)):
+                    p0_rel_errs = 1e-1*np.ones_like(p0)
+                    gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
+                    p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
+                    p0_temp = p0*(1+p0_rel_errs*np.random.randn(len(p0)))+p0_rel_errs/10.*np.abs(np.random.randn(len(p0)))
+
+                    amp = np.random.uniform(0.2,0.5)
+                    offset = np.random.uniform(-30,10)*np.pi/180
+
+                    p0_temp[p0_labels=='A'] = amp*np.cos(offset)
+                    p0_temp[p0_labels=='B'] = amp*np.sin(offset)
+                    # Assignment to non-existent indices is safely ignored, so this is fine for all modes
+                    p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
+                    p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
+
+                    p0_temp = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead').x
+                    lnprob_temp = helpers.lnprob(p0_temp, *lnprob_inputs)
+
+                    if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
+                        final_lnprob = lnprob_temp
+                        p0_optimized = np.copy(p0_temp)
+
+                p0_temps.append(p0_optimized)
+                SDNR = p0_optimized[-1]
+                fp = p0_optimized[p0_labels=='fp']
+
+                if useNNI:
+                    nni_SDNRs.append(SDNR)
+                    nni_fps.append(fp)
+                else:
+                    bliss_SDNRs.append(SDNR)
+                    bliss_fps.append(fp)
+
+        nbins = nbins[::-1]
+        bliss_SDNRs = np.array(bliss_SDNRs)[::-1]
+        bliss_fps = np.array(bliss_fps)[::-1]
+        nni_SDNRs = np.array(nni_SDNRs)[::-1]
+        nni_fps = np.array(nni_fps)[::-1]
+
+        blissNBin = 0
+        for i in range(len(nbins)):
+            if bliss_SDNRs[i]<nni_SDNRs[i]:
+                continue
+            else:
+                if i==0:
+                    continue
+                else:
+                    blissNBin = nbins[i-1]
+                    p0 = p0_temps[i-1]
+                print('Using blissNBin =', blissNBin)
+                break
+        if np.all(blissNBin == 0):
+            for i, nbin in enumerate(nbins[::-1]):
+                temp_inputs = list(bliss.precompute(flux, xdata, ydata, *nbin))
+                if np.sum(temp_inputs[-1]) > 50:
+                    continue
+                else:
+                    blissNBin = nbin
+                    p0 = p0_temps[i]
+                    print('Defaulting to blissNBin =', blissNBin)
+                    break
+        if np.all(blissNBin == 0):
+            blissNBin = nbins[0]
+            print('Hard defaulting to blissNBin =', blissNBin)
+            
+        # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
+        plt.plot(np.product(nbins, axis=1), nni_SDNRs*1e6, label='NNI')
+        plt.plot(np.product(nbins, axis=1), bliss_SDNRs*1e6, label='BLISS')
+        plt.xticks(np.product(nbins, axis=1))
+        plt.axvline(np.product(blissNBin), c='k')
+        plt.ylabel('SDNR of Residuals (ppm)')
+        plt.xlabel('Total number of knots')
+        plt.legend(loc=1)
+        plt.xscale('log')
+        if savepath!=None:
+            plt.savefig(savepath+'BLISS_SDNR_vs_BinSize.pdf', bbox_inches='tight')
+            # saving data used in the plot as pkl file
+            header = 'HEADER: Number of bins per axis, blissNBin, BLISS SDNR of Residuals (ppm), NNI SDNR of Residuals (ppm)'
+            data = [header, nbins, blissNBin, bliss_SDNRs*1e6, nni_SDNRs*1e6]
+            pathdata = savepath + 'BLISS_SDNR_vs_BinSize.pkl'
+            with open(pathdata, 'wb') as outfile:
+                pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+            
         if showPlot:
             plt.show()
         plt.close()
         
-    return
-
-
-# FIX: Add a docstring for this function
-def burnIn(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, detecfunc, signalfunc, lnpriorfunc,
-           time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False):
-    
-    if 'gp' in mode.lower():
-        return burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams,
-                         astrofunc, detecfunc, signalfunc, lnpriorfunc,
-                         time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=showPlot)
-    
-    p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
-    p0_detec = freeze.get_fitted_params(detecfunc, dparams)
-    p0_psfwi  = freeze.get_fitted_params(detec_models.detec_model_PSFW, dparams)
-    p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
-    p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
-
-    
-    #################
-    # Run optimization on just detector parameters first
-    #################
-    
-    if 'bliss' not in mode:
-        # Should work for PLD and Poly
+        # Make a diagnostic plot showing eclipse depth vs bin size for NNI and BLISS
+        plt.plot(np.product(nbins, axis=1), nni_fps*1e6, label='NNI')
+        plt.plot(np.product(nbins, axis=1), bliss_fps*1e6, label='BLISS')
+        plt.xticks(np.product(nbins, axis=1))
+        plt.axvline(np.product(blissNBin), c='k')
+        plt.ylabel('Eclipse Depth (ppm)')
+        plt.xlabel('Total number of knots')
+        plt.legend(loc='best')
+        plt.xscale('log')
+        if savepath!=None:
+            plt.savefig(savepath+'BLISS_EclipseDepth_vs_BinSize.pdf', bbox_inches='tight')
+            # saving data used in the plot as pkl file
+            header = 'HEADER: Number of bins per axis, blissNBin, BLISS Eclipse Depth (ppm), NNI Eclipse Depth (ppm)'
+            data = [header, nbins, blissNBin, bliss_fps*1e6, nni_fps*1e6]
+            pathdata = savepath + 'BLISS_EclipseDepth_vs_BinSize.pkl'
+            with open(pathdata, 'wb') as outfile:
+                pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
+        if showPlot:
+            plt.show()
+        plt.close()
         
-        spyFunc0 = lambda p0_temp, inputs: np.mean((resid-detecfunc(inputs, **dict([[p0_detec[i], p0_temp[i]] for i in range(len(p0_detec))])))**2)
-        spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_detec))], detec_inputs, 'Nelder-Mead')
-
-        # replace p0 with new detector coefficient values
-        p0[np.where(np.in1d(p0_labels,p0_detec))] = spyResult0.x
-        resid /= detecfunc(detec_inputs, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_detec))][i]] for i in range(len(p0_detec))]))
-
-        # 2) get initial guess for psfw model
-        if 'psfw' in mode.lower():
-            spyFunc0 = lambda p0_temp: np.mean((resid-psfwifunc([psfxw, psfyw], **dict([[p0_pfswi[i], p0_temp[i]] for i in range(len(p0_pfswi))])))**2)
-            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_psfwi))], method='Nelder-Mead')
-
-            # replace p0 with new detector coefficient values
-            if spyResult0.success:
-                p0[np.where(np.in1d(p0_labels,p0_psfwi))] = spyResult0.x
-                resid /= psfwifunc([psfxw, psfyw], **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_pfswi))][i]] for i in range(len(p0_pfswi))]))
-
-        # 3) get initial guess for hside model
-        if 'hside' in mode.lower():
-            spyFunc0 = lambda p0_temp: np.mean((resid-hsidefunc(time, **dict([[p0_hside[i], p0_temp[i]] for i in range(len(p0_hside))])))**2)
-            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_hside))], method='Nelder-Mead')
-
-            # replace p0 with new detector coefficient values
-            if spyResult0.success:
-                p0[np.where(np.in1d(p0_labels,p0_hside))] = spyResult0.x
-                resid /= hsidefunc(time, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_hside))][i]] for i in range(len(p0_hside))]))
-
-        if 'tslope' in mode.lower():
-            spyFunc0 = lambda p0_temp: np.mean((resid-tslopefunc(time, **dict([[p0_tslope[i], p0_temp[i]] for i in range(len(p0_tslope))])))**2)
-            spyResult0 = scipy.optimize.minimize(spyFunc0, p0[np.where(np.in1d(p0_labels,p0_tslope))], method='Nelder-Mead')
-
-            # replace p0 with new detector coefficient values
-            if spyResult0.success:
-                p0[np.where(np.in1d(p0_labels,p0_tslope))] = spyResult0.x
-                resid /= tslopefunc(time, **dict([[p0_detec[i], p0[np.where(np.in1d(p0_labels,p0_tslope))][i]] for i in range(len(p0_tslope))]))
-
-
-    # initial guess
-    signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-    #includes psfw and/or hside functions if they're being fit
-    detec_full_guess = signal_guess/astro_guess
-    
-    make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
-    
-    #################
-    # Run an initial MCMC burn-in and pick the best location found along the way
-    #################
-    
-#     ndim = len(p0)
-#     nwalkers = ndim*3
-#     nBurnInSteps1 = 25500 # Chosen to give 500 steps per walker for Poly2v1 and 250 steps per walker for Poly5v2
-    
-#     # get scattered starting point in parameter space 
-#     # MUST HAVE THE INITIAL SPREAD SUCH THAT EVERY SINGLE WALKER PASSES lnpriorfunc AND lnprior_custom
-#     p0_rel_errs = 1e-4*np.ones_like(p0)
-#     gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
-#     p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
-#     pos0 = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
-
-#     checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-    
-#     priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
-#     iters = 10
-#     while np.any(priorlnls) and iters>0:
-#     #         print('Warning: Some of the initial values fail the lnprior!')
-#     #         print('Trying to re-draw positions...')
-#         p0_rel_errs /= 1.5
-#         pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
-#         priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
-#         iters -= 1
-#     if iters==0 and np.any(priorlnls):
-#         print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
-
+        # Update the bliss inputs to the best blissNBin
+        astro_guess = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels)
+                                                       if label in astro_labels]))
+        temp_inputs = list(bliss.precompute(flux, xdata, ydata, *blissNBin, astro_guess, savepath, plot=True,
+                                            showPlot=showPlot))
+        signal_inputs[-1][blissInd] = tuple(temp_inputs)
+        lnprob_inputs[4] = signal_inputs
         
-        
-#     #First burn-in
-#     tic = t.time()
-#     print('Running first burn-in')
-#     with threadpool_limits(limits=1, user_api='blas'):
-# #     if True:
-#         with Pool(ncpu) as pool:
-#             #sampler
-#             sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
-#             pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
-#     print('Mean burn-in acceptance fraction: {0:.3f}'
-#                 .format(np.median(sampler.acceptance_fraction)))
-#     p0 = sampler.flatchain[np.argmax(sampler.flatlnprobability)]
+    #########################
     
-#     fname = savepath+'MCMC_'+mode+'_burnin1Walkers.pdf'
-#     fig = make_plots.walk_style(len(p0), nwalkers, sampler.chain, 10, int(np.rint(nBurnInSteps1/nwalkers)), p0_fancyLabels,
-#                                 fname, showPlot)
-    
-#     spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
-#     spyResult_full = scipy.optimize.minimize(spyFunc_full, p0, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
-    
-#     p0 = spyResult_full.x
-#     astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
-#     signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-#     #includes psfw and/or hside functions if they're being fit
-#     detec_full_guess = signal_guess/astro_guess
-#     make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
-    
-    return p0
+    print('Running iterative scipy.optimize on all parameters', flush=True)
+    def minfunc(p0, lnprob_inputs):
+        return -helpers.lnprob(p0, *lnprob_inputs)
 
-
-
-
-
-
-# FIX: Add a docstring for this function
-def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, detecfunc, signalfunc, lnpriorfunc, 
-              time, flux, astro_guess, resid, detec_inputs, signal_inputs, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd, ncpu, savepath, showPlot=False):
-    
-    p0_astro  = freeze.get_fitted_params(astro_models.ideal_lightcurve, dparams)
-    p0_detec = freeze.get_fitted_params(detecfunc, dparams)
-    p0_psfwi  = freeze.get_fitted_params(detec_models.detec_model_PSFW, dparams)
-    p0_hside  = freeze.get_fitted_params(detec_models.hside, dparams)
-    p0_tslope  = freeze.get_fitted_params(detec_models.tslope, dparams)
-    
-    ######################
-    # Iteratively run scipy optimize
-    ######################
-    checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
-
-    spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
-
-    nIterScipy = 10
-    
+    initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
     final_lnprob = -np.inf
     p0_optimized = []
     p0_temps = []
-    print('Running iterative scipy.optimize')
+    lnprob_temps = []
     for i in tqdm(range(nIterScipy)):
         p0_rel_errs = 1e-1*np.ones_like(p0)
         gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
         p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
         p0_temp = p0*(1+p0_rel_errs*np.random.randn(len(p0)))+p0_rel_errs/10.*np.abs(np.random.randn(len(p0)))
 
-        p0_temp[p0_labels=='A'] = np.random.uniform(0.,0.3)
-        p0_temp[p0_labels=='B'] = np.random.uniform(-0.2,0.2)
-        # Assignment to non-existent indices is safe (safelt ignores it), so this is fine for all modes
-        p0_temp[p0_labels=='C'] = np.random.uniform(-0.3,0.3)
-        p0_temp[p0_labels=='D'] = np.random.uniform(-0.3,0.3)
-        p0_temp[p0_labels=='gpAmp'] = np.random.uniform(-4,-6)
+        amp = np.random.uniform(0.2,0.5)
+        offset = np.random.uniform(-30,10)*np.pi/180
+
+        p0_temp[p0_labels=='A'] = amp*np.cos(offset)
+        p0_temp[p0_labels=='B'] = amp*np.sin(offset)
+        # Assignment to non-existent indices is safely ignored, so this is fine for all modes
+        p0_temp[p0_labels=='C'] = np.random.uniform(-0.1,0.1)
+        p0_temp[p0_labels=='D'] = np.random.uniform(-0.1,0.1)
+        p0_temp[p0_labels=='gpAmp'] = np.random.uniform(0.05,0.135)
         p0_temp[p0_labels=='gpLx'] = np.random.uniform(-0.5,-1)
         p0_temp[p0_labels=='gpLy'] = np.random.uniform(-0.5,-1)
 
-        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
-        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
+        spyResult = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead')
+        lnprob_temp = helpers.lnprob(spyResult.x, *lnprob_inputs)
 
-        p0_temps.append(np.copy(spyResult_full.x))
+        p0_temps.append(np.copy(spyResult.x))
+        lnprob_temps.append(lnprob_temp)
 
+    for p0_temp, lnprob_temp in zip(p0_temps, lnprob_temps):
         if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
             final_lnprob = lnprob_temp
-            p0_optimized = np.copy(spyResult_full.x)
+            p0_optimized = np.copy(p0_temp)
 
-            if final_lnprob > initial_lnprob:
-                print('Improved ln-likelihood!')
-                print("ln-likelihood: {0:.2f}".format(final_lnprob))
-                p0 = np.copy(p0_optimized)
-
-    astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
-    signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-    #includes psfw and/or hside functions if they're being fit
-    detec_full_guess = signal_guess/astro_guess
-
-    
-    if showPlot:
-        # plot detector initial guess
-        make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess)
-        plt.show()
-        plt.close()
-    
-    
-    ######################
-    # Iteratively run some MCMCs to break free of local minima
-    ######################
-    print('Running first burn-ins')
+    if final_lnprob > initial_lnprob:
+        print('Improved ln-likelihood!')
+        print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
+        p0 = np.copy(p0_optimized)
+        
+    #########################
+        
+    print('Running first mini burn-ins', flush=True)
     p0_temps_mcmc = []
     for p0_temp in p0_temps:
         ndim = len(p0)
@@ -896,153 +979,56 @@ def burnIn_GP(p0, mode, p0_labels, p0_fancyLabels, dparams, gparams, astrofunc, 
         p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
         pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
 
-        checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-       
-        priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
+        priorlnls = np.array([np.isinf(helpers.lnprob(p_tmp, *lnprob_inputs)) for p_tmp in pos0])
         iters = 10
         while np.any(priorlnls) and iters>0:
-    #         print('Warning: Some of the initial values fail the lnprior!')
-    #         print('Trying to re-draw positions...')
             p0_rel_errs /= 1.5
             pos0[priorlnls] = np.array([p0*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(np.sum(priorlnls))])
-            priorlnls = np.array([(lnpriorfunc(mode=mode, checkPhasePhis=checkPhasePhis, **dict([[p0_labels[i], p_tmp[i]] for i in range(len(p_tmp))])) != 0.0 or np.isinf(helpers.lnprior_custom(p_tmp, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd))) for p_tmp in pos0])
+            priorlnls[priorlnls] = np.array([np.isinf(helpers.lnprob(p_tmp, *lnprob_inputs)) for p_tmp in pos0[priorlnls]])
             iters -= 1
         if iters==0 and np.any(priorlnls):
-            print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!')
+            print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!',
+                  flush=True)
 
-        #Second burn-in
         #Do quick burn-in to get walkers spread out
-        tic = t.time()
-#         with threadpool_limits(limits=1, user_api='blas'):
-        if True:
+        with threadpool_limits(limits=1, user_api='blas'):
             with Pool(ncpu) as pool:
-                #sampler
-                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=[p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], a = 2, pool=pool)
-                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=False)
-        print('Mean burn-in acceptance fraction: {0:.3f}'
-                        .format(np.median(sampler.acceptance_fraction)))
-        # sampler.reset()
-        toc = t.time()
-        print('MCMC runtime = %.2f min\n' % ((toc-tic)/60.))
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs, a = 2, pool=pool)
+                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+        print('Mean burn-in acceptance fraction: {0:.3f}'.format(np.median(sampler.acceptance_fraction)), flush=True)
 
         p0_temps_mcmc.append(np.copy(sampler.flatchain[np.argmax(sampler.flatlnprobability)]))
-        
-        
-    ######################
-    # Iteratively run some MCMCs to break free of local minima
-    ######################
     
-    checkPhasePhis = np.linspace(-np.pi,np.pi,1000)
-
-    initial_lnprob = helpers.lnprob(p0, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
-
-    spyFunc_full = lambda p0_temp, inputs: -helpers.lnprob(p0_temp, *inputs)
-
+    #########################
+    
+    print('Running final iterative scipy.optimize on all parameters', flush=True)
+    initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
     final_lnprob = -np.inf
     p0_optimized = []
     p0_temps_final = []
-    print('Running second iterative scipy.optimize')
+    lnprob_temps_final = []
     for p0_temp in tqdm(p0_temps_mcmc):
+        spyResult = scipy.optimize.minimize(minfunc, p0_temp, lnprob_inputs, 'Nelder-Mead')
+        lnprob_temp = helpers.lnprob(spyResult.x, *lnprob_inputs)
 
-        spyResult_full = scipy.optimize.minimize(spyFunc_full, p0_temp, [p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd], 'Nelder-Mead')
-        lnprob_temp = helpers.lnprob(spyResult_full.x, p0_labels, signalfunc, lnpriorfunc, signal_inputs, checkPhasePhis, gpriorInds, priors, errs, upriorInds, uparams_limits, gammaInd)
+        p0_temps_final.append(np.copy(spyResult.x))
+        lnprob_temps_final.append(lnprob_temp)
 
-        p0_temps_final.append(np.copy(spyResult_full.x))
-
+    for p0_temp, lnprob_temp in zip(p0_temps_final, lnprob_temps_final):
         if np.isfinite(lnprob_temp) and lnprob_temp > final_lnprob:
             final_lnprob = lnprob_temp
-            p0_optimized = np.copy(spyResult_full.x)
+            p0_optimized = np.copy(p0_temp)
 
-            if final_lnprob > initial_lnprob:
-                print('Improved ln-likelihood!')
-                print("ln-likelihood: {0:.2f}".format(final_lnprob))
-                p0 = np.copy(p0_optimized)
-
-    astro_guess = astrofunc(time, **dict([[p0_astro[i], p0[np.where(np.in1d(p0_labels,p0_astro))][i]] for i in range(len(p0_astro))]))
-    signal_guess = signalfunc(signal_inputs, **dict([[p0_labels[i], p0[i]] for i in range(len(p0))]))
-    #includes psfw and/or hside functions if they're being fit
-    detec_full_guess = signal_guess/astro_guess
+    if final_lnprob > initial_lnprob:
+        print('Improved ln-likelihood!')
+        print("ln-likelihood: {0:.2f}".format(final_lnprob), flush=True)
+        p0 = np.copy(p0_optimized)
     
-    fig = make_plots.plot_init_guess(time, flux, astro_guess, detec_full_guess, savepath, showPlot)
+    astroModel = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels) if label in astro_labels]))
+    signalModel = signal_func(p0, *signal_inputs)
+    detecModel = signalModel/astroModel
+
+    make_plots.plot_model(time, flux, astroModel, detecModel, breaks, savepath, 'Initial_Guess.pdf',
+                          nbin=bestfitNbin, showPlot=showPlot, fontsize=24)
     
     return p0
-
-
-
-# FIX: Add a docstring for this function
-def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
-                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False):
-    if 't0' in p0_labels:
-        t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
-    else:
-        t0MCMC = p0_obj['t0']
-    if 'per' in p0_labels:
-        perMCMC = p0_mcmc[np.where(p0_labels == 'per')[0][0]]
-    else:
-        perMCMC = p0_obj['per']
-    if 'rp' in p0_labels:
-        rpMCMC = p0_mcmc[np.where(p0_labels == 'rp')[0][0]]
-    else:
-        rpMCMC = p0_obj['rp']
-    if 'a' in p0_labels:
-        aMCMC = p0_mcmc[np.where(p0_labels == 'a')[0][0]]
-    else:
-        aMCMC = p0_obj['a']
-    if 'inc' in p0_labels:
-        incMCMC = p0_mcmc[np.where(p0_labels == 'inc')[0][0]]
-    else:
-        incMCMC = p0_obj['inc']
-    if 'ecosw' in p0_labels:
-        ecoswMCMC = p0_mcmc[np.where(p0_labels == 'ecosw')[0][0]]
-    else:
-        ecoswMCMC = p0_obj['ecosw']
-    if 'esinw' in p0_labels:
-        esinwMCMC = p0_mcmc[np.where(p0_labels == 'esinw')[0][0]]
-    else:
-        esinwMCMC = p0_obj['esinw']
-    if 'q1' in p0_labels:
-        q1MCMC = p0_mcmc[np.where(p0_labels == 'q1')[0][0]]
-    else:
-        q1MCMC = p0_obj['q1']
-    if 'q2' in p0_labels:
-        q2MCMC = p0_mcmc[np.where(p0_labels == 'q2')[0][0]]
-    else:
-        q2MCMC = p0_obj['q2']
-    if 'fp'in p0_labels:
-        fpMCMC = p0_mcmc[np.where(p0_labels == 'fp')[0][0]]
-    else:
-        fpMCMC = p0_obj['fp']
-
-    eccMCMC = np.sqrt(ecoswMCMC**2 + esinwMCMC**2)
-    wMCMC   = np.arctan2(esinwMCMC, ecoswMCMC)
-    u1MCMC  = 2*np.sqrt(q1MCMC)*q2MCMC
-    u2MCMC  = np.sqrt(q1MCMC)*(1-2*q2MCMC)
-
-    trans, t_sec, true_anom = astro_models.transit_model(time, t0MCMC, perMCMC, rpMCMC,
-                                                         aMCMC, incMCMC, eccMCMC, wMCMC,
-                                                         u1MCMC, u2MCMC)
-    # generating secondary eclipses model
-    eclip = astro_models.eclipse(time, t0MCMC, perMCMC, rpMCMC, aMCMC, incMCMC, eccMCMC, wMCMC,
-                                 fpMCMC, t_sec)
-
-    # get in-transit indices
-    ind_trans  = np.where(trans!=1)
-    # get in-eclipse indices
-    ind_eclip  = np.where((eclip!=(1+fpMCMC)))
-    # seperating first and second eclipse
-    ind_ecli1 = ind_eclip[0][np.where(ind_eclip[0]<int(len(time)/2))]
-    ind_ecli2 = ind_eclip[0][np.where(ind_eclip[0]>int(len(time)/2))]
-
-    data1 = [xdata, ydata, psfxw, psfyw, flux, residuals]
-    data2 = [xdata[ind_ecli1], ydata[ind_ecli1], psfxw[ind_ecli1], psfyw[ind_ecli1], flux[ind_ecli1], residuals[ind_ecli1]]
-    data3 = [xdata[ind_trans], ydata[ind_trans], psfxw[ind_trans], psfyw[ind_trans], flux[ind_trans], residuals[ind_trans]]
-    data4 = [xdata[ind_ecli2], ydata[ind_ecli2], psfxw[ind_ecli2], psfyw[ind_ecli2], flux[ind_ecli2], residuals[ind_ecli2]]
-
-    if savepath is not None:
-        plotname = savepath + 'MCMC_'+mode+'_7.pdf'
-    else:
-        plotname = None
-    make_plots.triangle_colors(data1, data2, data3, data4, plotname, showPlot)
-    
-    return
-

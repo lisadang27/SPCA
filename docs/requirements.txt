@@ -9,4 +9,5 @@ photutils
 pandas
 pyyaml
 threadpoolctl
-sklearn
+scikit-learn
+tqdm
