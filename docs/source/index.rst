@@ -34,6 +34,7 @@ As of version 0.3, we have made some important changes. These include:
 - Added the ability to decorrelate using PSF-fitted centroids using the "\_PSFX" mode suffix
 - Added sigma-clipping along full time axis (not just within data cube). This comes at the cost of needing to load all frames into RAM at the same time which can be quite RAM intensive for some phase curves. Will consider allowing user to switch to using dask in the future to reduce RAM cost when performing photometry at the cost of slower run speeds.
 - Changed BLISS knot density selection algorithm to be more like POET's algorithm
+- Added a progress bar for when running photometry
 - No updates on emcee freezing, but it now rarely ever occurs for me (Taylor). Perhaps the better initialization routine is helping here.
 
 Version 0.2
