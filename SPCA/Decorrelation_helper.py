@@ -772,25 +772,29 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         nni_SDNRs = []
         nni_fps = []
         p0_temps = []
-        flux = lnprob_inputs[0]
-        xdata = signal_inputs[-1][blissInd][4]
-        ydata = signal_inputs[-1][blissInd][5]
-        minBin = int(np.floor((np.max(xdata)-np.min(xdata))/0.060))
-        minBin = np.max([2, minBin])
-        maxBin = int(np.ceil((np.max(xdata)-np.min(xdata))/0.010))
+        flux = signal_inputs[-1][blissInd][0]
+        xdata = signal_inputs[-1][blissInd][1]
+        ydata = signal_inputs[-1][blissInd][2]
+        
+        xSpread = np.max(xdata)-np.min(xdata)
+        ySpread = np.max(ydata)-np.min(ydata)
+        spreads = np.array([xSpread, ySpread])
+        spread = np.max(spreads)
+        knotSizes = np.linspace(0.010, 0.060, int(np.round(spread/0.010-spread/0.060)/2))
+        
         # Go in reverse order so initial tqdm ETA is a worst case estimate
-        nbins = np.unique(np.linspace(minBin, maxBin, maxBin-minBin+1, dtype=int))[::2][::-1]
-        # nbins = np.arange(2,15)[::-1]
-        for blissNBin in tqdm(nbins):
+        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes], axis=0)[::-1]
+        
+        for blissNBinX, blissNBinY in tqdm(nbins):
             for useNNI in [False, True]:
                 if useNNI:
-                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin))
-                    temp_inputs[19] = np.zeros_like(temp_inputs[19]).astype(bool)
-                    temp_inputs[20] = np.ones_like(temp_inputs[20]).astype(bool)
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBinX, blissNBinY))
+                    temp_inputs[-2] = np.zeros_like(temp_inputs[0]).astype(bool)
+                    temp_inputs[-1] = np.ones_like(temp_inputs[0]).astype(bool)
                     signal_inputs[-1][blissInd] = tuple(temp_inputs)
                     lnprob_inputs[4] = signal_inputs
                 else:
-                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin))
+                    temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBinX, blissNBinY))
                     signal_inputs[-1][blissInd] = tuple(temp_inputs)
                     lnprob_inputs[4] = signal_inputs
 
@@ -849,9 +853,9 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                     p0 = p0_temps[i-1]
                 print('Using blissNBin =', blissNBin)
                 break
-        if blissNBin == 0:
+        if np.all(blissNBin == 0):
             for i, nbin in enumerate(nbins[::-1]):
-                temp_inputs = list(bliss.precompute(flux, xdata, ydata, nbin))
+                temp_inputs = list(bliss.precompute(flux, xdata, ydata, *nbin))
                 if np.sum(temp_inputs[-1]) > 50:
                     continue
                 else:
@@ -859,23 +863,24 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                     p0 = p0_temps[i]
                     print('Defaulting to blissNBin =', blissNBin)
                     break
-        if blissNBin == 0:
-            blissNBin = np.min(nbins)
+        if np.all(blissNBin == 0):
+            blissNBin = nbins[0]
             print('Hard defaulting to blissNBin =', blissNBin)
             
         # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
-        plt.plot(nbins, nni_SDNRs*1e6, label='NNI')
-        plt.plot(nbins, bliss_SDNRs*1e6, label='BLISS')
-        plt.xticks(nbins)
-        plt.axvline(blissNBin, c='k')
+        plt.plot(np.product(nbins, axis=1), nni_SDNRs*1e6, label='NNI')
+        plt.plot(np.product(nbins, axis=1), bliss_SDNRs*1e6, label='BLISS')
+        plt.xticks(np.product(nbins, axis=1))
+        plt.axvline(np.product(blissNBin), c='k')
         plt.ylabel('SDNR of Residuals (ppm)')
-        plt.xlabel('Number of bins per axis')
+        plt.xlabel('Total number of knots')
         plt.legend(loc=1)
+        plt.xscale('log')
         if savepath!=None:
             plt.savefig(savepath+'BLISS_SDNR_vs_BinSize.pdf', bbox_inches='tight')
             # saving data used in the plot as pkl file
-            header = 'HEADER: Number of bins per axis, BLISS SDNR of Residuals (ppm), NNI SDNR of Residuals (ppm)'
-            data = [header, nbins, bliss_SDNRs*1e6, nni_SDNRs*1e6]
+            header = 'HEADER: Number of bins per axis, blissNBin, BLISS SDNR of Residuals (ppm), NNI SDNR of Residuals (ppm)'
+            data = [header, nbins, blissNBin, bliss_SDNRs*1e6, nni_SDNRs*1e6]
             pathdata = savepath + 'BLISS_SDNR_vs_BinSize.pkl'
             with open(pathdata, 'wb') as outfile:
                 pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
@@ -885,18 +890,19 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         plt.close()
         
         # Make a diagnostic plot showing eclipse depth vs bin size for NNI and BLISS
-        plt.plot(nbins, nni_fps*1e6, label='NNI')
-        plt.plot(nbins, bliss_fps*1e6, label='BLISS')
-        plt.xticks(nbins)
-        plt.axvline(blissNBin, c='k')
+        plt.plot(np.product(nbins, axis=1), nni_fps*1e6, label='NNI')
+        plt.plot(np.product(nbins, axis=1), bliss_fps*1e6, label='BLISS')
+        plt.xticks(np.product(nbins, axis=1))
+        plt.axvline(np.product(blissNBin), c='k')
         plt.ylabel('Eclipse Depth (ppm)')
-        plt.xlabel('Number of bins per axis')
+        plt.xlabel('Total number of knots')
         plt.legend(loc='best')
+        plt.xscale('log')
         if savepath!=None:
             plt.savefig(savepath+'BLISS_EclipseDepth_vs_BinSize.pdf', bbox_inches='tight')
             # saving data used in the plot as pkl file
-            header = 'HEADER: Number of bins per axis, BLISS Eclipse Depth (ppm), NNI Eclipse Depth (ppm)'
-            data = [header, nbins, bliss_fps*1e6, nni_fps*1e6]
+            header = 'HEADER: Number of bins per axis, blissNBin, BLISS Eclipse Depth (ppm), NNI Eclipse Depth (ppm)'
+            data = [header, nbins, blissNBin, bliss_fps*1e6, nni_fps*1e6]
             pathdata = savepath + 'BLISS_EclipseDepth_vs_BinSize.pkl'
             with open(pathdata, 'wb') as outfile:
                 pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)
@@ -907,7 +913,8 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
         # Update the bliss inputs to the best blissNBin
         astro_guess = astro_func(astro_inputs, **dict([[label, p0[i]] for i, label in enumerate(p0_labels)
                                                        if label in astro_labels]))
-        temp_inputs = list(bliss.precompute(flux, xdata, ydata, blissNBin, astro_guess, savepath, plot=True))
+        temp_inputs = list(bliss.precompute(flux, xdata, ydata, *blissNBin, astro_guess, savepath, plot=True,
+                                            showPlot=showPlot))
         signal_inputs[-1][blissInd] = tuple(temp_inputs)
         lnprob_inputs[4] = signal_inputs
         

@@ -1,5 +1,7 @@
 import numpy as np
 
+from . import bliss
+
 try:
     import george
     from george.modeling import Model
@@ -138,10 +140,9 @@ def detec_model_bliss(signal_input, astroModel):
     """Model the detector systematics with a BLISS model based on the centroid.
 
     Args:
-        signal_input (tuple): (flux, time, psfxw, psfyw, nBin, nData, knotNdata, low_bnd_x,
+        signal_input (tuple): (flux, nBinX, nBinY, knotNdata, low_bnd_x,
             up_bnd_x, low_bnd_y, up_bnd_y, LL_dist, LR_dist, UL_dist, UR_dist,
-            delta_xo, delta_yo, knot_nrst_x, knot_nrst_y, knot_nrst_lin, BLS, NNI,
-            knots_x_mesh, knots_y_mesh, tmask_good_knotNdata, mode) with dtypes (????). # FIX dtypes!
+            delta_xo, delta_yo, knot_nrst_x, knot_nrst_y, knot_nrst_lin, BLS, NNI) with dtypes (????). # FIX dtypes!
         astroModel (ndarray): The modelled astrophysical flux variations.
 
     Returns:
@@ -161,15 +162,13 @@ def detec_model_bliss(signal_input, astroModel):
         NNI     = NNI points
     '''
     
-    (flux, nBin, nData, knotNdata, xdata, ydata,
-     low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y,
+    (flux, xdata, ydata, nBinX, nBinY, knotNdata, low_bnd_x, up_bnd_x, low_bnd_y, up_bnd_y,
      LL_dist, LR_dist, UL_dist, UR_dist, delta_xo, delta_yo, knot_nrst_x, knot_nrst_y,
-     knot_nrst_lin, BLS, NNI, knots_x_mesh, knots_y_mesh, tmask_good_knotNdata) = signal_input
+     knot_nrst_lin, BLS, NNI) = signal_input
     
-    sensMap = np.bincount(knot_nrst_lin, weights=flux/astroModel, minlength=(nBin*nBin)).reshape((nBin,nBin))
-    sensMap /= knotNdata
+    sensMap = bliss.compute_sensMap(flux, astroModel, knot_nrst_lin, nBinX, nBinY, knotNdata)
     
-    detec = np.empty(nData)
+    detec = np.zeros_like(flux)
     
     # weight knots values by distance to knots
     LL = sensMap[low_bnd_y, low_bnd_x]*LL_dist

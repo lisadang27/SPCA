@@ -133,12 +133,11 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
     return
 
 
-def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
+def plot_knots(xdata, ydata, 
                tmask_good_knotNdata, knots_x, knots_y, 
-               knots_x_mesh, knots_y_mesh, nBin, knotNdata, savepath=None, showPlot=False):
+               knots_x_mesh, knots_y_mesh, knotNdata, savepath=None, showPlot=False):
     '''Plot the Bliss map'''
     
-    fB_avg = bliss.map_flux_avgQuick(flux, astroModel, knot_nrst_lin, nBin, knotNdata)
     delta_xo, delta_yo = knots_x[1] - knots_x[0], knots_y[1] - knots_y[0]
     
     star_colrs = knotNdata[tmask_good_knotNdata]
@@ -146,10 +145,10 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
     plt.figure(figsize=(12,6))
 
     plt.subplot(121)
-    plt.scatter(xdata, ydata,color=(0,0,0),alpha=0.2,s=2,marker='.')
+    plt.scatter(xdata, ydata, color=(0,0,0), alpha=0.2, s=2, marker='.')
     plt.gca().set_aspect((knots_x[-1]-knots_x[0])/(knots_y[-1]-knots_y[0]))
-    plt.xlabel('Pixel x',size='x-large');
-    plt.ylabel('Pixel y',size='x-large');
+    plt.xlabel('Pixel x', size='x-large');
+    plt.ylabel('Pixel y', size='x-large');
     plt.title('Knot Mesh',size='large')
     plt.xlim([knots_x[0] - 0.5*delta_xo, knots_x[-1] + 0.5*delta_xo])
     plt.ylim([knots_y[0] - 0.5*delta_yo, knots_y[-1] + 0.5*delta_yo])
@@ -173,8 +172,8 @@ def plot_knots(xdata, ydata, flux, astroModel, knot_nrst_lin,
         pathplot = savepath+'BLISS_Knots.pdf'
         plt.savefig(pathplot, bbox_inches='tight')
         # saving data used in the plot as pkl file
-        header = 'HEADER: xdata, ydata, flux, astroModel, knot_nrst_lin, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, nBin, knotNdata'
-        data = [header, xdata, ydata, flux, astroModel, knot_nrst_lin, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, nBin, knotNdata]
+        header = 'HEADER: xdata, ydata, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, knotNdata'
+        data = [header, xdata, ydata, tmask_good_knotNdata, knots_x, knots_y, knots_x_mesh, knots_y_mesh, knotNdata]
         pathdata = savepath + 'BLISS_Knots.pkl'
         with open(pathdata, 'wb') as outfile:
             pickle.dump(data, outfile, pickle.HIGHEST_PROTOCOL)

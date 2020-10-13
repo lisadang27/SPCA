@@ -23,7 +23,7 @@ copyright = '2019, Lisa Dang and Taylor James Bell'
 author = 'Lisa Dang and Taylor James Bell'
 
 # The full version, including alpha/beta/rc tags
-release = '0.2'
+release = '0.3'
 
 
 # -- General configuration ---------------------------------------------------
