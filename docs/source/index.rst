@@ -29,6 +29,7 @@ Update Log
 Version 0.3
 -----------
 As of version 0.3, we have made some important changes. These include:
+
 * Added the ability to perform full-frame photometry
 * Added the ability to fit unbinned photometry
 * Added the ability to decorrelate using PSF-fitted centroids using the "\_PSFX" mode suffix
@@ -40,6 +41,7 @@ As of version 0.3, we have made some important changes. These include:
 Version 0.2
 -----------
 As of version 0.2, we have made some important changes and some bug fixes. These include:
+
 * Renamed decorrelation and fitting file to Decorrelation (.py and .ipynb)
 * Full integration of PLD and PLDAper models
 * Reduced the amount of static code that the user sees and placed this in separate files instead.
