@@ -61,7 +61,12 @@ for planet, channel in zip(planets, channels):
             breaks = np.array(breaks.split(' ')).astype(float)
 
     filename   = channel + '_datacube_binned_AORs'+AOR_snip+'.dat'
-    flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername, filename, 'Poly2_v1')
+    if os.path.exists(filename):
+        flux, time, xdata, ydata, psfxw, psfyw = helpers.get_data(foldername, filename, 'Poly2_v1')
+    else:
+        # Working on unbinned photometry
+        filename   = channel + '_datacube_full_AORs'+AOR_snip+'.dat'
+        flux, time, xdata, ydata, psfxw, psfyw = helpers.get_full_data(foldername, filename, 'Poly2_v1')
     
     # Make the plots
     print(planet, channel)
