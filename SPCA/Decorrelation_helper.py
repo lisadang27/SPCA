@@ -491,8 +491,12 @@ def reload_old_fit(path_params, p0_obj, dparams, mode):
             print("type error: " + str(e), flush=True)    # catch errors if you use values from fun with less params
 
     if 'bliss' in mode.lower():
-        p0_obj['nBinX'] = Table_par['nBinX'][0]
-        p0_obj['nBinY'] = Table_par['nBinY'][0]
+        try:
+            p0_obj['nBinX'] = Table_par['nBinX'][0]
+            p0_obj['nBinY'] = Table_par['nBinY'][0]
+        except:
+            print('There are no previously saved BLISS dimensions.',
+                  '\nYou will need to rerun the initialization to find the BLISS bin dimensions.')
             
     return p0_obj
 
