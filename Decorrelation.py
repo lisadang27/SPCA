@@ -293,12 +293,12 @@ for iterationNumber in range(len(planets)):
                 # make photometry plots
                 make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath,
-                                           showPlot=True)
+                                           showPlot=False)
             else:
                 # plot raw data
                 make_plots.plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0, 
                                            time, flux, xdata, ydata, psfxw, psfyw, breaks, savepath,
-                                           peritime, showPlot=True)
+                                           peritime, showPlot=False)
 
         # Calculate the photon noise limit
         if oldPhotometry:
@@ -320,7 +320,12 @@ for iterationNumber in range(len(planets)):
         
         # if you want to use the best fit params from a previous MCMC run            
         if initializeWithOld:
-            p0_obj = dh.reload_old_fit(path_params, p0_obj, dparams)
+            p0_obj = dh.reload_old_fit(path_params, p0_obj, mode)
+        if 'bliss' in mode.lower() and not runMCMC and not initializeWithOld:
+            # Reload the number of bliss knots used so that you don't need to rerun initilization to remake outputs
+            Table_par = np.load(path_params)
+            p0_obj['nBinX'] = Table_par['nBinX'][0]
+            p0_obj['nBinY'] = Table_par['nBinY'][0]
 
         p0, p0_labels, p0_fancyLabels = helpers.get_p0(dparams, p0_obj)
         
@@ -446,9 +451,10 @@ for iterationNumber in range(len(planets)):
         ### The objective of this step is just to start the final MCMC in a reasonable region of parameter space
         
         if runMCMC and not initializeWithOld:
-            p0 = dh.burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_func, signal_inputs,
-                           lnprob_inputs, gparams, gpriorInds, priors, errs, time, flux, breaks, bestfitNbin, 
-                           ncpu, savepath, showPlot=False, nIterScipy=nIterScipy)
+            p0 = dh.burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_inputs_full, 
+                           signal_func, signal_inputs, signal_inputs_full, lnprob_inputs,
+                           gparams, gpriorInds, priors, errs, time, flux, breaks,
+                           bestfitNbin, ncpu, savepath, showPlot=False, nIterScipy=nIterScipy)
         
         #########################
         # Run the MCMC

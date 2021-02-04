@@ -59,7 +59,9 @@ def signal_params():
     
     p0_obj.update({'params': params, 'fancyParams': fancyParams,
                    'checkPhasePhis':np.linspace(-np.pi,np.pi,1000)})
-
+    
+    p0_obj.update({'nBinX': 8, 'nBinY': 8})
+    
     return p0_obj
 
 def get_data(foldername, filename, mode, foldername_aper='', foldername_psf='', cut=0):

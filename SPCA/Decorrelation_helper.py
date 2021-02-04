@@ -480,7 +480,7 @@ def setup_gpriors(gparams, p0_obj):
     return priors, errs
 
 # FIX: Add a docstring for this function
-def reload_old_fit(path_params, p0_obj, dparams):
+def reload_old_fit(path_params, p0_obj, dparams, mode):
     Table_par = np.load(path_params)                  # table of best-fit params from prev. run
     nparams   = p0_obj['params'][np.logical_not(np.in1d(p0_obj['params'], dparams))]   # get the name list of params to be fitted
     for name in nparams:
@@ -488,8 +488,12 @@ def reload_old_fit(path_params, p0_obj, dparams):
             p0_obj[name]  = Table_par[name][0]
         except Exception as e:
             # FIX: throw a more meaningful error message
-            print("type error: " + str(e), flush=True)            # catch errors if you use values from fun with less params
+            print("type error: " + str(e), flush=True)    # catch errors if you use values from fun with less params
 
+    if 'bliss' in mode.lower():
+        p0_obj['nBinX'] = Table_par['nBinX'][0]
+        p0_obj['nBinY'] = Table_par['nBinY'][0]
+            
     return p0_obj
 
 # FIX: Add a docstring for this function
@@ -610,7 +614,9 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     if 'bliss' in mode.lower():
         bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
                               for partial_func in signal_inputs[-3]])[0][0]
-        nKnotsUsed = np.sum(signal_inputs[-1][bliss_ind][-1])
+        nBinX, nBinY = signal_inputs[-1][blissInd][3:5]
+        # index -2 from bliss.precomute is a boolean array where there is one True for each BLISS knot
+        nKnotsUsed = np.sum(signal_inputs[-1][bliss_ind][-2])
         ndim_eff = ndim+nKnotsUsed
     else:
         ndim_eff = ndim
@@ -686,6 +692,10 @@ Unbinned data:
     ResultMCMC_Params['evidenceB'] = [EB]
     ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
+    if 'bliss' in mode.lower():
+        ResultMCMC_Params['nBinX'] = [nBinX]
+        ResultMCMC_Params['nBinY'] = [nBinY]
+    
     if 'gp' not in mode.lower() and nFrames!=1:
         ResultMCMC_Params['chi2'] = [chis]
         ResultMCMC_Params['logL'] = [logL]
@@ -697,8 +707,8 @@ Unbinned data:
     return p0_mcmc, MCMC_Results, residuals
 
 # FIX: Add a docstring for this function
-def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_func, signal_inputs, lnprob_inputs, 
-           gparams, gpriorInds, priors, errs, time, flux, breaks, bestfitNbin,
+def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_inputs_full, signal_func, signal_inputs, signal_inputs_full,
+           lnprob_inputs, gparams, gpriorInds, priors, errs, time, flux, breaks, bestfitNbin,
            ncpu, savepath=None, showPlot=False, nIterScipy=10):
     
     if 'gp' not in mode.lower() and 'bliss' not in mode.lower():
@@ -917,6 +927,17 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, signal_f
                                             showPlot=showPlot))
         signal_inputs[-1][blissInd] = tuple(temp_inputs)
         lnprob_inputs[4] = signal_inputs
+        
+        
+        astro_guess_full = astro_func(astro_inputs_full, **dict([[label, p0[i]] for i, label in enumerate(p0_labels)
+                                                                 if label in astro_labels]))
+        flux_full = signal_inputs_full[-1][blissInd][0]
+        xdata_full = signal_inputs_full[-1][blissInd][1]
+        ydata_full = signal_inputs_full[-1][blissInd][2]
+        
+        temp_inputs_full = list(bliss.precompute(flux_full, xdata_full, ydata_full, *blissNBin, astro_guess_full, savepath, 
+                                                 plot=False, showPlot=False))
+        signal_inputs_full[-1][blissInd] = tuple(temp_inputs_full)
         
     #########################
     
