@@ -618,7 +618,7 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     if 'bliss' in mode.lower():
         bliss_ind = np.where([partial_func.func.__name__=='detec_model_bliss'
                               for partial_func in signal_inputs[-3]])[0][0]
-        nBinX, nBinY = signal_inputs[-1][blissInd][3:5]
+        nBinX, nBinY = signal_inputs[-1][bliss_ind][3:5]
         # index -2 from bliss.precomute is a boolean array where there is one True for each BLISS knot
         nKnotsUsed = np.sum(signal_inputs[-1][bliss_ind][-2])
         ndim_eff = ndim+nKnotsUsed
