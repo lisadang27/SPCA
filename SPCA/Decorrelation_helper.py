@@ -565,7 +565,7 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
         offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
         offset[1] -= offset[0]
         offset[2] = offset[0]-offset[2]
-        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offsets[0], offsets[1], offsets[2])
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
 
     # print the R2/Rp ratio
     if ('ellipse' in mode.lower()) and ('rp' in p0_labels) and ('r2' in p0_labels):
