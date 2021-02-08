@@ -125,7 +125,8 @@ def loadArchivalData(rootpath, planet, channel):
         p0_obj['ecosw'] = e*np.cos(argp*np.pi/180.)
         if 90 < argp < 270:
             p0_obj['ecosw']*=-1
-        p0_obj['esinw'] = np.sin(argp*np.pi/180.)
+        # Using this weird method to make sure we get the sign correct
+        p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
         
     # Get the stellar brightness temperature to allow us to invert Plank equation later
     p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
