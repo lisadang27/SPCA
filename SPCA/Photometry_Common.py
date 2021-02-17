@@ -200,12 +200,15 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
     
     lbx, ubx, lby, uby = bounds
     
-    try:
-        image_stack = sigma_clip(image_stack, sigma=sigma, maxiters=maxiters, 
-                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
-    except TypeError:
-        image_stack = sigma_clip(image_stack, sigma=sigma, iters=maxiters,
-                                 cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
+    # Using a nested for-loop to significantly reduce RAM
+    for i in range(image_stack.shape[1]):
+        for j in range(image_stack.shape[2]):
+            try:
+                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j], sigma=sigma, maxiters=maxiters,
+                                                cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
+            except TypeError:
+                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j], sigma=sigma, iters=maxiters,
+                                                cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
     
     # If any pixels near the target star are bad, mask the entire frame
     image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
