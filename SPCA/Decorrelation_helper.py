@@ -76,9 +76,13 @@ def loadArchivalData(rootpath, planet, channel):
 
     if np.isfinite(data['pl_ratror'][nameIndex]):
         p0_obj['rp'] = data['pl_ratror'][nameIndex]
+        p0_obj['rp_err'] = np.mean([np.abs(data['pl_ratrorerr1'][nameIndex]),
+                                    np.abs(data['pl_ratrorerr2'][nameIndex])])
     else:
         p0_obj['rp'] = data['pl_rads'][nameIndex]/data['st_rad'][nameIndex]
-
+        p0_obj['rp_err'] = np.mean([np.abs(data['pl_radserr1'][nameIndex]),
+                                    np.abs(data['pl_radserr2'][nameIndex])])/data['st_rad'][nameIndex]
+        
     if np.isfinite(data['pl_ratdor'][nameIndex]):
         p0_obj['a'] = data['pl_ratdor'][nameIndex]
         p0_obj['a_err'] = np.mean([data['pl_ratdorerr1'][nameIndex],
@@ -114,8 +118,10 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj['feh'] = data['st_metfe'][nameIndex]
 
     e = data['pl_orbeccen'][nameIndex]
+    e_err = np.mean([np.abs(data['pl_orbeccenerr1'][nameIndex]), np.abs(data['pl_orbeccenerr2'][nameIndex])])
     argp = data['pl_orblper'][nameIndex]
-
+    argp_err = np.mean([np.abs(data['pl_orblpererr1'][nameIndex]), np.abs(data['pl_orblpererr2'][nameIndex])])
+    
     if e != 0 and np.isfinite(e):
 
         if not np.isfinite(argp):
@@ -127,7 +133,14 @@ def loadArchivalData(rootpath, planet, channel):
             p0_obj['ecosw']*=-1
         # Using this weird method to make sure we get the sign correct
         p0_obj['esinw'] = np.tan(argp*np.pi/180.)*p0_obj['ecosw']
-        
+    
+    
+        p0_obj['ecosw_err'] = np.sqrt( (e_err*np.cos(argp*np.pi/180.)                    )**2
+                                      +(e    *np.sin(argp*np.pi/180.)*argp_err*np.pi/180.)**2)
+
+        p0_obj['esinw_err'] = np.sqrt( (e_err*np.sin(argp*np.pi/180.)                    )**2
+                                      +(e    *np.cos(argp*np.pi/180.)*argp_err*np.pi/180.)**2)
+    
     # Get the stellar brightness temperature to allow us to invert Plank equation later
     p0_obj['tstar_b'], p0_obj['tstar_b_err'] = getTstarBright(rootpath, planet, channel, p0_obj)
     
@@ -816,7 +829,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
                 # Optimize parameters again
                 initial_lnprob = helpers.lnprob(p0, *lnprob_inputs)
                 final_lnprob = -np.inf
-                p0_optimized = []
+                p0_optimized = p0
                 for i in range(int(nIterScipy)):
                     p0_rel_errs = 1e-1*np.ones_like(p0)
                     gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
