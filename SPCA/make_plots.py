@@ -27,7 +27,7 @@ matplotlib.rcParams.update(params)
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
-from matplotlib.ticker import MaxNLocator
+from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from matplotlib import gridspec
 import pickle
 
@@ -210,7 +210,7 @@ def plot_knots(xdata, ydata,
     plt.close()
     return
 
-def walk_style(chain, labels, interv=10, fname=None, showPlot=False):
+def walk_style(chain, labels, interv=10, fname=None, showPlot=False, fontsize=15):
     """Make a plot showing the evolution of the walkers throughout the emcee sampling.
 
     Args:
@@ -253,12 +253,18 @@ def walk_style(chain, labels, interv=10, fname=None, showPlot=False):
         plt.fill_between(step, pos3sig, neg3sig, facecolor='k', alpha = 0.1)
         plt.fill_between(step, pos2sig, neg2sig, facecolor='k', alpha = 0.1)
         plt.fill_between(step, pos1sig, neg1sig, facecolor='k', alpha = 0.1)
-        plt.title(labels[ind])
+        plt.title(labels[ind], fontsize=fontsize)
         plt.xlim(np.min(step), np.max(step))
         if ind < (ndim - ncols):
             plt.xticks([])
         else: 
             plt.xticks(rotation=25)
+        
+        y_formatter = ScalarFormatter(useOffset=False)
+        plt.gca().yaxis.set_major_formatter(y_formatter)
+        plt.gca().xaxis.set_tick_params(labelsize=fontsize*0.8)
+        plt.gca().yaxis.set_tick_params(labelsize=fontsize*0.8)        
+    
     if fname != None:
         plt.savefig(fname, bbox_inches='tight')
     
@@ -431,7 +437,7 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     
     return
 
-def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname=None, showPlot=False):
+def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname=None, showPlot=False, fontsize=15):
     """Make a triangle plot like figure to help look for any residual correlations in the data.
 
     Args:
@@ -446,14 +452,16 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
 
     """
 
-    label = [r'$x_0$', r'$y_0$', r'$\sigma _x$', r'$\sigma _y$', r'$F$', r'Residuals']
+    label = [r'$x_0$', r'$y_0$', r'$\sigma_x$', r'$\sigma_y$', r'$F$', r'$\rm Residuals$']
 
     fig = plt.figure(figsize = (8,8))
+    axs = []
     gs  = gridspec.GridSpec(len(all_data)-1,len(all_data)-1)
     i = 0
     for k in range(np.sum(np.arange(len(all_data)))):
         j= k - np.sum(np.arange(i+1))
         ax = fig.add_subplot(gs[i,j])
+        axs.append(ax)
         ax.plot(all_data[j], all_data[i+1],'k.', markersize = 0.2)
         l1 = ax.plot(firstEcl_data[j], firstEcl_data[i+1],'.', color = '#66ccff', markersize = 0.7, label='$1^{st}$ secondary eclipse')
         l2 = ax.plot(transit_data[j], transit_data[i+1],'.', color = '#ff9933', markersize = 0.7, label='transit')
@@ -468,16 +476,22 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
             plt.setp(ax.get_xticklabels(), rotation = 45)
             plt.axhline(y=0, color='k', linestyle='dashed')
             ax.xaxis.set_major_locator(MaxNLocator(5, prune = 'both'))
-            ax.set_xlabel(label[j])
+            ax.set_xlabel(label[j], fontsize=fontsize)
         else:
             plt.setp(ax.get_xticklabels(), visible=False)
         if(i == j):
             i += 1
     handles = [l1,l2,l3]
 
+    for i in range(len(axs)):
+        axs[i].xaxis.set_tick_params(labelsize=fontsize*0.8)
+        axs[i].yaxis.set_tick_params(labelsize=fontsize*0.8)
+    
     fig.subplots_adjust(hspace=0)
     fig.subplots_adjust(wspace=0)
-
+    fig.align_ylabels(axs)
+    fig.align_xlabels(axs)
+    
     if fname is not None:
         fig.savefig(fname, bbox_inches='tight')
         # saving data used in the plot as pkl file
@@ -494,7 +508,7 @@ def triangle_colors(all_data, firstEcl_data, transit_data, secondEcl_data, fname
     return
 
 def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, residuals,
-                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False):
+                                   p0_mcmc, p0_labels, p0_obj, mode, savepath=None, showPlot=False, fontsize=15):
     if 't0' in p0_labels:
         t0MCMC = p0_mcmc[np.where(p0_labels == 't0')[0][0]]
     else:
@@ -565,6 +579,6 @@ def look_for_residual_correlations(time, flux, xdata, ydata, psfxw, psfyw, resid
         plotname = savepath + 'MCMC_'+mode+'_7.pdf'
     else:
         plotname = None
-    triangle_colors(data1, data2, data3, data4, plotname, showPlot)
+    triangle_colors(data1, data2, data3, data4, plotname, showPlot, fontsize)
     
     return
