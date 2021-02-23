@@ -1,3 +1,27 @@
+# Some code to make plots look a bit nicer
+import matplotlib
+fontsize = 20
+ticklen = 5
+params = {
+    'font.size': fontsize,
+    'axes.titlesize': fontsize,
+    'xtick.labelsize': fontsize,
+    'ytick.labelsize': fontsize,
+    'axes.labelsize': fontsize,
+    'legend.fontsize': fontsize,
+    'text.usetex': True,
+    'pgf.rcfonts': False,
+    'pgf.texsystem': 'xelatex',
+    'pgf.preamble': r'''\usepackage{fontspec}
+    \setmainfont{Linux Libertine O}''',
+    'xtick.major.size' : ticklen,
+    'ytick.major.size' : ticklen,
+    'xtick.minor.size' : ticklen/2,
+    'ytick.minor.size' : ticklen/2
+}
+matplotlib.rcParams.update(params)
+
+# Imports
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm
@@ -244,7 +268,7 @@ def walk_style(chain, labels, interv=10, fname=None, showPlot=False):
     
 # FIX - add docstring for this function
 def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initial_Guess.pdf',
-               plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=24, plot_peritime=False):
+               plotTrueAnomaly=False, nbin=None, showPlot=False, fontsize=20, plot_peritime=False):
     
     mcmc_signal = astro*detec
     
@@ -253,7 +277,7 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
         # Use p0_mcmc if there, otherwise p0_obj
         x = time
     else:
-        x = time
+        x = time-5e4
     
     if nbin is not None:
         x_binned, _ = helpers.binValues(x, x, nbin)
@@ -265,14 +289,14 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
     axes[0].set_xlim(np.nanmin(x), np.nanmax(x))
     axes[0].plot(x, flux, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[0].plot(x, astro*detec, '.', color = 'r', markersize = 2.5, alpha = 0.4)
-    axes[0].set_ylabel('Raw Flux', fontsize=fontsize)
+    axes[0].set_ylabel(r'$\rm Raw~Flux$', fontsize=fontsize)
 
     axes[1].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
     axes[1].plot(x, astro, color = 'r', linewidth=2)
     if nbin is not None:
         axes[1].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[1].set_ylabel('Calibrated Flux', fontsize=fontsize)
+    axes[1].set_ylabel(r'$\rm Calibrated~Flux$', fontsize=fontsize)
     
     axes[2].axhline(y=1, color='k', linewidth = 2, linestyle='dashed', alpha = 0.5)
     axes[2].plot(x, flux/detec, '.', color = 'k', markersize = 4, alpha = 0.15)
@@ -280,7 +304,7 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
     if nbin is not None:
         axes[2].errorbar(x_binned, calibrated_binned, yerr=calibrated_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[2].set_ylabel('Calibrated Flux', fontsize=fontsize)
+    axes[2].set_ylabel(r'$\rm Calibrated~Flux$', fontsize=fontsize)
     axes[2].set_ylim(ymin=1-3*np.nanstd(flux/detec - astro), ymax=np.max(astro)+3*np.nanstd(flux/detec - astro))
 
     axes[3].plot(x, flux/detec - astro, 'k.', markersize = 4, alpha = 0.15)
@@ -288,16 +312,18 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
     if nbin is not None:
         axes[3].errorbar(x_binned, residuals_binned, yerr=residuals_binned_err, fmt='.',
                          color = 'blue', markersize = 10, alpha = 1)
-    axes[3].set_ylabel('Residuals', fontsize=fontsize)
-    axes[3].set_xlabel('Time (BMJD)', fontsize=fontsize)
+    axes[3].set_ylabel(r'$\rm Residuals$', fontsize=fontsize)
+    axes[3].set_xlabel(r'$\rm Time~(BJD-2450000.5)$', fontsize=fontsize)
 
+    for i in range(len(axes)):
+        axes[i].xaxis.set_tick_params(labelsize=fontsize*0.8)
+        axes[i].yaxis.set_tick_params(labelsize=fontsize*0.8)
+    
     if plot_peritime:
         # FIX - compute peritime
         print('Have not yet implemented this!')
         
         for i in range(len(axes)):
-            axes[i].xaxis.set_tick_params(labelsize=fontsize)
-            axes[i].yaxis.set_tick_params(labelsize=fontsize)
             axes[i].axvline(x=peritime, color ='C1', alpha=0.8, linestyle = 'dashed')
     
     for i in range(len(axes)):
@@ -324,7 +350,7 @@ def plot_model(time, flux, astro, detec, breaks, savepath=None, plotName='Initia
     plt.close()
     return
 
-def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showPlot=True, showtxt=True, savetxt=False, fontsize=10):
+def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, savepath=None, showPlot=True, showtxt=True, savetxt=False, fontsize=20):
     
     maxbins = int(np.rint(residuals.size/minbins))
     
@@ -349,8 +375,8 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     ax = plt.gca()
     ax.set_yscale('log')
     ax.set_xscale('log')
-    ax.errorbar(binsz, rms, yerr=[rmslo, rmshi], fmt="k-", ecolor='0.5', capsize=0, label="Data RMS")
-    ax.plot(binsz, stderr, c='red', label="Gaussian std.")
+    ax.errorbar(binsz, rms, yerr=[rmslo, rmshi], fmt="k-", ecolor='0.5', capsize=0, label=r'$\rm Data~RMS$')
+    ax.plot(binsz, stderr, c='red', label=r'$\rm Gaussian~std.$')
     ylim = ax.get_ylim()
     ax.plot([ingrDuration,ingrDuration],ylim, color='black', ls='--', alpha=0.6)
     ax.plot([occDuration,occDuration],ylim, color='black', ls='-.', alpha=0.6)
@@ -359,8 +385,8 @@ def plot_rednoise(residuals, minbins, ingrDuration, occDuration, intTime, mode, 
     ax.xaxis.set_tick_params(labelsize=fontsize)
     ax.yaxis.set_tick_params(labelsize=fontsize)
     
-    plt.xlabel(r'N$_{\rm binned}$', fontsize=fontsize)
-    plt.ylabel('RMS', fontsize=fontsize)
+    plt.xlabel(r'$N_{\rm binned}$', fontsize=fontsize)
+    plt.ylabel(r'$\rm RMS$', fontsize=fontsize)
     plt.legend(loc='best', fontsize=fontsize)
     if savepath is not None:
         plotname = savepath + 'MCMC_'+mode+'_RedNoise.pdf'

@@ -573,7 +573,7 @@ for iterationNumber in range(len(planets)):
         detecModel = signalModel/astroModel
         
         make_plots.plot_model(time, flux, astroModel, detecModel, breaks, savepath, 'Bestfit_'+mode+'.pdf',
-                              nbin=bestfitNbin, showPlot=False, fontsize=24)
+                              nbin=bestfitNbin, showPlot=False)
         
         #########################
         # Look at residual red noise in data
