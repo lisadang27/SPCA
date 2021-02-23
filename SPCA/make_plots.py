@@ -1,5 +1,6 @@
 # Some code to make plots look a bit nicer
 import matplotlib
+from distutils.spawn import find_executable
 fontsize = 20
 ticklen = 5
 params = {
@@ -9,16 +10,17 @@ params = {
     'ytick.labelsize': fontsize,
     'axes.labelsize': fontsize,
     'legend.fontsize': fontsize,
-    'text.usetex': True,
-    'pgf.rcfonts': False,
-    'pgf.texsystem': 'xelatex',
-    'pgf.preamble': r'''\usepackage{fontspec}
-    \setmainfont{Linux Libertine O}''',
     'xtick.major.size' : ticklen,
     'ytick.major.size' : ticklen,
     'xtick.minor.size' : ticklen/2,
     'ytick.minor.size' : ticklen/2
 }
+if find_executable('latex'):
+    params['pgf.texsystem'] = 'xelatex'
+    params['pgf.preamble'] = r'''\usepackage{fontspec}
+    \setmainfont{Linux Libertine O}'''
+    params['text.usetex'] = True
+    params['pgf.rcfonts'] = False
 matplotlib.rcParams.update(params)
 
 # Imports
