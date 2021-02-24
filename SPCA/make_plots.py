@@ -69,33 +69,34 @@ def plot_photometry(time0, flux0, xdata0, ydata0, psfxw0, psfyw0,
     
     fig, axes = plt.subplots(5, 1, sharex=True, figsize=(10, 12))
 
-    axes[0].plot(time0, flux0,  'r.', markersize=1, alpha = 0.7)
-    axes[0].plot(time, flux,  'k.', markersize=2, alpha = 1.0)
-    axes[0].set_ylabel("Relative Flux $F$")
-    axes[0].set_xlim((np.nanmin(time0), np.nanmax(time0)))
+    axes[0].plot(time0-5e4, flux0,  'r.', markersize=1, alpha = 0.7)
+    axes[0].plot(time-5e4, flux,  'k.', markersize=2, alpha = 1.0)
+    axes[0].set_ylabel(r'$\rm Relative~Flux$')
+    axes[0].set_xlim((np.nanmin(time0-5e4), np.nanmax(time0-5e4)))
 
-    axes[1].plot(time0, xdata0,  'r.', markersize=1, alpha = 0.7)
-    axes[1].plot(time, xdata,  'k.', markersize=2, alpha = 1.0)
-    axes[1].set_ylabel("x-centroid $x_0$")
+    axes[1].plot(time0-5e4, xdata0,  'r.', markersize=1, alpha = 0.7)
+    axes[1].plot(time-5e4, xdata,  'k.', markersize=2, alpha = 1.0)
+    axes[1].set_ylabel(r'$x_0$')
 
-    axes[2].plot(time0, ydata0,  'r.', markersize=1, alpha = 0.7)
-    axes[2].plot(time, ydata, 'k.', markersize=2, alpha = 1.0)
-    axes[2].set_ylabel("y-centroid $y_0$")
+    axes[2].plot(time0-5e4, ydata0,  'r.', markersize=1, alpha = 0.7)
+    axes[2].plot(time-5e4, ydata, 'k.', markersize=2, alpha = 1.0)
+    axes[2].set_ylabel(r'$y_0$')
 
-    axes[3].plot(time0, psfxw0,  'r.', markersize=1, alpha = 0.7)
-    axes[3].plot(time, psfxw, 'k.', markersize=2, alpha = 1.0)
-    axes[3].set_ylabel("x PSF-width $\sigma _x$")
+    axes[3].plot(time0-5e4, psfxw0,  'r.', markersize=1, alpha = 0.7)
+    axes[3].plot(time-5e4, psfxw, 'k.', markersize=2, alpha = 1.0)
+    axes[3].set_ylabel(r'$\sigma_x$')
 
-    axes[4].plot(time0, psfyw0,  'r.', markersize=1, alpha = 0.7)
-    axes[4].plot(time, psfyw,  'k.', markersize=2, alpha = 1.0)
-    axes[4].set_ylabel("y PSF-width $\sigma _y$")
-    axes[4].set_xlabel('Time (BMJD)')
+    axes[4].plot(time0-5e4, psfyw0,  'r.', markersize=1, alpha = 0.7)
+    axes[4].plot(time-5e4, psfyw,  'k.', markersize=2, alpha = 1.0)
+    axes[4].set_ylabel(r'$\sigma_y$')
+    axes[4].set_xlabel(r'$\rm Time~(BJD-2450000.5)$')
 
     for i in range(5):
         for j in range(len(breaks)):
             axes[i].axvline(x=breaks[j], color ='k', alpha=0.3, linestyle = 'dashed')
 
     fig.subplots_adjust(hspace=0)
+    fig.align_ylabels()
     
     if savepath!=None:
         # saving plot as pdf
@@ -161,7 +162,7 @@ def plot_centroids(xdata0, ydata0, xdata, ydata, savepath='', showPlot=False):
 
 def plot_knots(xdata, ydata, 
                tmask_good_knotNdata, knots_x, knots_y, 
-               knots_x_mesh, knots_y_mesh, knotNdata, savepath=None, showPlot=False):
+               knots_x_mesh, knots_y_mesh, knotNdata, savepath=None, showPlot=False, fontsize=16):
     '''Plot the Bliss map'''
     
     delta_xo, delta_yo = knots_x[1] - knots_x[0], knots_y[1] - knots_y[0]
@@ -173,24 +174,27 @@ def plot_knots(xdata, ydata,
     plt.subplot(121)
     plt.scatter(xdata, ydata, color=(0,0,0), alpha=0.2, s=2, marker='.')
     plt.gca().set_aspect((knots_x[-1]-knots_x[0])/(knots_y[-1]-knots_y[0]))
-    plt.xlabel('Pixel x', size='x-large');
-    plt.ylabel('Pixel y', size='x-large');
-    plt.title('Knot Mesh',size='large')
+    plt.xlabel(r'${\rm Pixel}~x$', fontsize=fontsize);
+    plt.ylabel(r'${\rm Pixel}~y$', fontsize=fontsize);
+    plt.title(r'$\rm Knot~Mesh$',size=fontsize)
     plt.xlim([knots_x[0] - 0.5*delta_xo, knots_x[-1] + 0.5*delta_xo])
     plt.ylim([knots_y[0] - 0.5*delta_yo, knots_y[-1] + 0.5*delta_yo])
+    plt.gca().xaxis.set_tick_params(labelsize=fontsize*0.8)
+    plt.gca().yaxis.set_tick_params(labelsize=fontsize*0.8)
     plt.locator_params(axis='x',nbins=8)
     plt.locator_params(axis='y',nbins=8)
     my_stars = plt.scatter(knots_x_mesh[tmask_good_knotNdata],
                            knots_y_mesh[tmask_good_knotNdata],
                            c=star_colrs, cmap=matplotlib.cm.Purples,
                            edgecolor='k',marker='*',s=175,vmin=1)
-    plt.colorbar(my_stars, label='Linked Centroids',shrink=0.75)
+    cb = plt.colorbar(my_stars, shrink=0.75)
+    cb.set_label(label=r'$\rm Linked~Centroids$', size=fontsize)
     plt.scatter(knots_x_mesh[tmask_good_knotNdata == False],
                 knots_y_mesh[tmask_good_knotNdata == False], 
                 color=(1,0.75,0.75), marker='x',s=35)
-    legend = plt.legend(('Centroids','Good Knots','Bad Knots'),
+    legend = plt.legend((r'$\rm Centroids$',r'$\rm Good~Knots$',r'$\rm Bad~Knots$'),
                         loc='lower right',bbox_to_anchor=(0.975,0.025),
-                        fontsize='small',fancybox=True)
+                        fontsize=fontsize*0.75,fancybox=True)
     legend.legendHandles[1].set_color(matplotlib.cm.Purples(0.67)[:3])
     legend.legendHandles[1].set_edgecolor('black')
 
