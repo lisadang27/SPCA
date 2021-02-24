@@ -96,6 +96,11 @@ def loadArchivalData(rootpath, planet, channel):
                /data['st_rad'][nameIndex]**2/const.R_sun.value
                *np.mean([data['st_raderr1'][nameIndex], np.abs(data['st_raderr2'][nameIndex])]))**2
         )
+
+    if 'XO-3b' in planet:
+        p0_obj['a'] = 7.052
+        p0_obj['a_err'] = np.mean([0.076, 0.097])
+
     p0_obj['per'] = data['pl_orbper'][nameIndex]
     p0_obj['per_err'] = np.mean([data['pl_orbpererr1'][nameIndex],
                                  np.abs(data['pl_orbpererr2'][nameIndex])])
@@ -108,6 +113,10 @@ def loadArchivalData(rootpath, planet, channel):
     if planet=='HD189733b':
         p0_obj['inc'] = 85.710
         p0_obj['inc_err'] = 0.024
+    elif 'XO-3b' in planet:
+        p0_obj['inc'] = 84.11
+        p0_obj['inc_err'] = 0.16
+
     p0_obj['Tstar'] = data['st_teff'][nameIndex]
     p0_obj['Tstar_err'] = np.mean([data['st_tefferr1'][nameIndex],
                                    np.abs(data['st_tefferr2'][nameIndex])])
