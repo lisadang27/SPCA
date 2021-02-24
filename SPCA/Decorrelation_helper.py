@@ -817,7 +817,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         
         # Go in reverse order so initial tqdm ETA is a worst case estimate
         # Remove any options where there would only be a single bin
-        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes if np.all(np.ceil(spreads/knotSize).astype(int) > 1)], axis=0)[::-1]
+        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes if np.all(np.ceil(spreads/knotSize).astype(int) > 1)], axis=0)[::-1][:2]
         
         for blissNBinX, blissNBinY in tqdm(nbins):
             for useNNI in [False, True]:
@@ -902,12 +902,12 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
             print('Hard defaulting to blissNBin =', blissNBin)
             
         # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
-        plt.plot(np.product(nbins, axis=1), nni_SDNRs*1e6, label='NNI')
-        plt.plot(np.product(nbins, axis=1), bliss_SDNRs*1e6, label='BLISS')
+        plt.plot(np.product(nbins, axis=1), nni_SDNRs*1e6, label=r'$\rm NNI$')
+        plt.plot(np.product(nbins, axis=1), bliss_SDNRs*1e6, label=r'$\rm BLISS$')
         plt.xticks(np.product(nbins, axis=1))
         plt.axvline(np.product(blissNBin), c='k')
-        plt.ylabel('SDNR of Residuals (ppm)')
-        plt.xlabel('Total number of knots')
+        plt.ylabel(r'$\rm SDNR~of~Residuals~(ppm)$')
+        plt.xlabel(r'$\rm Total~number~of~knots$')
         plt.legend(loc=1)
         plt.xscale('log')
         if savepath!=None:
@@ -924,12 +924,12 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         plt.close()
         
         # Make a diagnostic plot showing eclipse depth vs bin size for NNI and BLISS
-        plt.plot(np.product(nbins, axis=1), nni_fps*1e6, label='NNI')
-        plt.plot(np.product(nbins, axis=1), bliss_fps*1e6, label='BLISS')
+        plt.plot(np.product(nbins, axis=1), nni_fps*1e6, label=r'$\rm NNI$')
+        plt.plot(np.product(nbins, axis=1), bliss_fps*1e6, label=r'$\rm BLISS$')
         plt.xticks(np.product(nbins, axis=1))
         plt.axvline(np.product(blissNBin), c='k')
-        plt.ylabel('Eclipse Depth (ppm)')
-        plt.xlabel('Total number of knots')
+        plt.ylabel(r'$\rm Eclipse~Depth~(ppm)$')
+        plt.xlabel(r'$\rm Total~number~of~knots$')
         plt.legend(loc='best')
         plt.xscale('log')
         if savepath!=None:
