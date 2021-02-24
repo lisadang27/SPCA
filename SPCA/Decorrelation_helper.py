@@ -117,6 +117,10 @@ def loadArchivalData(rootpath, planet, channel):
     p0_obj['logg'] = data['st_logg'][nameIndex]
     p0_obj['feh'] = data['st_metfe'][nameIndex]
 
+    if planet=='MASCARA-1b':
+        p0_obj['logg'] = 4.1050000
+        p0_obj['feh'] = 0
+    
     e = data['pl_orbeccen'][nameIndex]
     e_err = np.mean([np.abs(data['pl_orbeccenerr1'][nameIndex]), np.abs(data['pl_orbeccenerr2'][nameIndex])])
     argp = data['pl_orblper'][nameIndex]
@@ -711,6 +715,7 @@ Unbinned data:
     ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
     if 'bliss' in mode.lower():
+        print(nBinX, nBinY)
         ResultMCMC_Params['nBinX'] = [nBinX]
         ResultMCMC_Params['nBinY'] = [nBinY]
     
