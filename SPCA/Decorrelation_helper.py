@@ -826,7 +826,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         
         # Go in reverse order so initial tqdm ETA is a worst case estimate
         # Remove any options where there would only be a single bin
-        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes if np.all(np.ceil(spreads/knotSize).astype(int) > 1)], axis=0)[::-1][:2]
+        nbins = np.unique([np.ceil(spreads/knotSize).astype(int) for knotSize in knotSizes if np.all(np.ceil(spreads/knotSize).astype(int) > 1)], axis=0)[::-1]
         
         for blissNBinX, blissNBinY in tqdm(nbins):
             for useNNI in [False, True]:
