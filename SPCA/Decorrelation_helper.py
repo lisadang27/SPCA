@@ -724,7 +724,6 @@ Unbinned data:
     ResultMCMC_Params['sigF_photon_ppm'] = [sigF_photon_ppm]
 
     if 'bliss' in mode.lower():
-        print(nBinX, nBinY)
         ResultMCMC_Params['nBinX'] = [nBinX]
         ResultMCMC_Params['nBinY'] = [nBinY]
     
