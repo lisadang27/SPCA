@@ -204,11 +204,11 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
     for i in range(image_stack.shape[1]):
         for j in range(image_stack.shape[2]):
             try:
-                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j], sigma=sigma, maxiters=maxiters,
-                                                cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
+                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j].flatten(), sigma=sigma, maxiters=maxiters,
+                                                cenfunc=np.ma.median, stdfunc=np.ma.std)
             except TypeError:
-                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j], sigma=sigma, iters=maxiters,
-                                                cenfunc=np.ma.median, stdfunc=np.ma.std, axis = 0)
+                image_stack[:,i,j] = sigma_clip(image_stack[:,i,j].flatten(), sigma=sigma, iters=maxiters,
+                                                cenfunc=np.ma.median, stdfunc=np.ma.std)
     
     # If any pixels near the target star are bad, mask the entire frame
     image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
@@ -326,10 +326,10 @@ def prepare_image(savepath, AOR_snip, fnames, lens, stacks=[], ignoreFrames=[],
             # Getting just the stamp around the sweet spot
             image = np.ma.masked_invalid(hdu_list[0].data[np.newaxis,217:249,9:41])
         else:
-            image = np.ma.masked_invalid(hdu_list[0].data)
+            image = hdu_list[0].data
             #ignore any consistently bad frames in datacubes
             image[ignoreFrames] = np.nan
-            image[ignoreFrames].mask = True
+            image = np.ma.masked_invalid(image)
     
     #add background correcting stack if requested
     if addStack:
