@@ -602,7 +602,7 @@ def loglikelihood(data, fit, err):
     #using inverse sigma since multiplying is faster than dividing
     inv_err = err**-1
     len_fit = len(fit)
-    return -0.5*np.sum(((data - fit)*inv_err)**2) + len_fit*np.log(inv_err) - len_fit*np.log(np.sqrt(2*np.pi))
+    return -0.5*np.sum(((data - fit)*inv_err)**2) + len_fit*np.log(inv_err) - 0.5*len_fit*np.log(2*np.pi)
 
 def evidence(logL, Npar, Ndat):
     """Compute the Bayesian evidence.
