@@ -1,20 +1,20 @@
 Planet	Channel	Reference	Link	Rp	Fp	Semi-Amplitude	Offset (E)	Tday	Tnight	Sig_F	N_binned
-HD189733b	ch2	Knutson+2012	https://iopscience.iop.org/article/10.1088/0004-637X/754/1/22/metaa	0.15580+0.00019	1793+55	491+45	20.1+5.5	1192+9	928+26	4601 ppm	1
-WASP-43b	ch2	Stevenson+2017	https://iopscience.iop.org/article/10.3847/1538-3881/153/2/68	0.1589+0.0005	3830+80	1930+60	21.1+1.8	1512+25	Upper limit	Unpublished	1
+HD189733b	ch2	Knutson+2012	https://iopscience.iop.org/article/10.1088/0004-637X/754/1/22/metaa	0.15580+0.00019	1793+55	491+45	35.8+4.0	1192+9	928+26	4601 ppm	1
+WASP-43b	ch2	Stevenson+2017	https://iopscience.iop.org/article/10.3847/1538-3881/153/2/68	0.1589+0.0005	3830+80	1999+62	21.1+1.8	1512+25	Upper limit	Unpublished	1
 WASP-43b	ch2	Mendonça+2018	https://iopscience.iop.org/article/10.3847/1538-3881/aaaebc/meta	Unpublished	4060+100	1630+120	12+3	1545+47	914+75	Unpublished	1
 WASP-43b	ch2	Morello+2019	https://iopscience.iop.org/article/10.3847/1538-3881/ab14e2/pdf	0.1572+0.0010	3870+120	1800+96	11.3+2.1	1522+47	730+97	1.04x	1
 WASP-43b	ch2	May+2020	https://arxiv.org/pdf/2007.06618.pdf	Unpublished	3660+120	1613+83	20.6+2.0	1478+45	838+65	Unpublished	1
 Qatar-1b	ch2	Keating+2020	https://iopscience-iop-org.proxy3.library.mcgill.ca/article/10.3847/1538-3881/ab83f4	0.145+0.001	3000+200	918+114	-4+7	1557+35	1167+71	1.11x	64
 HD209458b	ch2	Zellem+2014	https://iopscience.iop.org/article/10.1088/0004-637X/790/1/53/meta	0.12130+0.00030	1317+50	545+58	40.9+6.0	1499+15	972+44	1.14x	1
-CoRoT-2b	ch2	Dang+2018	https://ui.adsabs.harvard.edu/abs/2018NatAs...2..220D/abstract	0.1697+0.0009	4400+200	2300+150	-23+4	1693+17	730+140	1500 ppm	64
+CoRoT-2b	ch2	Dang+2018	https://ui.adsabs.harvard.edu/abs/2018NatAs...2..220D/abstract	0.1697+0.0009	4400+200	1700+200	-24+3.4	1693+17	730+140	1500 ppm	64
 WASP-14b	ch2	Wong+2015	https://iopscience.iop.org/article/10.1088/0004-637X/811/2/122/meta	0.09421+0.00059	2247+86	786+23	6.8+1.4	2402+35	1380+65	1.14x	128
 WASP-19b	ch2	Wong+2016	https://iopscience.iop.org/article/10.3847/0004-637X/823/2/122/meta	0.1427+0.0021	5840+290	2370+215	12.9+3.6	2357+64	1180+160	1.28x	1
 HAT-P-7b	ch2	Wong+2016	https://iopscience.iop.org/article/10.3847/0004-637X/823/2/122/meta	0.07769+0.00078	1900+60	1040+175	-4.1+7.5	2682+49	1010+290	1.12x	1
-WASP-18b	ch2	Maxted+2013	https://academic.oup.com/mnras/article/428/3/2645/1074645	0.0987+0.00072	3790+210	1830+106	-3.6+9.36	3050+110	980+230	7170 ppm	1
+WASP-18b	ch2	Maxted+2013	https://academic.oup.com/mnras/article/428/3/2645/1074645	0.0987+0.00072	3790+210	1830+106	-3.6+9.4	3050+110	980+230	7170 ppm	1
 KELT-1b	ch2	Beatty+2019	https://iopscience-iop-org.proxy3.library.mcgill.ca/article/10.3847/1538-3881/ab33fc/meta?casa_token=soeiUlphik4AAAAA:rnufpVPzHkN7_xbyT7JI8Ha39BuCZEigrglAvGFFfas4AAmD9EiSa-vGYan-YNYW3bH3yqyi8yc	 0.0771+0.0003	2083+70	979+54	18.6+5.2	2902+74	1053+196	Unpublished	1
-WASP-103b	ch2	Kreidberg+2018	https://iopscience.iop.org/article/10.3847/1538-3881/aac3df/meta	0.1164+0.0011	 5686+138	2360+153	 1.0+0.4	 3154+99	1729+110	1.6319x	1
+WASP-103b	ch2	Kreidberg+2018	https://iopscience.iop.org/article/10.3847/1538-3881/aac3df/meta	0.1164+0.0011	 5686+138	2360+153	 1.0+0.4	 3154+99	1440+110	1.6319x	1
 WASP-12b_old	ch2	Cowan+2012	https://iopscience.iop.org/article/10.1088/0004-637X/747/1/82/metaa	0.1054+0.0014	3900+300	2000+150	16+4	2840+150	960+250	1.15x	1
 WASP-12b_old	ch2	Bell+2019	https://academic-oup-com.proxy3.library.mcgill.ca/mnras/article/489/2/1995/5538814	0.10656+0.00085	4360+140	2163+98	9.5+2.3	2989+66	790+150	1.31x	64
 WASP-12b	ch2	Bell+2019	https://academic-oup-com.proxy3.library.mcgill.ca/mnras/article/489/2/1995/5538814	0.1049+0.0010	3920+150	1639+151	19.1+3.9	2854+74	1340+180	1.35x	64
 WASP-33b	ch2	Zhang+2018	https://iopscience.iop.org/article/10.3847/1538-3881/aaa458	0.103+0.0011	4250+160	1792+94	19.8+3.0	3209+88	1498+116	1.09732360097324x	128
-KELT-9b	ch2	Mansfield+2020	https://iopscience-iop-org.proxy3.library.mcgill.ca/article/10.3847/2041-8213/ab5b09	0.08004+0.00041	3131+62	979+32	18.7+2.2	4566+138	2556+99	1.97x	180
+KELT-9b	ch2	Mansfield+2020	https://iopscience-iop-org.proxy3.library.mcgill.ca/article/10.3847/2041-8213/ab5b09	0.08004+0.00041	3131+62	953+37	18.7+2.2	4566+138	2556+99	1.97x	180
