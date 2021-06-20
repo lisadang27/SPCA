@@ -566,33 +566,34 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     for i in range(len(p0_mcmc)):
         out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format(p0_labels[i],MCMC_Results[i][0], MCMC_Results[i][1], MCMC_Results[i][2])
 
-    # getting and printing the phase offset
-    As = samples[:,np.where(p0_labels == 'A')[0][0]][:,np.newaxis]
-    Bs = samples[:,np.where(p0_labels == 'B')[0][0]][:,np.newaxis]
-    phis = np.linspace(-np.pi,np.pi,1000)
-    offsets = []
-    # Doing this in steps to not overflow RAM
-    stepSizeOffsets = int(1e2)
-    if ('A' in p0_labels)  and ('B' in p0_labels) and (('C' not in p0_labels and 'D' not in p0_labels) or not secondOrderOffset):
-        for i in range(int(len(As)/stepSizeOffsets)):
-            offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis),axis=1)]*180/np.pi)
-        if len(As)%stepSizeOffsets != 0:
-            offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
-        offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
-        offset[1] -= offset[0]
-        offset[2] = offset[0]-offset[2]
-        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
-    elif ('A' in p0_labels)  and ('B' in p0_labels) and ('C' in p0_labels) and ('D' in p0_labels):
-        Cs = samples[:,np.where(p0_labels == 'C')[0][0]][:,np.newaxis]
-        Ds = samples[:,np.where(p0_labels == 'D')[0][0]][:,np.newaxis]
-        for i in range(int(len(As)/stepSizeOffsets)):
-            offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis) + Cs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(2*phis)-1) + Ds[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(2*phis),axis=1)]*180/np.pi)
-        if len(As)%stepSizeOffsets != 0:
-            offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
-        offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
-        offset[1] -= offset[0]
-        offset[2] = offset[0]-offset[2]
-        out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
+    if np.any(p0_labels == 'A') and np.any(p0_labels == 'B'):
+        # getting and printing the phase offset
+        As = samples[:,np.where(p0_labels == 'A')[0][0]][:,np.newaxis]
+        Bs = samples[:,np.where(p0_labels == 'B')[0][0]][:,np.newaxis]
+        phis = np.linspace(-np.pi,np.pi,1000)
+        offsets = []
+        # Doing this in steps to not overflow RAM
+        stepSizeOffsets = int(1e2)
+        if ('A' in p0_labels)  and ('B' in p0_labels) and (('C' not in p0_labels and 'D' not in p0_labels) or not secondOrderOffset):
+            for i in range(int(len(As)/stepSizeOffsets)):
+                offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis),axis=1)]*180/np.pi)
+            if len(As)%stepSizeOffsets != 0:
+                offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
+            offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
+            offset[1] -= offset[0]
+            offset[2] = offset[0]-offset[2]
+            out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
+        elif ('A' in p0_labels)  and ('B' in p0_labels) and ('C' in p0_labels) and ('D' in p0_labels):
+            Cs = samples[:,np.where(p0_labels == 'C')[0][0]][:,np.newaxis]
+            Ds = samples[:,np.where(p0_labels == 'D')[0][0]][:,np.newaxis]
+            for i in range(int(len(As)/stepSizeOffsets)):
+                offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis) + Cs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(2*phis)-1) + Ds[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(2*phis),axis=1)]*180/np.pi)
+            if len(As)%stepSizeOffsets != 0:
+                offsets.extend(-phis[np.argmax(1 + As[-len(As)%stepSizeOffsets:]*(np.cos(phis)-1) + Bs[-len(As)%stepSizeOffsets:]*np.sin(phis),axis=1)]*180/np.pi)
+            offset = np.percentile(np.array(offsets), [16, 50, 84])[[1,2,0]]
+            offset[1] -= offset[0]
+            offset[2] = offset[0]-offset[2]
+            out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
 
     # print the R2/Rp ratio
     if ('ellipse' in mode.lower()) and ('rp' in p0_labels) and ('r2' in p0_labels):
