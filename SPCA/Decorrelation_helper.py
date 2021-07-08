@@ -594,6 +594,18 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
             offset[1] -= offset[0]
             offset[2] = offset[0]-offset[2]
             out += '{:>8} = {:>16}  +{:>16}  -{:>16} degrees east\n'.format('Offset', offset[0], offset[1], offset[2])
+    else : 
+        #Had to make an else loop if A and B are not fitted for. 
+        #Set A&B values to the ones found in p0_obj and calculate the offset
+        #by generating a phase curve and finding the phi corresponding
+        #to the maximum value.
+        Aval = p0_obj['A']
+        Bval = p0_obj['B']
+        phis = np.linspace(-np.pi,np.pi,1000)
+        PhaseMod = 1 + Aval*(np.cos(phis)-1) + Bval*np.sin(phis)
+        offset = -phis[np.argmax(PhaseMod)]*180/np.pi
+        out += '{:>8} = {:>16} degrees east\n'.format('Offset', offset)
+
 
     # print the R2/Rp ratio
     if ('ellipse' in mode.lower()) and ('rp' in p0_labels) and ('r2' in p0_labels):
@@ -611,15 +623,18 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
         rp_MCMC = samples[:,np.where(p0_labels == 'rp')[0][0]]*np.sqrt(compFactor)
     else:
         rp_MCMC = p0_obj['rp']
+        
+    #Added an if loop for when A&B are not fitted for and 
+    #so tday and tnight won't be calculated.     
+    if np.any(p0_labels == 'A') and np.any(p0_labels == 'B'):
+        tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'], As.shape[0])
 
-    tstar_bs = np.random.normal(p0_obj['tstar_b'], p0_obj['tstar_b_err'], As.shape[0])
+        tday = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC/rp_MCMC**2)))**-1
+        tnight = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC*(1-2*As[:,0])/rp_MCMC**2)))**-1
 
-    tday = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC/rp_MCMC**2)))**-1
-    tnight = const.h.value*const.c.value/(const.k_B.value*wav)*(np.log(1+(np.exp(const.h.value*const.c.value/(const.k_B.value*wav*tstar_bs))-1)/(fp_MCMC*(1-2*As[:,0])/rp_MCMC**2)))**-1
-
-    out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Day: ', np.median(tday), np.percentile(tday, 84)-np.median(tday), np.median(tday)-np.percentile(tday, 16))
-    out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Night: ', np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16))
-    out += 'For T_{*,b} = '+str(p0_obj['tstar_b'])+'\n'
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Day: ', np.median(tday), np.percentile(tday, 84)-np.median(tday), np.median(tday)-np.percentile(tday, 16))
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format('T Night: ', np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16))
+        out += 'For T_{*,b} = '+str(p0_obj['tstar_b'])+'\n'
 
     print(out, flush=True)
     with open(savepath+'MCMC_RESULTS_'+mode+'.txt','w') as file:
@@ -713,11 +728,17 @@ Unbinned data:
 
     for i in range(len(p0_labels)):
         ResultMCMC_Params[p0_labels[i]] = MCMC_Results[i]
-
-    ResultMCMC_Params['offset'] = offset
-    ResultMCMC_Params['tDay'] = [np.nanmedian(tday), np.nanpercentile(tday, 84)-np.nanmedian(tday), np.nanmedian(tday)-np.nanpercentile(tday, 16)]
-    ResultMCMC_Params['tNight'] = [np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16)]
-
+        
+    #Added an loop for when A and B are not fitted for
+    if np.any(p0_labels == 'A') and np.any(p0_labels == 'B'):
+        ResultMCMC_Params['offset'] = offset
+        ResultMCMC_Params['tDay'] = [np.nanmedian(tday), np.nanpercentile(tday, 84)-np.nanmedian(tday), np.nanmedian(tday)-np.nanpercentile(tday, 16)]
+        ResultMCMC_Params['tNight'] = [np.nanmedian(tnight), np.nanpercentile(tnight, 84)-np.nanmedian(tnight), np.nanmedian(tnight)-np.nanpercentile(tnight, 16)]
+    else : 
+        #if A&B are not fitted for output the offset calculated in lines 597-607
+        # we don't need to output tday and tnight since they were not calculated
+        ResultMCMC_Params['offset'] = offset
+        
     ResultMCMC_Params['chi2B'] = [chisB]
     ResultMCMC_Params['chi2datum'] = [chisB/len(flux)]
     ResultMCMC_Params['logLB'] = [logLB]
