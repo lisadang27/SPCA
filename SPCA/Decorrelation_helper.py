@@ -565,7 +565,6 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     out = "MCMC result:\n\n"
     for i in range(len(p0_mcmc)):
         out += '{:>8} = {:>16}  +{:>16}  -{:>16}\n'.format(p0_labels[i],MCMC_Results[i][0], MCMC_Results[i][1], MCMC_Results[i][2])
-
     if np.any(p0_labels == 'A') and np.any(p0_labels == 'B'):
         # getting and printing the phase offset
         As = samples[:,np.where(p0_labels == 'A')[0][0]][:,np.newaxis]
@@ -574,6 +573,12 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
         offsets = []
         # Doing this in steps to not overflow RAM
         stepSizeOffsets = int(1e2)
+        amplitudes = np.sqrt(As**2 + Bs**2)
+        amplitude = MCMC_Results[1][0]*np.percentile(np.array(amplitudes), [16, 50, 84])[[1,2,0]]
+        amplitude[1] -= amplitude[0]
+        amplitude[2] = amplitude[0]-amplitude[2]
+        out += '{:>8} = {:>16}  +{:>16}  -{:>16} \n'.format('Phase Semi-amplitude', amplitude[0], amplitude[1], amplitude[2])
+            
         if ('A' in p0_labels)  and ('B' in p0_labels) and (('C' not in p0_labels and 'D' not in p0_labels) or not secondOrderOffset):
             for i in range(int(len(As)/stepSizeOffsets)):
                 offsets.extend(-phis[np.argmax(1 + As[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*(np.cos(phis)-1) + Bs[i*stepSizeOffsets:(i+1)*stepSizeOffsets]*np.sin(phis),axis=1)]*180/np.pi)
@@ -914,6 +919,7 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
                     continue
                 else:
                     blissNBin = nbins[i-1]
+                    blissNBin = [84,64]
                     p0 = p0_temps[i-1]
                 print('Using blissNBin =', blissNBin)
                 break
@@ -929,8 +935,9 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
                     break
         if np.all(blissNBin == 0):
             blissNBin = nbins[0]
+            blissNBin = [84,64]
             print('Hard defaulting to blissNBin =', blissNBin)
-            
+        
         # Make a diagnostic plot showing SDNR vs bin size for NNI and BLISS
         plt.plot(np.product(nbins, axis=1), nni_SDNRs*1e6, label=r'$\rm NNI$')
         plt.plot(np.product(nbins, axis=1), bliss_SDNRs*1e6, label=r'$\rm BLISS$')
@@ -1053,7 +1060,6 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         gpriorInds = [np.where(p0_labels==gpar)[0][0] for gpar in gparams]
         p0_rel_errs[gpriorInds] = np.array(errs)/np.array(priors)
         pos0 = np.array([p0_temp*(1+p0_rel_errs*np.random.randn(ndim))+p0_rel_errs/10.*np.abs(np.random.randn(ndim)) for i in range(nwalkers)])
-
         priorlnls = np.array([np.isinf(helpers.lnprob(p_tmp, *lnprob_inputs)) for p_tmp in pos0])
         iters = 10
         while np.any(priorlnls) and iters>0:
@@ -1064,12 +1070,12 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         if iters==0 and np.any(priorlnls):
             print('Warning: Some of the initial values still fail the lnprior and the following MCMC will likely not work!',
                   flush=True)
-
         #Do quick burn-in to get walkers spread out
         with threadpool_limits(limits=1, user_api='blas'):
             with Pool(ncpu) as pool:
-                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs, a = 2, pool=pool)
-                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+                #check input of both these functions
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, pool=pool, args=lnprob_inputs)
+                pos1, prob, state = sampler.run_mcmc(pos0, int(np.rint(nBurnInSteps1/nwalkers)), progress=True)
         print('Mean burn-in acceptance fraction: {0:.3f}'.format(np.median(sampler.acceptance_fraction)), flush=True)
 
         p0_temps_mcmc.append(np.copy(sampler.flatchain[np.argmax(sampler.flatlnprobability)]))

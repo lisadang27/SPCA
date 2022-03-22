@@ -457,7 +457,6 @@ def get_p0(dparams, obj):
     
     function_params = obj['params']
     fancy_names = obj['fancyParams']
-    
     fit_params = np.array([sa for sa in function_params if not any(sb in sa for sb in dparams)])
     fancy_labels = np.array([fancy_names[i] for i in range(len(function_params)) if not function_params[i] in dparams])
     p0 = np.zeros(len(fit_params),dtype=float)
