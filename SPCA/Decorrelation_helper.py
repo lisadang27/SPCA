@@ -645,7 +645,12 @@ def print_MCMC_results(flux, flux_full, chain, lnprobchain, mode, channel,
     with open(savepath+'MCMC_RESULTS_'+mode+'.txt','w') as file:
         file.write(out) 
     
-    
+    with open(savepath+'As.txt','w') as file:
+        file.write(str(As))
+        
+    with open(savepath+'Bs.txt','w') as file:
+        file.write(str(Bs))
+        
     mcmc_signal = signal_func(p0_mcmc, *signal_inputs)
     mcmc_lightcurve = astro_func(astro_inputs, **dict([[label, p0_mcmc[i]] for i, label in enumerate(p0_labels)
                                                        if label in astro_labels]))

@@ -299,7 +299,7 @@ def check_phase(checkPhasePhis, A, B, C=0, D=0):
         bool: True if lightcurve implies non-physical negative flux coming from the planet, False otherwise.
     
     """
-    toggle = True
+    toggle = False
     if toggle:
         if not (-90 < np.arctan2(B, A)*180/np.pi < 90):
             return -np.inf
