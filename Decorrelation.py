@@ -490,9 +490,8 @@ for iterationNumber in range(len(planets)):
             print('Running MCMC', flush=True)
             with threadpool_limits(limits=1, user_api='blas'):
                 with Pool(ncpu) as pool:
-                    sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs,
-                                                    a = 2, pool=pool)
-                    pos2, prob, state = sampler.run_mcmc(pos0, np.rint((nBurnInSteps2+nProductionSteps)/nwalkers),
+                    sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, pool=pool, args=lnprob_inputs)
+                    pos2, prob, state = sampler.run_mcmc(pos0, int(np.rint((nBurnInSteps2+nProductionSteps)/nwalkers))
                                                          progress=True)
             print("Mean acceptance fraction: {0:.3f}".format(np.mean(sampler.acceptance_fraction)), flush=True)
             

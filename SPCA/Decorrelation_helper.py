@@ -1068,8 +1068,8 @@ def burnIn(p0, p0_labels, mode, astro_func, astro_labels, astro_inputs, astro_in
         #Do quick burn-in to get walkers spread out
         with threadpool_limits(limits=1, user_api='blas'):
             with Pool(ncpu) as pool:
-                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, args=lnprob_inputs, pool=pool)
-                pos1, prob, state = sampler.run_mcmc(pos0, np.rint(nBurnInSteps1/nwalkers), progress=True)
+                sampler = emcee.EnsembleSampler(nwalkers, ndim, helpers.lnprob, pool=pool, args=lnprob_inputs)
+                pos1, prob, state = sampler.run_mcmc(pos0, int(np.rint(nBurnInSteps1/nwalkers)), progress=True)
         print('Mean burn-in acceptance fraction: {0:.3f}'.format(np.median(sampler.acceptance_fraction)), flush=True)
 
         p0_temps_mcmc.append(np.copy(sampler.flatchain[np.argmax(sampler.flatlnprobability)]))
