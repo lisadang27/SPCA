@@ -284,33 +284,36 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
     return transit + fplanet
 
 
-
 def check_phase(checkPhasePhis, A, B, C=0, D=0):
     """Check if the phasecurve ever dips below zero, implying non-physical negative flux coming from the planet.
-
     Args:
         phis (ndarray): Array of phases in radians at which to calculate the model, e.g. phis=np.linspace(-np.pi,np.pi,1000).
         A (float): Amplitude of the first-order cosine term.
         B (float): Amplitude of the first-order sine term.
         C (float, optional): Amplitude of the second-order cosine term. Default=0.
         D (float, optional): Amplitude of the second-order sine term. Default=0.
-
     Returns:
         bool: True if lightcurve implies non-physical negative flux coming from the planet, False otherwise.
     
     """
+    toggle = False # False = don't check phase
+    if toggle:
+        if not (-90 < np.arctan2(B, A)*180/np.pi < 90):
+            return -np.inf
     
-    if not (-90 < np.arctan2(B, A)*180/np.pi < 90):
-        return -np.inf
-    
-    if C==0 and D==0:
-        #avoid wasting time by multiplying by a bunch of zeros
-        negative = np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis) < 0)
-    else: 
-        negative =  np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis)
+        if C==0 and D==0:
+            #avoid wasting time by multiplying by a bunch of zeros
+            negative = np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis) < 0)
+        else: 
+            negative =  np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis)
                             + C*(np.cos(2*checkPhasePhis)-1) + D*np.sin(2*checkPhasePhis) < 0)
         
-    if negative:
-        return -np.inf
+        if negative:
+            return -np.inf
+        else:
+            return 0
     else:
         return 0
+
+
+

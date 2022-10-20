@@ -10,7 +10,9 @@ from photutils import CircularAperture, EllipticalAperture, RectangularAperture
 from photutils.utils import calc_total_error
 
 from multiprocessing import Pool
+from threadpoolctl import threadpool_limits
 from functools import partial
+from multiprocessing import get_context
 
 from collections import Iterable
 
@@ -476,7 +478,7 @@ def get_lightcurve(basepath, AOR_snip, channel, planet,
                    [], [], [], [], [],
                    scale, shape, methods, moveCentroids)
 
-    pool = Pool(ncpu)
+    pool = get_context('fork').Pool(ncpu)
     for i in range(N):
         pool.apply_async(wrapMyFunc, args=(i,), callback=update)
     pool.close()

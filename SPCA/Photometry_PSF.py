@@ -11,7 +11,9 @@ from photutils import CircularAperture, EllipticalAperture, RectangularAperture
 from photutils.utils import calc_total_error
 
 from multiprocessing import Pool
+from threadpoolctl import threadpool_limits
 from functools import partial
+from multiprocessing import get_context
 
 from collections import Iterable
 
@@ -111,7 +113,7 @@ def fit_2DGaussian(image_stack, scale=1, bounds=(13, 18, 13, 18), defaultCentroi
     results = [None] * N  # result list of correct size
     func = partial(fitgaussian, bounds, scale)
 
-    pool = Pool(ncpu)
+    pool = get_context('fork').Pool(ncpu)
     for i in range(N):
         pool.apply_async(wrapMyFunc, args=(i,), callback=update)
     pool.close()

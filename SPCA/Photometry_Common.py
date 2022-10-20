@@ -1,7 +1,9 @@
 import os, glob
 import numpy as np
 from multiprocessing import Pool
+from threadpoolctl import threadpool_limits
 from functools import partial
+from multiprocessing import get_context
 
 from astropy.stats import sigma_clip
 from astropy.convolution import convolve, Box1DKernel
@@ -211,6 +213,7 @@ def sigma_clipping(image_stack, bounds = (13, 18, 13, 18), sigma=5, maxiters=3):
                                                 cenfunc=np.ma.median, stdfunc=np.ma.std)
     
     # If any pixels near the target star are bad, mask the entire frame
+    
     image_stack[np.any(image_stack.mask[:,lbx:ubx,lby:uby], axis=(1,2))] = np.ma.masked
     
     return image_stack
@@ -430,13 +433,15 @@ def prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames=[],
         stacks = get_stacks(stackPath, datapath, AOR_snip)
     else:
         stacks = []
-    
+    inds = range(len(fnames))
+
     # Load all of the images using multiprocessing to speed things up
-    with Pool(ncpu) as pool:
-        func = partial(prepare_image, savepath, AOR_snip, fnames, lens, stacks, ignoreFrames,
-                       oversamp, scale, reuse_oversamp, saveoversamp, addStack, stackPath, maskStars)
-        inds = range(len(fnames))
-        results = np.ma.masked_array(pool.map(func, inds)).reshape(-1,int(32**2+1))
+    with threadpool_limits(limits=1, user_api='blas'):
+        with get_context('fork').Pool(ncpu) as pool:
+            func = partial(prepare_image, savepath, AOR_snip, fnames, lens, stacks, ignoreFrames,
+                           oversamp, scale, reuse_oversamp, saveoversamp, addStack, stackPath, maskStars)
+            inds = range(len(fnames))
+            results = np.ma.masked_array(pool.map(func, inds)).reshape(-1,int(32**2+1))
     
     # Access global variable
     global image_stack
@@ -459,10 +464,11 @@ def prepare_images(basepath, planet, channel, AOR_snip, ignoreFrames=[],
     
     print('Subtracting background... ', end='', flush=True)
     # background subtraction is done on global variable
-    with Pool(ncpu) as pool:
-        func = partial(bgsubtract, (11, 19, 11, 19))
-        inds = range(image_stack.shape[0])
-        bg, bg_err = np.array(pool.map(func, inds)).T
+    with threadpool_limits(limits=1, user_api='blas'):
+        with get_context('fork').Pool(ncpu) as pool:
+            func = partial(bgsubtract, (11, 19, 11, 19))
+            inds = range(image_stack.shape[0])
+            bg, bg_err = np.array(pool.map(func, inds)).T
     
     print('Frames loaded!', flush=True)
     
