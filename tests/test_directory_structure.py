@@ -30,14 +30,16 @@ class TestDirectoryStructure(unittest.TestCase):
             self.assertTrue(directory.is_dir(), directory)
 
     def test_mixed_channels_are_routed_by_each_member(self):
-        archive = self.make_archive([
-            ("download_readme.txt", b"Download metadata"),
-            ("r1234501/", b""),
-            ("r1234501/ch1/bcd/first_bcd.fits", b"Channel 1, AOR 1"),
-            ("r1234501/ch2/bcd/first_bcd.fits", b"Channel 2, AOR 1"),
-            ("r1234502/ch2/bcd/second_bcd.fits", b"Channel 2, AOR 2"),
-            ("r1234502/ch1/cal/dark.fits", b"Channel 1 calibration"),
-        ])
+        archive = self.make_archive(
+            [
+                ("download_readme.txt", b"Download metadata"),
+                ("r1234501/", b""),
+                ("r1234501/ch1/bcd/first_bcd.fits", b"Channel 1, AOR 1"),
+                ("r1234501/ch2/bcd/first_bcd.fits", b"Channel 2, AOR 1"),
+                ("r1234502/ch2/bcd/second_bcd.fits", b"Channel 2, AOR 2"),
+                ("r1234502/ch1/cal/dark.fits", b"Channel 1 calibration"),
+            ]
+        )
         original_zip = archive.read_bytes()
 
         self.assertEqual(make_directory_structure(self.root), "r1234")
@@ -51,7 +53,8 @@ class TestDirectoryStructure(unittest.TestCase):
         }
         actual = {
             path.relative_to(self.root).as_posix(): path.read_bytes()
-            for path in (self.root / "data").rglob("*") if path.is_file()
+            for path in (self.root / "data").rglob("*")
+            if path.is_file()
         }
         self.assertEqual(actual, expected)
         for channel in ("ch1", "ch2"):
@@ -64,12 +67,22 @@ class TestDirectoryStructure(unittest.TestCase):
         for number in range(1, 5):
             channel = f"ch{number}"
             with self.subTest(channel=channel):
-                self.make_archive([
-                    (f"r1234501/{channel}/", b""),
-                    (f"r1234501/{channel}/bcd/image_bcd.fits", channel.encode()),
-                ], name=f"{channel}.zip")
+                self.make_archive(
+                    [
+                        (f"r1234501/{channel}/", b""),
+                        (f"r1234501/{channel}/bcd/image_bcd.fits", channel.encode()),
+                    ],
+                    name=f"{channel}.zip",
+                )
                 make_directory_structure(str(self.root))
-                image = self.root / "data" / channel / "r1234501" / channel / "bcd/image_bcd.fits"
+                image = (
+                    self.root
+                    / "data"
+                    / channel
+                    / "r1234501"
+                    / channel
+                    / "bcd/image_bcd.fits"
+                )
                 self.assertEqual(image.read_bytes(), channel.encode())
                 self.assert_analysis_directories(channel)
 
@@ -77,20 +90,31 @@ class TestDirectoryStructure(unittest.TestCase):
         existing = self.root / "data/ch1/r1234501/ch1/bcd/existing_bcd.fits"
         existing.parent.mkdir(parents=True)
         existing.write_bytes(b"Existing observation")
-        first = self.make_archive([
-            ("r1234501/ch1/bcd/first_bcd.fits", b"First observation"),
-        ])
-        second = self.make_archive([
-            ("r1299901/ch2/bcd/second_bcd.fits", b"Second observation"),
-        ], name="second.ZIP")
+        first = self.make_archive(
+            [
+                ("r1234501/ch1/bcd/first_bcd.fits", b"First observation"),
+            ]
+        )
+        second = self.make_archive(
+            [
+                ("r1299901/ch2/bcd/second_bcd.fits", b"Second observation"),
+            ],
+            name="second.ZIP",
+        )
         ignored = self.root / "not-an-archive.zip.txt"
         ignored.write_text("Not a ZIP")
 
         self.assertEqual(make_directory_structure(self.root), "r12")
 
         self.assertEqual(existing.read_bytes(), b"Existing observation")
-        self.assertEqual((self.root / "data/ch1/r1234501/ch1/bcd/first_bcd.fits").read_bytes(), b"First observation")
-        self.assertEqual((self.root / "data/ch2/r1299901/ch2/bcd/second_bcd.fits").read_bytes(), b"Second observation")
+        self.assertEqual(
+            (self.root / "data/ch1/r1234501/ch1/bcd/first_bcd.fits").read_bytes(),
+            b"First observation",
+        )
+        self.assertEqual(
+            (self.root / "data/ch2/r1299901/ch2/bcd/second_bcd.fits").read_bytes(),
+            b"Second observation",
+        )
         self.assertTrue((self.root / "raw" / first.name).is_file())
         self.assertTrue((self.root / "raw" / second.name).is_file())
         self.assertTrue(ignored.is_file())
@@ -122,10 +146,12 @@ class TestDirectoryStructure(unittest.TestCase):
     def test_invalid_member_paths_are_rejected_before_extraction(self):
         for filename in ("../ch1/image.fits", "/r123/ch1/image.fits"):
             with self.subTest(filename=filename):
-                archive = self.make_archive([
-                    ("r1234501/ch1/bcd/image.fits", b"Observation"),
-                    (filename, b"Invalid member"),
-                ])
+                archive = self.make_archive(
+                    [
+                        ("r1234501/ch1/bcd/image.fits", b"Observation"),
+                        (filename, b"Invalid member"),
+                    ]
+                )
                 with self.assertRaisesRegex(ValueError, "Invalid path"):
                     make_directory_structure(self.root)
                 self.assertTrue(archive.is_file())

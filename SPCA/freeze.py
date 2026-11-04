@@ -4,9 +4,11 @@ from functools import partial
 import SPCA
 from SPCA import *
 
+
 # FIX: Add a docstring for this function or remove it
 def get_lambdaparams(function):
     return inspect.getfullargspec(function).args[1:]
+
 
 # FIX: Add a docstring for this function
 def get_fitted_params(function, dparams):
@@ -14,16 +16,17 @@ def get_fitted_params(function, dparams):
         name = function.func.__name__
     else:
         name = function.__name__
-    
-    if name=='detec_model_bliss':
-        if 'sigF' in dparams:
+
+    if name == "detec_model_bliss":
+        if "sigF" in dparams:
             params = []
         else:
-            params = ['sigF']
+            params = ["sigF"]
     else:
         params = get_lambdaparams(function)
         params = [param for param in params if param not in dparams]
     return params
+
 
 # FIX - this is currently empty!!!
 def load_past_params(path):
@@ -34,16 +37,17 @@ def load_past_params(path):
 
     Returns:
         ndarray: p0 (the previously fitted values)
-    
+
     """
-    
+
     return
+
 
 def make_lambdafunc(function, p0_labels, dparams=[], obj=[], debug=False):
     """Create a lambda function called dynamic_funk that will fix the parameters listed in dparams with the values in obj.
 
     Note: The module where the original function is needs to be loaded in this file.
-    
+
     Args:
         function (string): Name of the original function.
         dparams (list, optional): List of all input parameters the user does not wish to fit (default is None.)
@@ -52,17 +56,23 @@ def make_lambdafunc(function, p0_labels, dparams=[], obj=[], debug=False):
 
     Returns:
         function: dynamic_funk (the lambda function with fixed parameters.)
-    
+
     """
-    
-    full_args  = inspect.getfullargspec(function).args
-    freeze_kwargs = dict([[dparams[i], obj[dparams[i]]] for i in range(len(dparams)) if dparams[i] in full_args])
+
+    full_args = inspect.getfullargspec(function).args
+    freeze_kwargs = dict(
+        [
+            [dparams[i], obj[dparams[i]]]
+            for i in range(len(dparams))
+            if dparams[i] in full_args
+        ]
+    )
     dynamic_funk = partial(function, **freeze_kwargs)
-    
+
     if debug:
         print(inspect.getfullargspec(dynamic_funk).args)
         print()
-    
+
     fittedArgs = [arg for arg in full_args if arg in p0_labels]
-    
+
     return dynamic_funk, fittedArgs

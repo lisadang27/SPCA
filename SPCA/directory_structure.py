@@ -25,7 +25,8 @@ def make_directory_structure(rootpath):
     """
     rootpath = Path(rootpath)
     archives = sorted(
-        path for path in rootpath.iterdir()
+        path
+        for path in rootpath.iterdir()
         if path.is_file() and path.suffix.lower() == ".zip"
     )
     if not archives:
@@ -44,7 +45,9 @@ def make_directory_structure(rootpath):
             for member in zipfile.infolist():
                 path = PurePosixPath(member.filename)
                 if path.is_absolute() or ".." in path.parts:
-                    raise ValueError(f"Invalid path in {archive.name}: {member.filename}")
+                    raise ValueError(
+                        f"Invalid path in {archive.name}: {member.filename}"
+                    )
 
                 parts = path.parts
                 channel = None
