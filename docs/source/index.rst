@@ -21,9 +21,13 @@ SPCA requires Python 3.9 or newer. To install it, run the following in a termina
         # IF you want to install george to run GP analyses, also then run
         python -m pip install ".[GP]"
 
-For development, use `python -m pip install -e .` (or
-`python -m pip install -e ".[GP]"` for GP support) so edits to the package
-are available without reinstalling.
+For development, use ``python -m pip install -e ".[dev]"`` (or
+``python -m pip install -e ".[dev,GP]"`` for GP support) so edits to the package
+are available without reinstalling. Then run ``pre-commit install`` to enable the
+formatting and file checks on each commit. They format Python files and notebook
+code, check JSON, TOML, and YAML files, and fix common whitespace issues. If a
+hook changes a file, review and stage the changes before committing again. To
+check specific files before committing, run ``pre-commit run --files path/to/file``.
 
 Please note that SPCA is in a state of testing and development. The developers of this repo have very limited time to spend on maintenance and development.
 
