@@ -6,17 +6,21 @@ The full API can be found at [https://spca.readthedocs.io](https://spca.readthed
 
 ## Installation Instructions
 
-To install SPCA, run the following in a terminal:
+SPCA requires Python 3.9 or newer. To install it, run the following in a terminal:
 
 ```
         git clone https://github.com/lisadang27/SPCA.git
         cd SPCA
-        pip install .
+        python -m pip install .
         # IF you want to install george to run GP analyses, also then run
-        pip install .[GP]
+        python -m pip install ".[GP]"
 ```
 
-Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects like PSF fitting with aperture photometry or nearby companion removal using PSF subtraction.
+For development, use `python -m pip install -e .` (or
+`python -m pip install -e ".[GP]"` for GP support) so edits to the package
+are available without reinstalling.
+
+Please note that SPCA is in a state of testing and development. The developers of this repo have very limited time to spend on maintenance and development.
 
 ## Update Log
 

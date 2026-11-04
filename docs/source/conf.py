@@ -16,6 +16,8 @@ sys.path.insert(0, os.path.abspath('.'))
 sys.path.insert(0, os.path.abspath('../'))
 sys.path.insert(0, os.path.abspath('../../'))
 
+from SPCA import __version__
+
 # -- Project information -----------------------------------------------------
 
 project = 'SPCA'
@@ -23,7 +25,7 @@ copyright = '2019, Lisa Dang and Taylor James Bell'
 author = 'Lisa Dang and Taylor James Bell'
 
 # The full version, including alpha/beta/rc tags
-release = '0.3'
+release = __version__
 
 
 # -- General configuration ---------------------------------------------------

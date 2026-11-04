@@ -1,0 +1,49 @@
+[build-system]
+requires = ["setuptools>=80", "setuptools-scm>=8"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "SPCA"
+dynamic = ["version"]
+description = "An open-source, modular, and automated pipeline for Spitzer Phase Curve Analyses."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "GPL-3.0-only"
+license-files = ["LICENSE"]
+authors = [
+    {name = "Lisa Dang", email = "lisa.dang@physics.mcgill.ca"},
+    {name = "Taylor James Bell", email = "taylor.bell@mail.mcgill.ca"},
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "numpy",
+    "scipy",
+    "astropy",
+    "matplotlib",
+    "emcee>=3",
+    "mc3",
+    "batman-package",
+    "corner",
+    "photutils>=0.7",
+    "pandas",
+    "pyyaml",
+    "threadpoolctl",
+    "scikit-learn",
+    "tqdm",
+]
+
+[project.optional-dependencies]
+GP = ["pybind11", "george"]
+
+[project.urls]
+Homepage = "https://github.com/lisadang27/SPCA"
+Documentation = "https://spca.readthedocs.io"
+
+[tool.setuptools.packages.find]
+include = ["SPCA", "SPCA.*"]
+namespaces = false
+
+[tool.setuptools_scm]
