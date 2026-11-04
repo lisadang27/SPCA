@@ -5,7 +5,7 @@ from pathlib import Path
 
 from SPCA.directory_structure import make_directory_structure
 
-basepath = "/homes/picaro/bellt/research/"
+basepath = "/path/to/research/"
 
 planets = [
     "CoRoT-2b",

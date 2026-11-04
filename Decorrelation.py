@@ -55,7 +55,7 @@ planets = np.array(
 )
 channels = np.array(["ch2" for planet in planets])
 
-rootpath = "/homes/picaro/bellt/research/"
+rootpath = "/path/to/research/"
 
 mode_appendix = "_autoRun"
 

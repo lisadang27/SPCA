@@ -29,7 +29,7 @@ planets = [
 ]
 channels = ["ch2" for planet in planets]
 
-rootpath = "/homes/picaro/bellt/research/"
+rootpath = "/path/to/research/"
 
 for planet, channel in zip(planets, channels):
     AOR_snip = ""

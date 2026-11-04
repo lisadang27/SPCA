@@ -5,7 +5,7 @@ import numpy as np
 import os
 
 
-mainpath = "/home/taylor/Documents/Research/spitzer/MEGA/"
+mainpath = "/path/to/spitzer/MEGA/"
 
 planets = [
     "CoRoT-2b",

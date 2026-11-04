@@ -42,7 +42,7 @@ subarrays = [True if planet != "WASP-103b" else False for planet in planets]
 ncpu = 56
 
 # folder containing data from each planet
-basepath = "/homes/picaro/bellt/research/"
+basepath = "/path/to/research/"
 
 #################
 # General settings
