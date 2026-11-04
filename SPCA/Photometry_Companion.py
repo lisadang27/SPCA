@@ -9,6 +9,7 @@ import numpy as np
 from scipy import interpolate
 from scipy import stats as st
 from scipy import optimize as opt
+import unittest
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -17,8 +18,12 @@ import matplotlib.patches
 from astropy.io import fits
 from astropy.stats import sigma_clip
 
-from photutils import aperture_photometry
-from photutils import CircularAperture, EllipticalAperture, RectangularAperture
+from photutils.aperture import (
+    CircularAperture,
+    EllipticalAperture,
+    RectangularAperture,
+    aperture_photometry,
+)
 from photutils.utils import calc_total_error
 
 import glob
@@ -875,4 +880,4 @@ def get_lightcurve(
 
 
 if __name__ == "__main__":
-    main()
+    unittest.main()

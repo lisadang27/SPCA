@@ -1,6 +1,6 @@
 import os, glob
 import numpy as np
-from multiprocessing import Pool
+from multiprocessing import get_context
 from functools import partial
 
 from astropy.stats import sigma_clip
@@ -18,6 +18,21 @@ import warnings
 warnings.filterwarnings("ignore")
 
 image_stack = np.zeros((0, 32, 32))
+
+
+def _get_pool(processes):
+    """Create a multiprocessing pool that preserves shared module state.
+
+    The aperture and PSF routines use module-level image data to avoid
+    pickling large arrays. macOS uses ``spawn`` by default, which does not
+    inherit that state; use ``fork`` where available and fall back to the
+    platform default elsewhere.
+    """
+    try:
+        context = get_context("fork")
+    except ValueError:
+        context = get_context()
+    return context.Pool(processes)
 
 
 def create_folder(fullname, auto=False, overwrite=False):
@@ -536,7 +551,7 @@ def prepare_images(
         stacks = []
 
     # Load all of the images using multiprocessing to speed things up
-    with Pool(ncpu) as pool:
+    with _get_pool(ncpu) as pool:
         func = partial(
             prepare_image,
             savepath,
@@ -577,7 +592,7 @@ def prepare_images(
 
     print("Subtracting background... ", end="", flush=True)
     # background subtraction is done on global variable
-    with Pool(ncpu) as pool:
+    with _get_pool(ncpu) as pool:
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T

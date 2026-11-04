@@ -120,154 +120,160 @@ stamp_sizes = [3, 5]
 # Everything below is automated
 #####################################################################
 
-for planetNum, planet in enumerate(planets):
-    channel = channels[planetNum]
 
-    print("Starting planet", planet, "channel", channel)
+def main():
+    for planetNum, planet in enumerate(planets):
+        channel = channels[planetNum]
 
-    # bit of AOR to pick out which folders contain AORs that should be analyzed
-    with open(basepath + planet + "/analysis/aorSnippet.txt", "r") as file:
-        AOR_snip = file.readline().strip()
+        print("Starting planet", planet, "channel", channel)
 
-    for addStack in addStacks:
-        if subarrays[planetNum] and (True in allowIgnoreFrames):
-            # Perform frame diagnostics to figure out which frames within a datacube are consistently bad
-            print("Analysing", channel, "for systematically bad frames...")
-            ignoreFrames = frameDiagnosticsBackend.run_diagnostics(
-                planet,
-                channel,
-                AOR_snip,
-                basepath,
-                addStack,
-                highpassWidth,
-                nsigma,
-                ncpu,
-                showPlot=False,
-                savePlot=True,
-            )
-        else:
-            ignoreFrames = []
+        # bit of AOR to pick out which folders contain AORs that should be analyzed
+        with open(basepath + planet + "/analysis/aorSnippet.txt", "r") as file:
+            AOR_snip = file.readline().strip()
 
-        for allowIgnoreFrame in np.sort(allowIgnoreFrames)[::-1]:
-            if allowIgnoreFrame and len(ignoreFrames) != 0:
-                print("Using ignoreFrames")
-                ignoreFrames_temp = ignoreFrames
-            elif allowIgnoreFrame and (False in allowIgnoreFrames):
-                continue
+        for addStack in addStacks:
+            if subarrays[planetNum] and (True in allowIgnoreFrames):
+                # Perform frame diagnostics to figure out which frames within a datacube are consistently bad
+                print("Analysing", channel, "for systematically bad frames...")
+                ignoreFrames = frameDiagnosticsBackend.run_diagnostics(
+                    planet,
+                    channel,
+                    AOR_snip,
+                    basepath,
+                    addStack,
+                    highpassWidth,
+                    nsigma,
+                    ncpu,
+                    showPlot=False,
+                    savePlot=True,
+                )
             else:
-                print("Trying no ignoreFrames")
-                ignoreFrames_temp = []
+                ignoreFrames = []
 
-            image_stack, bg, bg_err, time = prepare_images(
-                basepath,
-                planet,
-                channel,
-                AOR_snip,
-                ignoreFrames_temp,
-                oversamp,
-                scale,
-                True,
-                True,
-                addStack,
-                maskStars,
-                ncpu,
-            )
+            for allowIgnoreFrame in np.sort(allowIgnoreFrames)[::-1]:
+                if allowIgnoreFrame and len(ignoreFrames) != 0:
+                    print("Using ignoreFrames")
+                    ignoreFrames_temp = ignoreFrames
+                elif allowIgnoreFrame and (False in allowIgnoreFrames):
+                    continue
+                else:
+                    print("Trying no ignoreFrames")
+                    ignoreFrames_temp = []
 
-            # Try all of the different photometry methods
-            for photometryMethod in photometryMethods:
-                if photometryMethod.lower() == "aperture":
-                    print("Starting Aperture photometry!")
-                    APhotometry.get_lightcurve(
-                        basepath,
-                        AOR_snip,
-                        channel,
-                        planet,
-                        True,
-                        onlyBest,
-                        highpassWidth,
-                        bin_data,
-                        bin_size,
-                        True,
-                        True,
-                        oversamp,
-                        scale,
-                        True,
-                        True,
-                        radii,
-                        edges,
-                        addStack,
-                        ignoreFrames_temp,
-                        maskStars,
-                        moveCentroids,
-                        ncpu,
-                        image_stack,
-                        bg,
-                        bg_err,
-                        time,
-                    )
+                image_stack, bg, bg_err, time = prepare_images(
+                    basepath,
+                    planet,
+                    channel,
+                    AOR_snip,
+                    ignoreFrames_temp,
+                    oversamp,
+                    scale,
+                    True,
+                    True,
+                    addStack,
+                    maskStars,
+                    ncpu,
+                )
 
-                elif photometryMethod.lower() == "psf":
-                    print("Starting PSF photometry!")
-                    PSFPhotometry.get_lightcurve(
-                        basepath,
-                        AOR_snip,
-                        channel,
-                        planet,
-                        True,
-                        highpassWidth,
-                        bin_data,
-                        bin_size,
-                        True,
-                        True,
-                        oversamp,
-                        scale,
-                        True,
-                        True,
-                        addStack,
-                        ignoreFrames_temp,
-                        maskStars,
-                        ncpu,
-                        image_stack,
-                        bg,
-                        bg_err,
-                        time,
-                    )
+                # Try all of the different photometry methods
+                for photometryMethod in photometryMethods:
+                    if photometryMethod.lower() == "aperture":
+                        print("Starting Aperture photometry!")
+                        APhotometry.get_lightcurve(
+                            basepath,
+                            AOR_snip,
+                            channel,
+                            planet,
+                            True,
+                            onlyBest,
+                            highpassWidth,
+                            bin_data,
+                            bin_size,
+                            True,
+                            True,
+                            oversamp,
+                            scale,
+                            True,
+                            True,
+                            radii,
+                            edges,
+                            addStack,
+                            ignoreFrames_temp,
+                            maskStars,
+                            moveCentroids,
+                            ncpu,
+                            image_stack,
+                            bg,
+                            bg_err,
+                            time,
+                        )
 
-                elif photometryMethod.lower() == "pld":
-                    print("Starting PLD photometry!")
-                    PLDPhotometry.get_lightcurve(
-                        basepath,
-                        AOR_snip,
-                        channel,
-                        planet,
-                        stamp_sizes,
-                        True,
-                        highpassWidth,
-                        bin_data,
-                        bin_size,
-                        True,
-                        True,
-                        addStack,
-                        ignoreFrames_temp,
-                        maskStars,
-                        ncpu,
-                        image_stack,
-                        bg,
-                        bg_err,
-                        time,
-                    )
-                    if ignoreFrames_temp == ignoreFrames:
-                        # Write down what frames should be ignored in case not doing PLDAper
-                        with open(
-                            basepath
-                            + planet
-                            + "/analysis/"
-                            + channel
-                            + "/PLD_ignoreFrames.txt",
-                            "w",
-                        ) as file:
-                            file.write(
-                                "IgnoreFrames = " + str(ignoreFrames)[1:-1] + "\n"
-                            )
+                    elif photometryMethod.lower() == "psf":
+                        print("Starting PSF photometry!")
+                        PSFPhotometry.get_lightcurve(
+                            basepath,
+                            AOR_snip,
+                            channel,
+                            planet,
+                            True,
+                            highpassWidth,
+                            bin_data,
+                            bin_size,
+                            True,
+                            True,
+                            oversamp,
+                            scale,
+                            True,
+                            True,
+                            addStack,
+                            ignoreFrames_temp,
+                            maskStars,
+                            ncpu,
+                            image_stack,
+                            bg,
+                            bg_err,
+                            time,
+                        )
 
-print("Done!")
+                    elif photometryMethod.lower() == "pld":
+                        print("Starting PLD photometry!")
+                        PLDPhotometry.get_lightcurve(
+                            basepath,
+                            AOR_snip,
+                            channel,
+                            planet,
+                            stamp_sizes,
+                            True,
+                            highpassWidth,
+                            bin_data,
+                            bin_size,
+                            True,
+                            True,
+                            addStack,
+                            ignoreFrames_temp,
+                            maskStars,
+                            ncpu,
+                            image_stack,
+                            bg,
+                            bg_err,
+                            time,
+                        )
+                        if ignoreFrames_temp == ignoreFrames:
+                            # Write down what frames should be ignored in case not doing PLDAper
+                            with open(
+                                basepath
+                                + planet
+                                + "/analysis/"
+                                + channel
+                                + "/PLD_ignoreFrames.txt",
+                                "w",
+                            ) as file:
+                                file.write(
+                                    "IgnoreFrames = " + str(ignoreFrames)[1:-1] + "\n"
+                                )
+
+    print("Done!")
+
+
+if __name__ == "__main__":
+    main()

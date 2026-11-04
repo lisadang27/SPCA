@@ -5,14 +5,17 @@ import sys
 
 from astropy.stats import sigma_clip
 
-from photutils import aperture_photometry
-from photutils import CircularAperture, EllipticalAperture, RectangularAperture
+from photutils.aperture import (
+    CircularAperture,
+    EllipticalAperture,
+    RectangularAperture,
+    aperture_photometry,
+)
 from photutils.utils import calc_total_error
 
-from multiprocessing import Pool
 from functools import partial
 
-from collections import Iterable
+from collections.abc import Iterable
 
 from .Photometry_Common import (
     highpassflist,
@@ -20,6 +23,7 @@ from .Photometry_Common import (
     create_folder,
     prepare_images,
     clip_data,
+    _get_pool,
 )
 from .make_plots import plot_photometry
 
@@ -714,7 +718,7 @@ def get_lightcurve(
         moveCentroids,
     )
 
-    pool = Pool(ncpu)
+    pool = _get_pool(ncpu)
     for i in range(N):
         pool.apply_async(wrapMyFunc, args=(i,), callback=update)
     pool.close()
@@ -975,7 +979,7 @@ class TestAperturehotometryMethods(unittest.TestCase):
             image_stack[i, 14 + i, 15] = 2
         xo = np.ones(image_stack.shape[0]) * 15
         yo = np.arange(14, 18)
-        with Pool(1) as pool:
+        with _get_pool(1) as pool:
             func = partial(
                 A_photometry,
                 np.zeros_like(xo),

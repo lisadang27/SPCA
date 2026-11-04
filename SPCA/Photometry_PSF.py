@@ -6,16 +6,25 @@ import sys
 
 from astropy.stats import sigma_clip
 
-from photutils import aperture_photometry
-from photutils import CircularAperture, EllipticalAperture, RectangularAperture
+from photutils.aperture import (
+    CircularAperture,
+    EllipticalAperture,
+    RectangularAperture,
+    aperture_photometry,
+)
 from photutils.utils import calc_total_error
 
-from multiprocessing import Pool
 from functools import partial
 
-from collections import Iterable
+from collections.abc import Iterable
 
-from .Photometry_Common import bin_array, create_folder, prepare_images, clip_data
+from .Photometry_Common import (
+    _get_pool,
+    bin_array,
+    clip_data,
+    create_folder,
+    prepare_images,
+)
 from .make_plots import plot_photometry
 
 import os, warnings
@@ -133,7 +142,7 @@ def fit_2DGaussian(
     results = [None] * N  # result list of correct size
     func = partial(fitgaussian, bounds, scale)
 
-    pool = Pool(ncpu)
+    pool = _get_pool(ncpu)
     for i in range(N):
         pool.apply_async(wrapMyFunc, args=(i,), callback=update)
     pool.close()
