@@ -25,6 +25,29 @@ import pickle
 from SPCA import helpers, astro_models, make_plots, bliss
 
 
+def _get_emcee_move(stretch_scale=2.0):
+    """Create the configured emcee stretch move.
+
+    Parameters
+    ----------
+    stretch_scale : float, optional
+        Scale parameter for the stretch move. Must be greater than 1.
+
+    Returns
+    -------
+    emcee.moves.StretchMove
+        A stretch move configured with ``stretch_scale``.
+
+    Raises
+    ------
+    ValueError
+        If ``stretch_scale`` is less than or equal to 1.
+    """
+    if stretch_scale <= 1:
+        raise ValueError("stretch_scale must be greater than 1.")
+    return emcee.moves.StretchMove(a=stretch_scale)
+
+
 def downloadExoplanetArchive():
     """Downloads the most recent masterfile of the best data on each target
     Args:
@@ -1570,7 +1593,12 @@ def burnIn(
         with threadpool_limits(limits=1, user_api="blas"):
             with Pool(ncpu) as pool:
                 sampler = emcee.EnsembleSampler(
-                    nwalkers, ndim, helpers.lnprob, pool=pool, args=lnprob_inputs
+                    nwalkers,
+                    ndim,
+                    helpers.lnprob,
+                    pool=pool,
+                    args=lnprob_inputs,
+                    moves=_get_emcee_move(),
                 )
                 pos1, prob, state = sampler.run_mcmc(
                     pos0, int(np.rint(nBurnInSteps1 / nwalkers)), progress=True

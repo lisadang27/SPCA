@@ -773,7 +773,12 @@ for iterationNumber in range(len(planets)):
             with threadpool_limits(limits=1, user_api="blas"):
                 with Pool(ncpu) as pool:
                     sampler = emcee.EnsembleSampler(
-                        nwalkers, ndim, helpers.lnprob, pool=pool, args=lnprob_inputs
+                        nwalkers,
+                        ndim,
+                        helpers.lnprob,
+                        pool=pool,
+                        args=lnprob_inputs,
+                        moves=dh._get_emcee_move(),
                     )
                     pos2, prob, state = sampler.run_mcmc(
                         pos0,
