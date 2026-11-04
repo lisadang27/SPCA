@@ -1,19 +1,18 @@
-import os, glob
-import numpy as np
-from multiprocessing import get_context
+import glob
+import os
+import warnings
 from functools import partial
+from multiprocessing import get_context
 
-from astropy.stats import sigma_clip
-from astropy.convolution import convolve, Box1DKernel
-from astropy.wcs import WCS
-from astropy.wcs.utils import skycoord_to_pixel
+import numpy as np
+import scipy.interpolate
+from astropy.convolution import Box1DKernel, convolve
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
-
-import scipy.interpolate
+from astropy.stats import sigma_clip
+from astropy.wcs import WCS
+from astropy.wcs.utils import skycoord_to_pixel
 from scipy.stats import binned_statistic
-
-import warnings
 
 warnings.filterwarnings("ignore")
 

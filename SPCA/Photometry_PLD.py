@@ -1,11 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
+import warnings
 
+import matplotlib.pyplot as plt
+import numpy as np
 from astropy.stats import sigma_clip
 
-from .Photometry_Common import bin_array, create_folder, prepare_images, clip_data
-
-import warnings
+from .Photometry_Common import bin_array, clip_data, create_folder, prepare_images
 
 warnings.filterwarnings("ignore")
 

@@ -5,19 +5,20 @@
 # Title: Photometry with Companion (PSF + Aperture)
 # --------------------------------------------------------------
 
-import numpy as np
-from scipy import interpolate
-from scipy import stats as st
-from scipy import optimize as opt
+import csv
+import glob
+import os
+import sys
+import time as tim
 import unittest
+import warnings
 
 import matplotlib
-import matplotlib.pyplot as plt
 import matplotlib.patches
-
+import matplotlib.pyplot as plt
+import numpy as np
 from astropy.io import fits
 from astropy.stats import sigma_clip
-
 from photutils.aperture import (
     CircularAperture,
     EllipticalAperture,
@@ -25,12 +26,9 @@ from photutils.aperture import (
     aperture_photometry,
 )
 from photutils.utils import calc_total_error
-
-import glob
-import csv
-import time as tim
-import os, sys
-import warnings
+from scipy import interpolate
+from scipy import optimize as opt
+from scipy import stats as st
 
 
 def get_fnames(directory, AOR_snip, ch):

@@ -1,14 +1,12 @@
-import numpy as np
-import scipy.optimize as spopt
-
-import matplotlib.pyplot as plt
-
-from astropy.stats import sigma_clip
-
 import inspect
+import os
+import sys
 from functools import partial
 
-import os, sys
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.optimize as spopt
+from astropy.stats import sigma_clip
 
 lib_path = os.path.abspath(os.path.join("../"))
 sys.path.append(lib_path)
@@ -17,7 +15,7 @@ from copy import deepcopy
 
 # SPCA libraries
 import SPCA
-from SPCA import astro_models, detec_models, bliss
+from SPCA import astro_models, bliss, detec_models
 
 
 # FIX: Add a docstring for this function

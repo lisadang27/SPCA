@@ -1,15 +1,16 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import numpy as np
 import os
 
+import numpy as np
+
 # SPCA libraries
-from SPCA import frameDiagnosticsBackend
 from SPCA import Photometry_Aperture as APhotometry
-from SPCA import Photometry_PSF as PSFPhotometry
 from SPCA import Photometry_Companion as CPhotometry
 from SPCA import Photometry_PLD as PLDPhotometry
+from SPCA import Photometry_PSF as PSFPhotometry
+from SPCA import frameDiagnosticsBackend
 from SPCA.Photometry_Common import prepare_images
 
 # The names of all the planets you want analyzed (without spaces)

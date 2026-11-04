@@ -46,6 +46,10 @@ Documentation = "https://spca.readthedocs.io"
 [tool.ruff]
 target-version = "py39"
 
+[tool.isort]
+profile = "black"
+py_version = 39
+
 [tool.setuptools.packages.find]
 include = ["SPCA", "SPCA.*"]
 namespaces = false

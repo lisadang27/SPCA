@@ -1,8 +1,8 @@
 """Regression tests for channel routing when unpacking Spitzer downloads."""
 
+import unittest
 from pathlib import Path
 from tempfile import TemporaryDirectory
-import unittest
 from zipfile import BadZipFile, ZipFile
 
 from SPCA.directory_structure import make_directory_structure

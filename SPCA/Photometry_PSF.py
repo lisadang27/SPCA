@@ -1,11 +1,12 @@
-import numpy as np
-from scipy import optimize
-import matplotlib.pyplot as plt
-from tqdm import tqdm
+import os
 import sys
+import warnings
+from collections.abc import Iterable
+from functools import partial
 
+import matplotlib.pyplot as plt
+import numpy as np
 from astropy.stats import sigma_clip
-
 from photutils.aperture import (
     CircularAperture,
     EllipticalAperture,
@@ -13,11 +14,10 @@ from photutils.aperture import (
     aperture_photometry,
 )
 from photutils.utils import calc_total_error
+from scipy import optimize
+from tqdm import tqdm
 
-from functools import partial
-
-from collections.abc import Iterable
-
+from .make_plots import plot_photometry
 from .Photometry_Common import (
     _get_pool,
     bin_array,
@@ -25,9 +25,6 @@ from .Photometry_Common import (
     create_folder,
     prepare_images,
 )
-from .make_plots import plot_photometry
-
-import os, warnings
 
 warnings.filterwarnings("ignore")
 

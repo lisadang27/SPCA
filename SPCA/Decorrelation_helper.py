@@ -1,28 +1,26 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import os, errno
-from tqdm import tqdm
-
-import scipy.optimize
-import emcee
-from astropy import constants as const
-
-from multiprocessing import Pool
-from threadpoolctl import threadpool_limits
-
+import errno
+import os
 import warnings
+from multiprocessing import Pool
+
+import emcee
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.optimize
+from astropy import constants as const
+from threadpoolctl import threadpool_limits
+from tqdm import tqdm
 
 warnings.filterwarnings("ignore")
 
-from astropy.table import Table
-from astropy.io import fits
-
+import pickle
 import urllib.request
 
-import pickle
+from astropy.io import fits
+from astropy.table import Table
 
 # SPCA libraries
-from SPCA import helpers, astro_models, make_plots, bliss
+from SPCA import astro_models, bliss, helpers, make_plots
 
 
 def _get_emcee_move(stretch_scale=2.0):

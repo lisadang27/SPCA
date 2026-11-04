@@ -1,5 +1,5 @@
-import numpy as np
 import batman
+import numpy as np
 
 
 def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):

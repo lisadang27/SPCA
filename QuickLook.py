@@ -1,11 +1,10 @@
-import numpy as np
-import matplotlib.pyplot as plt
-from astropy.io import fits
-
 import os
 
-from SPCA import make_plots, helpers
+import matplotlib.pyplot as plt
+import numpy as np
+from astropy.io import fits
 
+from SPCA import helpers, make_plots
 
 planets = [
     "CoRoT-2b",

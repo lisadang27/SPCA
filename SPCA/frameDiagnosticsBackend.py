@@ -1,13 +1,13 @@
-import numpy as np
+import warnings
+
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
+import numpy as np
 from astropy.stats import sigma_clip
+from matplotlib.ticker import MaxNLocator
 
 # SPCA libraries
 from .Photometry_Aperture import get_lightcurve
 from .Photometry_Common import create_folder
-
-import warnings
 
 warnings.filterwarnings("ignore")
 

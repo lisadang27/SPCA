@@ -1,35 +1,33 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import numpy as np
-import matplotlib.pyplot as plt
 import os
-from sklearn.decomposition import PCA
-
-from multiprocessing import Pool
-from threadpoolctl import threadpool_limits
-
 import warnings
+from multiprocessing import Pool
+
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.decomposition import PCA
+from threadpoolctl import threadpool_limits
 
 warnings.filterwarnings("ignore")
 
-import emcee
-import corner
-
 import inspect
 
+import corner
+import emcee
+
 # SPCA libraries
+from SPCA import Decorrelation_helper as dh
 from SPCA import (
-    helpers,
     astro_models,
+    bliss,
+    detec_models,
+    freeze,
+    helpers,
     make_plots,
     make_plots_custom,
-    detec_models,
-    bliss,
-    freeze,
 )
-from SPCA import Decorrelation_helper as dh
-
 
 planets = np.array(
     [

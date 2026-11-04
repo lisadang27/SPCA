@@ -1,6 +1,7 @@
 # Some code to make plots look a bit nicer
-import matplotlib
 from distutils.spawn import find_executable
+
+import matplotlib
 
 fontsize = 20
 ticklen = 5
@@ -24,15 +25,17 @@ if find_executable("latex"):
     params["pgf.rcfonts"] = False
 matplotlib.rcParams.update(params)
 
+import os
+import pickle
+import sys
+
+import matplotlib.cm
+import matplotlib.pyplot as plt
+
 # Imports
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.cm
-from matplotlib.ticker import MaxNLocator, ScalarFormatter
 from matplotlib import gridspec
-import pickle
-
-import os, sys
+from matplotlib.ticker import MaxNLocator, ScalarFormatter
 
 lib_path = os.path.abspath(os.path.join("../MCcubed/rednoise/"))
 sys.path.append(lib_path)
@@ -40,7 +43,7 @@ sys.path.append(lib_path)
 from mc3.stats import time_avg
 
 # SPCA libraries
-from . import bliss, helpers, astro_models
+from . import astro_models, bliss, helpers
 
 
 def plot_photometry(
