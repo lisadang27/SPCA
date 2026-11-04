@@ -53,6 +53,11 @@ Most of the following commands have an .ipynb ending and .py ending option avail
 
 2. Next, use the Make\_Directory\_Structure file to extract the data and setup the required directories.
 
+ZIP files containing multiple IRAC channels are split into the matching
+`data/chN/` directories, retaining the `AOR/chN/` paths used by the photometry
+pipeline. All channels are preserved; inspect the observations to decide which
+channel to analyze. The original ZIP files are moved to `raw/` after extraction.
+
 3. Then use the Everything\_Photometry file to perform a suite of different photometries on your data. The code will automatically select the best aperture photometry method which gives the lowest scatter after smoothing the raw flux by a boxcar filter of a width provided by the user.
 
 4. Then use the QuickLook file to ensure that you have looked at the raw data (to ensure it looks reasonable) and to determine whether you want to remove the first AOR (in case it is a short AOR to be discarded). By looking at the raw data, you can gain some insight into how successful different decorrelation models might be.
