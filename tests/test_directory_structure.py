@@ -124,6 +124,33 @@ class TestDirectoryStructure(unittest.TestCase):
             make_directory_structure(self.root)
         self.assertEqual(list(self.root.iterdir()), [])
 
+    def test_already_extracted_bcds_are_reused_idempotently(self):
+        for channel in ("ch1", "ch3", "ch4"):
+            path = (
+                self.root
+                / "data"
+                / channel
+                / "r1234501"
+                / channel
+                / "bcd/image_bcd.fits"
+            )
+            path.parent.mkdir(parents=True)
+            path.write_bytes(b"Unchanged downloaded image")
+        for _ in range(2):
+            self.assertEqual(make_directory_structure(self.root), "r1234")
+            for channel in ("ch1", "ch3", "ch4"):
+                self.assert_analysis_directories(channel)
+        self.assertFalse(list(self.root.glob("*.zip")))
+
+    def test_existing_and_zip_aors_both_contribute_to_snippet(self):
+        path = self.root / "data/ch1/r1299901/ch1/bcd/existing_bcd.fits"
+        path.parent.mkdir(parents=True)
+        path.write_bytes(b"Existing")
+        self.make_archive([("r1234501/ch2/bcd/new_bcd.fits", b"New")])
+        self.assertEqual(make_directory_structure(self.root), "r12")
+        self.assert_analysis_directories("ch1")
+        self.assert_analysis_directories("ch2")
+
     def test_archive_without_channel_paths_is_left_in_place(self):
         archive = self.make_archive([("readme.txt", b"No observations")])
         with self.assertRaisesRegex(ValueError, "No AOR/chN directories"):

@@ -37,6 +37,7 @@ dependencies = [
 
 [project.optional-dependencies]
 GP = ["pybind11", "george"]
+download = ["astroquery>=0.4.10", "pyvo>=1.5", "requests>=2.25", "urllib3>=1.26"]
 dev = ["pre-commit>=3.5"]
 
 [project.urls]

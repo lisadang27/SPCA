@@ -5,6 +5,7 @@ from pathlib import Path
 
 from SPCA.directory_structure import make_directory_structure
 
+# Campaign roots may contain SHA ZIPs or programmatically downloaded data/.
 basepath = "/path/to/research/"
 
 planets = [

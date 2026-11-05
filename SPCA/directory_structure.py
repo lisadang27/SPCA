@@ -1,26 +1,29 @@
 """Prepare Spitzer archive downloads for the photometry pipeline."""
 
 import os
+import re
 from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 
 def make_directory_structure(rootpath):
-    """Unpack each archive member into the directory for its IRAC channel.
+    """Prepare ZIP downloads or already-extracted BCD trees for SPCA.
 
     Members named ``AOR/chN/...`` are extracted to ``data/chN/AOR/chN/...``.
     Files outside a channel directory, such as download readmes, are preserved
     under ``data/``. Original ZIP files are moved to ``raw/`` after extraction.
     Existing output directories are reused, but archived ZIPs are not replaced.
+    Programmatic downloads already in ``data/chN/AOR/chN/bcd/`` are reused
+    without making ZIP copies. Repeated setup of extracted data is supported.
 
     Args:
-        rootpath (str or pathlib.Path): Directory containing the downloaded ZIPs.
+        rootpath (str or pathlib.Path): Campaign root containing ZIPs or data/.
 
     Returns:
         str: Common AOR prefix, also written to ``analysis/aorSnippet.txt``.
 
     Raises:
-        ValueError: No ZIPs, no channel directories, or invalid archive paths.
+        ValueError: No ZIPs or extracted BCDs, no channels, or invalid ZIP paths.
         FileExistsError: A ZIP with the same name already exists in ``raw/``.
     """
     rootpath = Path(rootpath)
@@ -29,11 +32,19 @@ def make_directory_structure(rootpath):
         for path in rootpath.iterdir()
         if path.is_file() and path.suffix.lower() == ".zip"
     )
-    if not archives:
-        raise ValueError(f"No ZIP archives found in {rootpath}")
-
     channels = set()
     aors = set()
+    for channel in ("ch1", "ch2", "ch3", "ch4"):
+        for directory in sorted((rootpath / "data" / channel).glob("r*")):
+            if not re.fullmatch(r"r[0-9]+", directory.name):
+                continue
+            bcd = directory / channel / "bcd"
+            if any(path.is_file() for path in bcd.glob("*_bcd.fits")):
+                channels.add(channel)
+                aors.add(directory.name)
+    if not archives and not aors:
+        raise ValueError(f"No ZIP archives or extracted BCD data found in {rootpath}")
+
     archive_members = []
     for archive in archives:
         if (rootpath / "raw" / archive.name).exists():
