@@ -360,18 +360,38 @@ def _records(table: Table, excluded: dict) -> list:
     return records
 
 
+def _merge_record(merged: dict, record: dict) -> None:
+    """Deduplicate a product within its science AOR/channel, checking metadata."""
+    key = (
+        record["aorkey"],
+        record["channel"],
+        record["url"] or record["filename"],
+    )
+    previous = merged.get(key)
+    if previous is not None:
+        for name, value in record.items():
+            old = previous[name]
+            if old == value or (
+                isinstance(old, float)
+                and isinstance(value, float)
+                and np.isnan(old)
+                and np.isnan(value)
+            ):
+                continue
+            raise ArchiveError(
+                f"Conflicting archive metadata for {record['url'] or record['filename']} "
+                f"in AOR {record['aorkey']}/ch{record['channel']}: "
+                f"{name} ({old!r} != {value!r})"
+            )
+    else:
+        merged[key] = record
+
+
 def _merge(records: list) -> list:
-    """Deduplicate records by URL deterministically; conflicts are errors."""
+    """Deduplicate by science AOR/channel/URL; conflicting metadata is an error."""
     merged = {}
     for record in records:
-        key = record["url"] or (record["aorkey"], record["channel"], record["filename"])
-        previous = merged.get(key)
-        if previous is not None and (previous["aorkey"], previous["channel"]) != (
-            record["aorkey"],
-            record["channel"],
-        ):
-            raise ArchiveError(f"Conflicting archive metadata for {key}")
-        merged.setdefault(key, record)
+        _merge_record(merged, record)
     return sorted(
         merged.values(),
         key=lambda r: (r["aorkey"], r["channel"], r["subdir"], r["filename"], r["url"]),
@@ -662,8 +682,10 @@ def _aor_records(
         for table in _sia_search(client, center, expansion_radius, window):
             for record in _records(table, excluded):
                 if record["aorkey"] == aor:
-                    target = found if record["channel"] is not None else level
-                    target[record["url"]] = record
+                    if record["channel"] is None:
+                        level[record["url"]] = record
+                    else:
+                        _merge_record(found, record)
 
     if not (np.isfinite(mjd_min) and np.isfinite(mjd_max)):
         absorb(None)
@@ -681,7 +703,9 @@ def _aor_records(
             source = "aor_metadata"
             if not spans:
                 if report is None:
-                    report = _quality_report(client, aor, sorted(found))
+                    report = _quality_report(
+                        client, aor, sorted(record["url"] for record in found.values())
+                    )
                 if "start" in report and "end" in report:
                     spans = [(report["start"], report["end"])]
                     source = "qa_report"
@@ -973,7 +997,10 @@ def plan_download(
     aorkeys : sequence, optional
         Subset of discovered AORs; unknown requested AORs are errors.
     channels : sequence of int
-        Channels to plan.
+        Channels to plan. Requested channels absent from discovery are reported
+        informationally, not as incomplete observations: cryogenic IRAC channel
+        pairs 1/3 and 2/4 view different fields. Discovered AOR/channel pairs
+        without science BCD links remain errors.
     ancillary : bool
         Include uncertainty, mask, and other ``bcd/``/``cal/`` FITS products.
         False retrieves only science ``*_bcd.fits`` files.
@@ -1095,9 +1122,10 @@ def plan_download(
             limitation=LIMITATION,
         )
         if missing:
-            LOGGER.warning(
-                "No BCD links returned for requested AOR/channels %s; their "
-                "availability/completeness is unverified",
+            LOGGER.info(
+                "Requested AOR/channels without discovered BCDs: %s. "
+                "These channels may observe different fields; absence alone "
+                "is not a completeness warning.",
                 ", ".join(missing),
             )
         if excluded:

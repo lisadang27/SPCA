@@ -569,6 +569,65 @@ class PlanningTests(Fixture):
         self.assertEqual(summary["unknown_sizes"][0], 1)
         self.assertEqual(summary["estimated_bytes"][0], 0)
 
+    def test_shared_calibration_is_retained_for_each_science_aor(self):
+        entries = [(2, "bcd", "a_bcd.fits"), (2, "cal", "a_sdark.fits")]
+        table = vstack(
+            [
+                sia_products(entries, aor="1234501", pid="60003"),
+                sia_products(
+                    entries, aor="1234502", pid="60003", mjd=54769.04, ra=97.64
+                ),
+            ]
+        )
+        # Repeated SIA rows in each science AOR must still be deduplicated.
+        self.client.query_sia.return_value = vstack([table, table])
+        found = self.discover(pids=[60003], channels=[2])
+        self.assertEqual(list(found["aorkey"]), ["1234501", "1234502"])
+        self.assertEqual(list(found["science_bcds"]), [1, 1])
+        self.assertEqual(list(found["other_ancillary_files"]), [1, 1])
+        plan = plan_download(found, self.root, channels=[2], client=self.client)
+        self.assertEqual(len(plan), 4)
+        calibration = plan[plan["product"] == "ancillary"]
+        self.assertEqual(len(set(calibration["url"])), 1)
+        self.assertEqual(
+            list(calibration["local_path"]),
+            [
+                "data/ch2/r1234501/ch2/cal/a_sdark.fits",
+                "data/ch2/r1234502/ch2/cal/a_sdark.fits",
+            ],
+        )
+        self.assertEqual(list(calibration["aorkey"]), ["1234501", "1234502"])
+        self.assertEqual(list(calibration["channel"]), [2, 2])
+
+    def test_conflicting_same_aor_url_metadata_is_rejected(self):
+        for field, value in (
+            ("proposal_id", "WASP_C5_60003"),
+            ("access_estsize", 999),
+            ("t_min", 54768.05),
+        ):
+            with self.subTest(field=field):
+                first = sia_products([(1, "bcd", "a_bcd.fits")])
+                second = first.copy()
+                second[field][0] = value
+                self.client.query_sia.return_value = vstack([first, second])
+                with self.assertRaisesRegex(
+                    ArchiveError, "Conflicting archive metadata"
+                ):
+                    self.discover()
+                # Expansion must not hide conflicts by keeping only the last row.
+                with self.assertRaisesRegex(
+                    ArchiveError, "Conflicting archive metadata"
+                ):
+                    self.plan()
+
+    def test_duplicate_same_aor_url_with_missing_metadata_is_deduplicated(self):
+        table = sia_products([(1, "bcd", "a_bcd.fits")])
+        table.remove_columns(["s_ra", "s_dec", "access_estsize"])
+        self.client.query_sia.return_value = vstack([table, table])
+        found = self.discover()
+        self.assertEqual(list(found["science_bcds"]), [1])
+        self.assertEqual(len(self.plan()), 1)
+
     def test_plan_without_expansion_hints_is_rejected(self):
         observations = self.observations()
         observations.remove_columns(["ra", "dec", "mjd_min", "mjd_max"])
@@ -581,7 +640,9 @@ class PlanningTests(Fixture):
             self.plan()
 
     def test_unavailable_requested_channels_are_reported(self):
-        with self.assertLogs("SPCA.spitzer_download", level="WARNING"):
+        self.client.fetch_text.side_effect = None
+        self.client.fetch_text.return_value = quality_report()
+        with self.assertLogs("SPCA.spitzer_download", level="INFO") as logs:
             plan = plan_download(
                 self.observations(),
                 self.root,
@@ -590,6 +651,15 @@ class PlanningTests(Fixture):
                 client=self.client,
             )
         self.assertEqual(plan.meta["channels_without_bcd_links"], ["1234501/ch4"])
+        self.assertFalse(any(record.levelname == "WARNING" for record in logs.records))
+
+    def test_discovered_channel_losing_bcd_links_remains_error(self):
+        observations = self.observations()
+        observations["channel"] = [4]
+        with self.assertRaisesRegex(
+            ArchiveError, "No science BCD links for discovered"
+        ):
+            plan_download(observations, self.root, client=self.client)
 
     def test_unknown_aor_rejected(self):
         with self.assertRaisesRegex(ValueError, "not discovered"):

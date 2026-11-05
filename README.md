@@ -148,6 +148,12 @@ search intentionally does not plan; `--compare` lists such channels. Discovery
 and planning each re-query whole AORs, so previewing a multi-hour staring AOR
 takes minutes.
 
+Cryogenic IRAC channel pairs 1/3 and 2/4 view different fields. Requested
+channels absent from discovery are informational, not completeness warnings;
+planning still fails if a discovered AOR/channel loses its science BCD links.
+Shared calibration files are retained separately under each science AOR's
+channel directory, even when their original archive URL is identical.
+
 #### How files are found
 
 `Irsa.query_sia(collection="spitzer_sha")` returns **one record per archive
