@@ -620,6 +620,109 @@ class PlanningTests(Fixture):
                 ):
                     self.plan()
 
+    def test_repeated_calibration_associations_use_science_coverage(self):
+        tables = []
+        for aor in ("1234501", "1234502"):
+            science = sia_products(
+                [
+                    (1, "bcd", "a_bcd.fits", T0),
+                    (1, "bcd", "b_bcd.fits", T0 + 1.5),
+                ],
+                aor=aor,
+            )
+            calibration = sia_products(
+                [
+                    (1, "cal", "shared_sdark.fits", T0 - 10),
+                    (1, "cal", "shared_sdark.fits", T0 + 10),
+                ],
+                aor=aor,
+                ra=120,
+                dec=-20,
+                pid="60003",
+            )
+            calibration["s_ra"][1] = 130
+            calibration["s_dec"][1] = -30
+            calibration["s_xel1"][1] = 256
+            calibration["s_fov"][1] = 0.08
+            calibration["access_estsize"][1] = 999
+            calibration["instrument_keywords"][1] = '{"reqmode": ["Other"]}'
+            calibration["proposal_id"][1] = "WASP_C5_70060"
+            tables.extend([science, calibration])
+        table = vstack(tables)
+        self.client.query_sia.return_value = table
+        found = self.discover(pids=[50517], channels=[1])
+        self.assertEqual(list(found["science_bcds"]), [2, 2])
+        self.assertEqual(list(found["other_ancillary_files"]), [1, 1])
+        np.testing.assert_allclose(found["mjd_min"], T0)
+        np.testing.assert_allclose(found["mjd_max"], T0 + 1.501)
+        np.testing.assert_allclose(found["ra"], 97.6366)
+        np.testing.assert_allclose(found["dec"], 29.6723)
+        self.assertEqual(list(found["pid"]), ["50517", "50517"])
+        self.assertEqual(
+            list(found["mode"]), ["IracMapPC, subarray", "IracMapPC, subarray"]
+        )
+        plan = plan_download(found, self.root, channels=[1], client=self.client)
+        calibration = plan[plan["product"] == "ancillary"]
+        self.assertEqual(
+            list(calibration["local_path"]),
+            [
+                "data/ch1/r1234501/ch1/cal/shared_sdark.fits",
+                "data/ch1/r1234502/ch1/cal/shared_sdark.fits",
+            ],
+        )
+        self.assertEqual(len(set(calibration["url"])), 1)
+        self.assertEqual(list(calibration["estimated_bytes"]), [999 * 1024] * 2)
+        # Input ordering must not determine retained association metadata.
+        self.client.query_sia.return_value = table[::-1]
+        reversed_plan = plan_download(
+            found, self.root, channels=[1], client=self.client
+        )
+        self.assertTrue(np.all(plan == reversed_plan))
+
+    def test_different_calibration_urls_for_same_destination_are_errors(self):
+        first = sia_products(
+            [(1, "bcd", "a_bcd.fits"), (1, "cal", "shared_sdark.fits")]
+        )
+        second = first[1:].copy()
+        second["access_url"] = [
+            str(url).replace("IRAC049600", "IRAC024200") for url in second["access_url"]
+        ]
+        self.client.query_sia.return_value = vstack([first, second])
+        with self.assertRaisesRegex(ArchiveError, "Conflicting archive"):
+            self.discover()
+        with self.assertRaisesRegex(ArchiveError, "Conflicting archive"):
+            self.plan(ancillary=True)
+
+    def test_date_filtered_long_aor_with_repeated_calibration(self):
+        for authoritative in (False, True):
+            with self.subTest(authoritative=authoritative):
+                science, count = long_aor(aor_level=authoritative)
+                calibration = sia_products(
+                    [
+                        (1, "cal", "shared_sdark.fits", float(t))
+                        for t in science["t_min"][:count]
+                    ]
+                )
+                self.client.query_sia.side_effect = time_filtered(
+                    vstack([science, calibration])
+                )
+                found = self.discover(
+                    channels=[1],
+                    start="2008-10-29T00:00:00",
+                    end="2008-10-29T01:00:00",
+                )
+                self.assertEqual(found["science_bcds"][0], count)
+                self.assertEqual(found["other_ancillary_files"][0], 1)
+                self.assertEqual(
+                    found["time_coverage"][0],
+                    "aor_metadata" if authoritative else "gap_search",
+                )
+                self.assertAlmostEqual(found["mjd_min"][0], T0)
+                self.assertAlmostEqual(found["mjd_max"][0], T0 + 1.501)
+                plan = plan_download(found, self.root, channels=[1], client=self.client)
+                self.assertEqual(len(plan), count + 1)
+                self.assertEqual(sum(plan["product"] == "ancillary"), 1)
+
     def test_duplicate_same_aor_url_with_missing_metadata_is_deduplicated(self):
         table = sia_products([(1, "bcd", "a_bcd.fits")])
         table.remove_columns(["s_ra", "s_dec", "access_estsize"])

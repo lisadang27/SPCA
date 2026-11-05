@@ -152,7 +152,15 @@ Cryogenic IRAC channel pairs 1/3 and 2/4 view different fields. Requested
 channels absent from discovery are informational, not completeness warnings;
 planning still fails if a discovered AOR/channel loses its science BCD links.
 Shared calibration files are retained separately under each science AOR's
-channel directory, even when their original archive URL is identical.
+channel directory, even when their original archive URL is identical. Repeated
+calibration links within an AOR/channel are deduplicated by local product
+identity: their dates, time bounds, pointing, PID, mode, and size estimates
+describe the referring observations and can differ. Calibration rows retain a
+deterministic representative association, combined time bounds, and the largest
+size estimate; these are not authoritative calibration-file metadata. Discovery
+summaries and expansion hints prefer science exposures (and AOR-level time
+bounds), not calibration associations. Different URLs targeting the same local
+file remain errors.
 
 #### How files are found
 

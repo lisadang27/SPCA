@@ -361,15 +361,26 @@ def _records(table: Table, excluded: dict) -> list:
 
 
 def _merge_record(merged: dict, record: dict) -> None:
-    """Deduplicate a product within its science AOR/channel, checking metadata."""
+    """Deduplicate local products, separating calibration association metadata.
+
+    Calibration dates, pointing, PID, mode, and size estimates describe the
+    referring SIA observation, not immutable properties of the calibration.
+    Keep a deterministic representative association, union its time bounds,
+    and use the largest size estimate for previewing. Science metadata remains
+    strict. Different URLs targeting the same local product are always errors.
+    """
     key = (
         record["aorkey"],
         record["channel"],
-        record["url"] or record["filename"],
+        record["subdir"],
+        record["filename"],
     )
     previous = merged.get(key)
     if previous is not None:
-        for name, value in record.items():
+        calibration = record["subdir"] == "cal"
+        fields = ("url", "category") if calibration else record
+        for name in fields:
+            value = record[name]
             old = previous[name]
             if old == value or (
                 isinstance(old, float)
@@ -378,17 +389,38 @@ def _merge_record(merged: dict, record: dict) -> None:
                 and np.isnan(value)
             ):
                 continue
+            if name == "url":
+                raise ArchiveError(
+                    f"Conflicting archive URLs for AOR {record['aorkey']}/"
+                    f"ch{record['channel']}/{record['subdir']}/{record['filename']}: "
+                    f"{old!r} != {value!r}"
+                )
             raise ArchiveError(
                 f"Conflicting archive metadata for {record['url'] or record['filename']} "
                 f"in AOR {record['aorkey']}/ch{record['channel']}: "
                 f"{name} ({old!r} != {value!r})"
             )
+        if calibration:
+
+            def association_key(item):
+                return tuple(
+                    str(item[name]) for name in ("date", "pid", "mode", "ra", "dec")
+                )
+
+            combined = min((previous, record), key=association_key).copy()
+            for name, reducer in (("mjd_min", min), ("mjd_max", max)):
+                times = [r[name] for r in (previous, record) if np.isfinite(r[name])]
+                combined[name] = reducer(times) if times else np.nan
+            combined["estimated_bytes"] = max(
+                previous["estimated_bytes"], record["estimated_bytes"]
+            )
+            merged[key] = combined
     else:
-        merged[key] = record
+        merged[key] = record.copy()
 
 
 def _merge(records: list) -> list:
-    """Deduplicate by science AOR/channel/URL; conflicting metadata is an error."""
+    """Deduplicate by local AOR/channel/product; conflicting identity is an error."""
     merged = {}
     for record in records:
         _merge_record(merged, record)
@@ -399,9 +431,14 @@ def _merge(records: list) -> list:
 
 
 def _hint(records: list, fallback: SkyCoord | None) -> tuple:
-    """Return an AOR's mean position and MJD range from its records."""
-    ra = np.array([r["ra"] for r in records], dtype=float)
-    dec = np.array([r["dec"] for r in records], dtype=float)
+    """Use science exposures for position/time hints, including AOR-level bounds.
+
+    Calibration associations are only a fallback when no science is available.
+    """
+    science = [r for r in records if r.get("category") == "science"]
+    positions = science or records
+    ra = np.array([r["ra"] for r in positions], dtype=float)
+    dec = np.array([r["dec"] for r in positions], dtype=float)
     good = np.isfinite(ra) & np.isfinite(dec)
     if good.any():
         # Average unit vectors to handle RA wrapping.
@@ -412,8 +449,11 @@ def _hint(records: list, fallback: SkyCoord | None) -> tuple:
         ra0, dec0 = fallback.icrs.ra.deg, fallback.icrs.dec.deg
     else:
         ra0 = dec0 = np.nan
+    temporal = (
+        science + [r for r in records if r["channel"] is None] if science else records
+    )
     times = np.array(
-        [t for r in records for t in (r["mjd_min"], r["mjd_max"])], dtype=float
+        [t for r in temporal for t in (r["mjd_min"], r["mjd_max"])], dtype=float
     )
     times = times[np.isfinite(times)]
     return (
@@ -895,7 +935,8 @@ def discover_observations(
             ra, dec, mjd_min, mjd_max = _hint(aor_records, None)
             for channel in sorted({record["channel"] for record in aor_records}):
                 group = [r for r in aor_records if r["channel"] == channel]
-                programs = {r["pid"] for r in group if r["pid"]}
+                metadata = [r for r in group if r["category"] == "science"] or group
+                programs = {r["pid"] for r in metadata if r["pid"]}
                 if len(programs) > 1:
                     raise ArchiveError(f"Conflicting PIDs for AOR {aor}: {programs}")
                 if wanted_pids:
@@ -906,13 +947,14 @@ def discover_observations(
                         )
                     if not programs & wanted_pids:
                         continue
-                dates = [Time(r["date"]).mjd for r in group if r["date"]]
+                dates = [Time(r["date"]).mjd for r in metadata if r["date"]]
                 if start or end:
-                    if len(dates) != len(group):
+                    if len(dates) != len(metadata):
                         raise ArchiveError(
                             f"Missing date for AOR {aor}; cannot apply date filter"
                         )
-                    if max(dates) < lower or min(dates) > upper:
+                    _, _, first, last = _hint(metadata, None)
+                    if last < lower or first > upper:
                         continue
                 counts = _pair_counts(group)
                 if not counts["science"]:
@@ -938,7 +980,7 @@ def discover_observations(
                         next(iter(programs), ""),
                         channel,
                         Time(min(dates), format="mjd").isot if dates else "",
-                        ", ".join(sorted({r["mode"] for r in group if r["mode"]})),
+                        ", ".join(sorted({r["mode"] for r in metadata if r["mode"]})),
                         counts["science"],
                         counts["uncertainty"],
                         counts["mask"],
