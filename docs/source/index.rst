@@ -11,17 +11,25 @@ SPCA is an open-source, modular, and automated pipeline for Spitzer Phase Curve 
 Installation Instructions
 =========================
 
-To install SPCA, run the following in a terminal:
+SPCA requires Python 3.9 or newer. To install it, run the following in a terminal:
 
 .. code-block:: bash
 
         git clone https://github.com/lisadang27/SPCA.git
         cd SPCA
-        pip install .
+        python -m pip install .
         # IF you want to install george to run GP analyses, also then run
-        pip install .[GP]
+        python -m pip install ".[GP]"
 
-Please note however that SPCA is in a state of alpha testing and is still under development. Frequent changes are expected over the upcoming few months as we finalize some aspects like PSF fitting with aperture photometry or nearby companion removal using PSF subtraction.
+For development, use ``python -m pip install -e ".[dev]"`` (or
+``python -m pip install -e ".[dev,GP]"`` for GP support) so edits to the package
+are available without reinstalling. Then run ``pre-commit install`` to enable the
+formatting and file checks on each commit. They format Python files and notebook
+code, check JSON, TOML, and YAML files, and fix common whitespace issues. If a
+hook changes a file, review and stage the changes before committing again. To
+check specific files before committing, run ``pre-commit run --files path/to/file``.
+
+Please note that SPCA is in a state of testing and development. The developers of this repo have very limited time to spend on maintenance and development.
 
 Update Log
 ==========
@@ -59,6 +67,11 @@ Package Usage
 Most of the following commands have an .ipynb ending and .py ending option available, where the .py version is optimized for analyzing many data sets and the .ipynb file is optimized for viewing the analysis of a single data set. Each file has a portion at the top where you can set parameters which will determine the techniques.
 
 2. Next, use the Make_Directory_Structure file to extract the data and setup the required directories.
+
+ZIP files containing multiple IRAC channels are split into the matching
+``data/chN/`` directories, retaining the ``AOR/chN/`` paths used by the photometry
+pipeline. All channels are preserved; inspect the observations to decide which
+channel to analyze. The original ZIP files are moved to ``raw/`` after extraction.
 
 3. Then use the Everything_Photometry file to perform a suite of different photometries on your data. The code will automatically select the best aperture photometry method which gives the lowest scatter after smoothing the raw flux by a boxcar filter of a width provided by the user.
 

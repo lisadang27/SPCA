@@ -1,12 +1,54 @@
-__pycache__
-.ipynb_checkpoints
+# Python bytecode and caches
+__pycache__/
+*.py[cod]
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Build and packaging outputs
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test and coverage outputs
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+
+# Jupyter and documentation outputs
+.ipynb_checkpoints/
+docs/build/
+docs/_build/
+
+# Local environment settings (keep example configurations trackable)
+.env
+.env.*
+!.env.example
+!.env.sample
+!.env.template
+
+# Editor and operating system files
+*.code-workspace
 *.swp
-MCcubed
-*.pyc
+*.swo
+*~
+.idea/
+.vscode/
 .DS_Store
+._*
+Desktop.ini
+Thumbs.db
+
+# Project-specific local data and dependencies
+MCcubed
 WASP12b_special
 masterfile.ecsv
-docs/build
-build
-*.egg-info
-

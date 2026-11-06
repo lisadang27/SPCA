@@ -1,5 +1,6 @@
-import numpy as np
 import batman
+import numpy as np
+
 
 def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
     """Get a model transit lightcurve.
@@ -19,10 +20,10 @@ def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
     Returns:
         tuple: flux, t_secondary, anom (ndarray, float, ndarray).
             Model transit lightcurve, time of secondary eclipse,
-    
+
     """
-    
-    #make object to store transit parameters
+
+    # make object to store transit parameters
     params = batman.TransitParams()
     params.t0 = t0
     params.per = per
@@ -34,15 +35,14 @@ def transit_model(time, t0, per, rp, a, inc, ecc, w, u1, u2):
     params.limb_dark = "quadratic"
     params.u = [u1, u2]
 
-    #initialize model
+    # initialize model
     m = batman.TransitModel(params, time)
     flux = m.light_curve(params)
     t_secondary = m.get_t_secondary(params)
     # anom is in radians!
-    anom       = m.get_true_anomaly()
+    anom = m.get_true_anomaly()
 
     return flux, t_secondary, anom
-
 
 
 def eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec):
@@ -62,10 +62,10 @@ def eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec):
 
     Returns:
         ndarray: flux. The model eclipse light curve.
-    
+
     """
-    
-    #make object to store transit parameters
+
+    # make object to store transit parameters
     params = batman.TransitParams()
     params.t0 = t0
     params.per = per
@@ -78,13 +78,12 @@ def eclipse(time, t0, per, rp, a, inc, ecc, w, fp, t_sec):
     params.u = []
     params.fp = fp
     params.t_secondary = t_sec
-    
-    #initialize model
+
+    # initialize model
     m = batman.TransitModel(params, time, transittype="secondary")
     flux = m.light_curve(params)
 
     return flux
-
 
 
 def area_noOffset(time, t_sec, per, rp, inc, r2):
@@ -100,19 +99,26 @@ def area_noOffset(time, t_sec, per, rp, inc, r2):
 
     Returns:
         ndarray: Modelled projected area of the ellipsoid over time.
-    
-    """
-    
-    t = time - t_sec
-    orbFreq = 2*np.pi/per
-    #calculate the orbital phase (assumes the planet is tidally locked)
-    phi = (orbFreq*t-np.pi)%(2*np.pi)
-    #convert inclination to radians for numpy
-    inc = inc*np.pi/180
-    
-    return np.pi*np.sqrt(rp**2*np.sin(inc)**2*(r2**2*np.sin(phi)**2 + rp**2*np.cos(phi)**2)
-                         + rp**2*r2**2*np.cos(inc)**2)/(np.pi*rp**2)
 
+    """
+
+    t = time - t_sec
+    orbFreq = 2 * np.pi / per
+    # calculate the orbital phase (assumes the planet is tidally locked)
+    phi = (orbFreq * t - np.pi) % (2 * np.pi)
+    # convert inclination to radians for numpy
+    inc = inc * np.pi / 180
+
+    return (
+        np.pi
+        * np.sqrt(
+            rp**2
+            * np.sin(inc) ** 2
+            * (r2**2 * np.sin(phi) ** 2 + rp**2 * np.cos(phi) ** 2)
+            + rp**2 * r2**2 * np.cos(inc) ** 2
+        )
+        / (np.pi * rp**2)
+    )
 
 
 def area(time, t_sec, per, rp, inc, r2, r2off):
@@ -129,20 +135,28 @@ def area(time, t_sec, per, rp, inc, r2, r2off):
 
     Returns:
         ndarray: Modelled projected area of the ellipsoid over time.
-    
+
     """
-    
+
     t = time - t_sec
-    orbFreq = 2*np.pi/per
-    #calculate the orbital phase (assumes the planet is tidally locked)
-    phi = (orbFreq*t-np.pi)%(2*np.pi)
-    #effectively rotate the elongated axis by changing phi
-    phi -= r2off*np.pi/180
-    #convert inclination to radians for numpy
-    inc = inc*np.pi/180
-    
-    return np.pi*np.sqrt(rp**2*np.sin(inc)**2*(r2**2*np.sin(phi)**2 + rp**2*np.cos(phi)**2)
-                         + rp**2*r2**2*np.cos(inc)**2)/(np.pi*rp**2)
+    orbFreq = 2 * np.pi / per
+    # calculate the orbital phase (assumes the planet is tidally locked)
+    phi = (orbFreq * t - np.pi) % (2 * np.pi)
+    # effectively rotate the elongated axis by changing phi
+    phi -= r2off * np.pi / 180
+    # convert inclination to radians for numpy
+    inc = inc * np.pi / 180
+
+    return (
+        np.pi
+        * np.sqrt(
+            rp**2
+            * np.sin(inc) ** 2
+            * (r2**2 * np.sin(phi) ** 2 + rp**2 * np.cos(phi) ** 2)
+            + rp**2 * r2**2 * np.cos(inc) ** 2
+        )
+        / (np.pi * rp**2)
+    )
 
 
 def phase_variation(time, t_sec, per, anom, ecc, w, A, B, C=0, D=0):
@@ -162,32 +176,56 @@ def phase_variation(time, t_sec, per, anom, ecc, w, A, B, C=0, D=0):
 
     Returns:
         ndarray: Modelled phase variations.
-    
+
     """
-    
-    #calculate the orbital phase
-    if ecc == 0.:
-        #the planet is on a circular orbit
-        t    = time - t_sec
-        freq = 2.*np.pi/per
-        phi  = (freq*t)
+
+    # calculate the orbital phase
+    if ecc == 0.0:
+        # the planet is on a circular orbit
+        t = time - t_sec
+        freq = 2.0 * np.pi / per
+        phi = freq * t
     else:
-        #the planet is on an eccentric orbit
-        phi  = anom + w*np.pi/180. + np.pi/2.
-    
-    #calculate the phase variations
-    if C==0. and D==0.:
-        #Skip multiplying by a bunch of zeros to speed up fitting
-        phaseVars = 1. + A*(np.cos(phi)-1.) + B*np.sin(phi)
+        # the planet is on an eccentric orbit
+        phi = anom + w * np.pi / 180.0 + np.pi / 2.0
+
+    # calculate the phase variations
+    if C == 0.0 and D == 0.0:
+        # Skip multiplying by a bunch of zeros to speed up fitting
+        phaseVars = 1.0 + A * (np.cos(phi) - 1.0) + B * np.sin(phi)
     else:
-        phaseVars = 1. + A*(np.cos(phi)-1.) + B*np.sin(phi) + C*(np.cos(2.*phi)-1.) + D*np.sin(2.*phi)
-    
+        phaseVars = (
+            1.0
+            + A * (np.cos(phi) - 1.0)
+            + B * np.sin(phi)
+            + C * (np.cos(2.0 * phi) - 1.0)
+            + D * np.sin(2.0 * phi)
+        )
+
     return phaseVars
 
 
-
-
-def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C=0., D=0., r2=None, r2off=None):
+def fplanet_model(
+    time,
+    anom,
+    t0,
+    per,
+    rp,
+    a,
+    inc,
+    ecc,
+    w,
+    u1,
+    u2,
+    fp,
+    t_sec,
+    A,
+    B,
+    C=0.0,
+    D=0.0,
+    r2=None,
+    r2off=None,
+):
     """Model observed flux coming from the planet over time.
 
     Args:
@@ -213,26 +251,44 @@ def fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A,
 
     Returns:
         ndarray: Observed flux coming from planet over time.
-    
+
     """
-    
+
     fplanet = phase_variation(time, t_sec, per, anom, ecc, w, A, B, C, D)
-    
-    if r2!=rp and r2!=None:
-        #if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
-        #rp will just be the minimum physical radius
-        rEcl = rp*area(t_sec, t_sec, per, rp, inc, r2, r2off)
+
+    if r2 != rp and r2 != None:
+        # if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
+        # rp will just be the minimum physical radius
+        rEcl = rp * area(t_sec, t_sec, per, rp, inc, r2, r2off)
         fplanet *= area(time, t_sec, per, rp, inc, r2, r2off)
     else:
         rEcl = rp
-    
+
     eclip = eclipse(time, t0, per, rEcl, a, inc, ecc, w, fp, t_sec)
-    fplanet *= (eclip - 1)
-    
+    fplanet *= eclip - 1
+
     return fplanet
 
 
-def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, C=0, D=0, r2=None, r2off=None):
+def ideal_lightcurve(
+    time,
+    t0,
+    per,
+    rp,
+    a,
+    inc,
+    ecosw,
+    esinw,
+    q1,
+    q2,
+    fp,
+    A,
+    B,
+    C=0,
+    D=0,
+    r2=None,
+    r2off=None,
+):
     """Model observed flux coming from the star+planet system over time.
 
     Args:
@@ -256,33 +312,52 @@ def ideal_lightcurve(time, t0, per, rp, a, inc, ecosw, esinw, q1, q2, fp, A, B, 
 
     Returns:
         ndarray: Observed flux coming from star+planet system over time.
-    
+
     """
-    
-    if ecosw==0 and esinw==0:
+
+    if ecosw == 0 and esinw == 0:
         ecc = 0
         w = 0
     else:
         ecc = np.sqrt(ecosw**2 + esinw**2)
-        #longitude of periastron needs to be in degrees for batman!
-        w   = np.arctan2(esinw, ecosw)*180./np.pi
-    
-    #convert q1 and q2 limb darkening parameterization to u1 and u2 used by batman
-    u1  = 2*np.sqrt(q1)*q2
-    u2  = np.sqrt(q1)*(1-2*q2)
-    
-    if r2!=rp and r2!=None:
-        #if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
-        #rp will just be the minimum physical radius
-        rTrans = rp*area(t0, t0, per, rp, inc, r2, r2off)
+        # longitude of periastron needs to be in degrees for batman!
+        w = np.arctan2(esinw, ecosw) * 180.0 / np.pi
+
+    # convert q1 and q2 limb darkening parameterization to u1 and u2 used by batman
+    u1 = 2 * np.sqrt(q1) * q2
+    u2 = np.sqrt(q1) * (1 - 2 * q2)
+
+    if r2 != rp and r2 != None:
+        # if you are using r2off or non-90 inclination, the transit radius isn't going to be rp anymore.
+        # rp will just be the minimum physical radius
+        rTrans = rp * area(t0, t0, per, rp, inc, r2, r2off)
     else:
         rTrans = rp
-    
-    transit, t_sec, anom = transit_model(time, t0, per, rTrans, a, inc, ecc, w, u1, u2)
-    fplanet = fplanet_model(time, anom, t0, per, rp, a, inc, ecc, w, u1, u2, fp, t_sec, A, B, C, D, r2, r2off)
-    
-    return transit + fplanet
 
+    transit, t_sec, anom = transit_model(time, t0, per, rTrans, a, inc, ecc, w, u1, u2)
+    fplanet = fplanet_model(
+        time,
+        anom,
+        t0,
+        per,
+        rp,
+        a,
+        inc,
+        ecc,
+        w,
+        u1,
+        u2,
+        fp,
+        t_sec,
+        A,
+        B,
+        C,
+        D,
+        r2,
+        r2off,
+    )
+
+    return transit + fplanet
 
 
 def check_phase(checkPhasePhis, A, B, C=0, D=0):
@@ -297,19 +372,27 @@ def check_phase(checkPhasePhis, A, B, C=0, D=0):
 
     Returns:
         bool: True if lightcurve implies non-physical negative flux coming from the planet, False otherwise.
-    
+
     """
-    
-    if not (-90 < np.arctan2(B, A)*180/np.pi < 90):
+
+    if not (-90 < np.arctan2(B, A) * 180 / np.pi < 90):
         return -np.inf
-    
-    if C==0 and D==0:
-        #avoid wasting time by multiplying by a bunch of zeros
-        negative = np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis) < 0)
-    else: 
-        negative =  np.any(1 + A*(np.cos(checkPhasePhis)-1) + B*np.sin(checkPhasePhis)
-                            + C*(np.cos(2*checkPhasePhis)-1) + D*np.sin(2*checkPhasePhis) < 0)
-        
+
+    if C == 0 and D == 0:
+        # avoid wasting time by multiplying by a bunch of zeros
+        negative = np.any(
+            1 + A * (np.cos(checkPhasePhis) - 1) + B * np.sin(checkPhasePhis) < 0
+        )
+    else:
+        negative = np.any(
+            1
+            + A * (np.cos(checkPhasePhis) - 1)
+            + B * np.sin(checkPhasePhis)
+            + C * (np.cos(2 * checkPhasePhis) - 1)
+            + D * np.sin(2 * checkPhasePhis)
+            < 0
+        )
+
     if negative:
         return -np.inf
     else:
