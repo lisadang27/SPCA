@@ -247,7 +247,7 @@ def A_photometry(
                 image_stack[i, :, :], apertures, error=data_error, method=method
             )
             results.extend(
-                [float(phot_table[f"aperture_sum_{j}"]) for j in range(len(apertures))]
+                [float(phot_table[f"aperture_sum_{j}"][0]) for j in range(len(apertures))]
             )
 
     return np.array(results)
