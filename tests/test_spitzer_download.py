@@ -35,6 +35,7 @@ from SPCA.spitzer_download import (
 
 HAS_REQUESTS = importlib.util.find_spec("requests") is not None
 HAS_ASTROQUERY = importlib.util.find_spec("astroquery") is not None
+DEFAULT = ("spca", "bcd")
 ROOT = Path(__file__).resolve().parents[1]
 BASE = "https://irsa.example/data/SPITZER/SHA/archive/proc/IRAC049600"
 T0 = 54768.0  # 2008-10-29T00:00:00 UTC
@@ -46,6 +47,14 @@ def image_bytes(shape=(4, 4)):
         stream
     )
     return stream.getvalue()
+
+
+def labels(table):
+    """Map file basenames to product labels for plans or inventories."""
+    return {
+        Path(str(path)).name: str(product)
+        for path, product in zip(table["local_path"], table["product"])
+    }
 
 
 def sia_products(
@@ -194,12 +203,13 @@ class Fixture(unittest.TestCase):
             ),
         )
 
-    def plan(self, ancillary=False):
+    def plan(self, profile="spca", science_product="bcd"):
         return plan_download(
             self.observations(),
             self.root,
             channels=[1],
-            ancillary=ancillary,
+            profile=profile,
+            science_product=science_product,
             client=self.client,
         )
 
@@ -207,6 +217,270 @@ class Fixture(unittest.TestCase):
         return discover_observations(
             position=self.position, client=self.client, **kwargs
         )
+
+
+class ProductProfileTests(Fixture):
+    def setUp(self):
+        super().setUp()
+        self.entries = [
+            (1, "bcd", "a" + suffix)
+            for suffix in (
+                "_bcd.fits",
+                "_cbcd.fits",
+                "_bunc.fits",
+                "_cbunc.fits",
+                "_bimsk.fits",
+                "_brmsk.fits",
+                "_scmsk.fits",
+                "_unc2d.fits",
+                "_msk2d.fits",
+                "_cov2d.fits",
+            )
+        ] + [
+            (1, "cal", "a_sdark.fits"),
+            (1, "cal", "a_flat.fits"),
+            (1, "bcd", "orphan_bunc.fits"),
+        ]
+        self.client.query_sia.return_value = sia_products(self.entries)
+
+    def profile_plan(self, profile, science_product="bcd"):
+        return plan_download(
+            self.observations(),
+            self.root,
+            channels=[1],
+            profile=profile,
+            science_product=science_product,
+            client=self.client,
+        )
+
+    def test_profiles_select_exact_science_version(self):
+        for product in ("bcd", "cbcd"):
+            with self.subTest(product=product):
+                spca = self.profile_plan("spca", product)
+                self.assertEqual(
+                    set(spca["filename"]), {f"a_{product}.fits", "a_sdark.fits"}
+                )
+                qa = self.profile_plan("science-qa", product)
+                uncertainty = "bunc" if product == "bcd" else "cbunc"
+                self.assertEqual(
+                    set(qa["filename"]),
+                    {
+                        f"a_{product}.fits",
+                        f"a_{uncertainty}.fits",
+                        "a_bimsk.fits",
+                        "a_brmsk.fits",
+                        "a_sdark.fits",
+                    },
+                )
+                self.assertEqual(qa.meta["profile"], "science-qa")
+                self.assertEqual(qa.meta["science_product"], product)
+                persisted = Table.read(save_plan(qa), format="ascii.ecsv")
+                self.assertEqual(persisted.meta["science_product"], product)
+                self.assertEqual(list(qa["product"]).count("science"), 1)
+        archive = self.profile_plan("archive")
+        self.assertEqual(set(archive["filename"]), {entry[2] for entry in self.entries})
+        self.assertEqual(len(archive), len(self.entries))
+        # Archive keeps both versions but only the selected one counts as science.
+        products = dict(zip(archive["filename"], archive["product"]))
+        self.assertEqual(products["a_bcd.fits"], "science")
+        self.assertEqual(products["a_cbcd.fits"], "ancillary")
+        self.assertEqual(observation_summary(archive)["science_images"][0], 1)
+        archive_cbcd = self.profile_plan("archive", "cbcd")
+        products = dict(zip(archive_cbcd["filename"], archive_cbcd["product"]))
+        self.assertEqual(products["a_cbcd.fits"], "science")
+        self.assertEqual(products["a_bcd.fits"], "ancillary")
+        save_plan(archive_cbcd)
+        spitzer_download._validate_plan(
+            Table.read(self.root / "download_plan.ecsv", format="ascii.ecsv")
+        )
+
+    def test_missing_selected_version_is_error(self):
+        self.client.query_sia.return_value = sia_products([(1, "bcd", "a_bcd.fits")])
+        with self.assertRaisesRegex(ArchiveError, r"No \*_cbcd.fits science images"):
+            self.profile_plan("spca", "cbcd")
+
+    def test_default_selection_is_spca_bcd(self):
+        plan = plan_download(
+            self.observations(), self.root, channels=[1], client=self.client
+        )
+        self.assertEqual((plan.meta["profile"], plan.meta["science_product"]), DEFAULT)
+        self.assertEqual(set(plan["filename"]), {"a_bcd.fits", "a_sdark.fits"})
+
+    def test_invalid_profile_combinations_rejected_before_archive_query(self):
+        for kwargs in (
+            {"profile": "unknown"},
+            {"science_product": "both"},
+        ):
+            with self.subTest(kwargs=kwargs):
+                self.client.query_sia.reset_mock()
+                with self.assertRaises(ValueError):
+                    plan_download(
+                        self.observations(), self.root, client=self.client, **kwargs
+                    )
+                self.client.query_sia.assert_not_called()
+        with self.assertRaises(TypeError):
+            plan_download(self.observations(), self.root, ancillary=False)
+
+    def test_plan_without_recorded_selection_is_rejected(self):
+        plan = self.profile_plan("archive")
+        plan.meta.pop("profile")
+        plan.meta.pop("science_product")
+        with self.assertRaisesRegex(ArchiveError, "regenerate"):
+            download_plan(plan, client=self.client)
+        self.client.session.get.assert_not_called()
+
+    @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP tests")
+    def test_inventory_comparison_and_profile_changes_preserve_files(self):
+        self.client.session.get.return_value = response(image_bytes())
+        inventory = download_plan(self.profile_plan("archive"), client=self.client)
+        original = set(inventory["local_path"])
+        reference = self.root / "reference/r1234501/ch1/bcd"
+        reference.mkdir(parents=True)
+        for channel, directory, name in self.entries:
+            if directory == "bcd":
+                (reference / name).touch()
+        for profile in ("spca", "science-qa"):
+            for product in ("bcd", "cbcd"):
+                with self.subTest(profile=profile, product=product):
+                    plan = self.profile_plan(profile, product)
+                    result = compare_inventory(plan, self.root / "reference")
+                    self.assertEqual(result["missing_files"][0], 0)
+                    excluded = result.meta["details"]["1234501/ch1"]["excluded"][
+                        "not_requested"
+                    ]
+                    self.assertIn("a_scmsk.fits", excluded)
+                    self.client.session.get.reset_mock()
+                    inventory = download_plan(plan, client=self.client)
+                    self.client.session.get.assert_not_called()
+                    self.assertEqual(set(inventory["local_path"]), original)
+                    self.assertTrue(
+                        all((self.root / path).is_file() for path in original)
+                    )
+                    persisted = Table.read(
+                        self.root / "download_inventory.ecsv", format="ascii.ecsv"
+                    )
+                    self.assertEqual(persisted.meta["profile"], profile)
+                    self.assertEqual(
+                        persisted.meta["product_selection"]["1234501/ch1"][
+                            "science_product"
+                        ],
+                        product,
+                    )
+                    result = compare_inventory(persisted, self.root / "reference")
+                    self.assertEqual(result["missing_files"][0], 0)
+
+    def test_discovery_counts_versions_as_one_exposure(self):
+        found = self.discover(channels=[1])
+        self.assertEqual(list(found["science_exposures"]), [1])
+        self.assertEqual(list(found["bcd_files"]), [1])
+        self.assertEqual(list(found["cbcd_files"]), [1])
+
+    @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP tests")
+    def test_archive_with_both_versions_counts_one_science_image(self):
+        self.client.session.get.return_value = response(image_bytes())
+        for product in ("bcd", "cbcd"):
+            with self.subTest(product=product):
+                plan = self.profile_plan("archive", product)
+                self.assertEqual(observation_summary(plan)["science_images"][0], 1)
+                inventory = download_plan(plan, client=self.client)
+                persisted = Table.read(
+                    self.root / "download_inventory.ecsv", format="ascii.ecsv"
+                )
+                for table in (inventory, persisted):
+                    summary = inventory_summary(table)
+                    self.assertEqual(summary["science"][0], 1)
+                    self.assertEqual(summary["science_product"][0], product)
+                    found = labels(table)
+                    other = "bcd" if product == "cbcd" else "cbcd"
+                    self.assertEqual(found[f"a_{product}.fits"], "science")
+                    self.assertEqual(found[f"a_{other}.fits"], "ancillary")
+                reference = self.root / "reference/r1234501/ch1/bcd"
+                reference.mkdir(parents=True, exist_ok=True)
+                for name in ("a_bcd.fits", "a_cbcd.fits"):
+                    (reference / name).touch()
+                result = compare_inventory(persisted, self.root / "reference")
+                self.assertEqual(result["planned_science"][0], 1)
+                self.assertEqual(result["reference_science"][0], 1)
+
+    @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP tests")
+    def test_switching_versions_with_both_downloaded_relabels_without_requests(self):
+        self.client.session.get.return_value = response(image_bytes())
+        download_plan(self.profile_plan("spca", "bcd"), client=self.client)
+        download_plan(self.profile_plan("spca", "cbcd"), client=self.client)
+        for product, other in (("bcd", "cbcd"), ("cbcd", "bcd")):
+            with self.subTest(product=product):
+                self.client.session.get.reset_mock()
+                inventory = download_plan(
+                    self.profile_plan("spca", product), client=self.client
+                )
+                self.client.session.get.assert_not_called()
+                persisted = Table.read(
+                    self.root / "download_inventory.ecsv", format="ascii.ecsv"
+                )
+                for table in (inventory, persisted):
+                    found = labels(table)
+                    self.assertEqual(found[f"a_{product}.fits"], "science")
+                    self.assertEqual(found[f"a_{other}.fits"], "ancillary")
+                    summary = inventory_summary(table)
+                    self.assertEqual(summary["science"][0], 1)
+                    self.assertEqual(summary["science_product"][0], product)
+                    self.assertEqual(table.meta["science_product"], product)
+
+    @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP tests")
+    def test_profile_journal_recovery_preserves_selection(self):
+        for selection in (DEFAULT, ("spca", "cbcd"), ("science-qa", "bcd")):
+            with self.subTest(selection=selection):
+                self.recover_after_kill(*selection)
+
+    def recover_after_kill(self, profile, science_product):
+        class Killed(BaseException):
+            pass
+
+        for name in (
+            "download_inventory.ecsv",
+            "download_manifest.ecsv",
+            "download_journal.jsonl",
+        ):
+            (self.root / name).unlink(missing_ok=True)
+        for path in self.root.rglob("*.fits"):
+            path.unlink()
+        plan = self.profile_plan(profile, science_product)
+        self.client.session.get.reset_mock()
+        self.client.session.get.return_value = response(image_bytes())
+        original = spitzer_download._write_table
+
+        def write(table, path):
+            if path.name == "download_inventory.ecsv" and len(table):
+                raise Killed
+            original(table, path)
+
+        with (
+            patch.object(spitzer_download, "_write_table", side_effect=write),
+            self.assertRaises(Killed),
+        ):
+            download_plan(plan, client=self.client)
+        self.client.session.get.reset_mock()
+        inventory = download_plan(plan, client=self.client)
+        self.client.session.get.assert_not_called()
+        self.assertEqual(set(self.manifest_statuses()), {"skipped"})
+        self.assertEqual(inventory.meta["profile"], profile)
+        self.assertEqual(inventory.meta["science_product"], science_product)
+        self.assertEqual(inventory_summary(inventory)["science"][0], 1)
+
+    def manifest_statuses(self):
+        return Table.read(self.root / "download_manifest.ecsv", format="ascii.ecsv")[
+            "status"
+        ]
+
+    @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP tests")
+    def test_switching_science_version_retains_verified_files(self):
+        self.client.session.get.return_value = response(image_bytes())
+        first = download_plan(self.profile_plan("spca"), client=self.client)
+        self.client.session.get.reset_mock()
+        second = download_plan(self.profile_plan("spca", "cbcd"), client=self.client)
+        self.client.session.get.assert_called_once()
+        self.assertTrue(set(first["local_path"]) < set(second["local_path"]))
+        self.assertEqual(second.meta["science_product"], "cbcd")
 
 
 class DiscoveryTests(Fixture):
@@ -271,10 +545,12 @@ class DiscoveryTests(Fixture):
         self.assertEqual(list(found["channel"]), [3])
         row = found[0]
         self.assertEqual(row["pid"], "50517")
-        self.assertEqual(row["science_bcds"], 1)
+        self.assertEqual(row["science_exposures"], 1)
+        self.assertEqual(row["bcd_files"], 1)
+        self.assertEqual(row["cbcd_files"], 0)
         self.assertEqual(row["other_ancillary_files"], 1)
         self.assertEqual(row["excluded_files"], 2)
-        self.assertEqual(row["estimated_bytes"], 2 * len(image_bytes()))
+        self.assertEqual(row["archive_bytes"], 2 * len(image_bytes()))
         self.assertEqual(row["mode"], "IracMapPC, subarray")
         self.assertEqual(row["time_coverage"], "aor_metadata")
         self.assertTrue(str(row["date"]).startswith("2008-10-29"))
@@ -344,7 +620,7 @@ class DiscoveryTests(Fixture):
             end="2008-07-01",
         )
         self.assertEqual(len(found), 1)
-        self.assertEqual(found["science_bcds"][0], 2)
+        self.assertEqual(found["science_exposures"][0], 2)
         self.assertTrue(str(found["date"][0]).startswith("2008-01-01"))
 
     def test_unmatched_filters_return_empty_metadata_table(self):
@@ -441,7 +717,7 @@ class AorTimeCoverageTests(Fixture):
     def test_aor_level_record_bounds_whole_aor(self):
         table, count = long_aor(aor_level=True)
         found = self.run_discovery(table)
-        self.assertEqual(found["science_bcds"][0], count)
+        self.assertEqual(found["science_exposures"][0], count)
         self.assertEqual(found["time_coverage"][0], "aor_metadata")
         self.assertAlmostEqual(found["mjd_max"][0], T0 + 1.5 + 0.001)
         self.client.fetch_text.assert_not_called()
@@ -451,7 +727,7 @@ class AorTimeCoverageTests(Fixture):
         self.client.fetch_text.side_effect = None
         self.client.fetch_text.return_value = quality_report()
         found = self.run_discovery(table)
-        self.assertEqual(found["science_bcds"][0], count)
+        self.assertEqual(found["science_exposures"][0], count)
         self.assertEqual(found["time_coverage"][0], "qa_report")
         self.client.fetch_text.assert_called_once()
         self.assertEqual(
@@ -463,7 +739,7 @@ class AorTimeCoverageTests(Fixture):
         table, count = long_aor()
         with self.assertLogs("SPCA.spitzer_download", level="WARNING") as logs:
             found = self.run_discovery(table)
-        self.assertEqual(found["science_bcds"][0], count)
+        self.assertEqual(found["science_exposures"][0], count)
         self.assertEqual(found["time_coverage"][0], "gap_search")
         self.assertTrue(any("gap_search" in line for line in logs.output))
         last = max(c.kwargs["time"][1] for c in self.client.query_sia.call_args_list)
@@ -521,7 +797,7 @@ class PlanningTests(Fixture):
         )
 
     def test_per_file_plan_keeps_cal_and_reports_exclusions(self):
-        plan = self.sia_plan()
+        plan = self.sia_plan(profile="archive")
         self.assertEqual(
             list(plan["local_path"]),
             [
@@ -545,8 +821,8 @@ class PlanningTests(Fixture):
         self.assertIn(plan.meta["time_coverage"]["1234501"], ("gap_search",))
         summary = observation_summary(plan)
         self.assertEqual(summary["estimated_bytes"][0], 4 * len(image_bytes()))
-        self.assertEqual(summary["bcds_without_uncertainty"][0], 0)
-        self.assertEqual(summary["bcds_without_mask"][0], 0)
+        self.assertEqual(summary["images_without_uncertainty"][0], 0)
+        self.assertEqual(summary["images_without_mask"][0], 0)
         self.assertEqual(summary["completeness"][0], "unverified")
 
     def test_plan_requeries_aor_time_window(self):
@@ -556,10 +832,27 @@ class PlanningTests(Fixture):
         self.assertAlmostEqual(low, 54768.04 - spitzer_download.AOR_PAD)
         self.assertAlmostEqual(high, 54768.041 + spitzer_download.AOR_PAD)
 
-    def test_bcd_only_excludes_ancillary_as_not_requested(self):
-        plan = self.sia_plan(ancillary=False)
-        self.assertEqual(list(plan["product"]), ["science"])
-        self.assertEqual(plan.meta["excluded_products"]["not_requested"], 3)
+    def test_default_spca_profile_keeps_science_and_sky_dark_only(self):
+        plan = self.sia_plan()
+        self.assertEqual((plan.meta["profile"], plan.meta["science_product"]), DEFAULT)
+        self.assertEqual(
+            dict(zip(plan["filename"], plan["product"])),
+            {"a_bcd.fits": "science", "a_sdark.fits": "ancillary"},
+        )
+        self.assertEqual(plan.meta["excluded_products"]["not_requested"], 2)
+
+    def test_science_qa_adds_uncertainty_and_mask_and_keeps_sky_dark(self):
+        plan = self.sia_plan(profile="science-qa")
+        self.assertEqual(
+            dict(zip(plan["filename"], plan["product"])),
+            {
+                "a_bcd.fits": "science",
+                "a_bunc.fits": "uncertainty",
+                "a_bimsk.fits": "mask",
+                "a_sdark.fits": "ancillary",
+            },
+        )
+        self.assertNotIn("not_requested", plan.meta["excluded_products"])
 
     def test_missing_size_estimate_is_unknown(self):
         table = sia_products(self.entries[:1])
@@ -583,7 +876,7 @@ class PlanningTests(Fixture):
         self.client.query_sia.return_value = vstack([table, table])
         found = self.discover(pids=[60003], channels=[2])
         self.assertEqual(list(found["aorkey"]), ["1234501", "1234502"])
-        self.assertEqual(list(found["science_bcds"]), [1, 1])
+        self.assertEqual(list(found["science_exposures"]), [1, 1])
         self.assertEqual(list(found["other_ancillary_files"]), [1, 1])
         plan = plan_download(found, self.root, channels=[2], client=self.client)
         self.assertEqual(len(plan), 4)
@@ -651,7 +944,7 @@ class PlanningTests(Fixture):
         table = vstack(tables)
         self.client.query_sia.return_value = table
         found = self.discover(pids=[50517], channels=[1])
-        self.assertEqual(list(found["science_bcds"]), [2, 2])
+        self.assertEqual(list(found["science_exposures"]), [2, 2])
         self.assertEqual(list(found["other_ancillary_files"]), [1, 1])
         np.testing.assert_allclose(found["mjd_min"], T0)
         np.testing.assert_allclose(found["mjd_max"], T0 + 1.501)
@@ -691,7 +984,7 @@ class PlanningTests(Fixture):
         with self.assertRaisesRegex(ArchiveError, "Conflicting archive"):
             self.discover()
         with self.assertRaisesRegex(ArchiveError, "Conflicting archive"):
-            self.plan(ancillary=True)
+            self.plan(profile="archive")
 
     def test_date_filtered_long_aor_with_repeated_calibration(self):
         for authoritative in (False, True):
@@ -711,7 +1004,7 @@ class PlanningTests(Fixture):
                     start="2008-10-29T00:00:00",
                     end="2008-10-29T01:00:00",
                 )
-                self.assertEqual(found["science_bcds"][0], count)
+                self.assertEqual(found["science_exposures"][0], count)
                 self.assertEqual(found["other_ancillary_files"][0], 1)
                 self.assertEqual(
                     found["time_coverage"][0],
@@ -728,7 +1021,7 @@ class PlanningTests(Fixture):
         table.remove_columns(["s_ra", "s_dec", "access_estsize"])
         self.client.query_sia.return_value = vstack([table, table])
         found = self.discover()
-        self.assertEqual(list(found["science_bcds"]), [1])
+        self.assertEqual(list(found["science_exposures"]), [1])
         self.assertEqual(len(self.plan()), 1)
 
     def test_plan_without_expansion_hints_is_rejected(self):
@@ -739,7 +1032,7 @@ class PlanningTests(Fixture):
 
     def test_empty_inventory_is_not_complete(self):
         self.client.query_sia.return_value = sia_products([])
-        with self.assertRaisesRegex(ArchiveError, "No science BCD"):
+        with self.assertRaisesRegex(ArchiveError, r"No \*_bcd.fits science images"):
             self.plan()
 
     def test_unavailable_requested_channels_are_reported(self):
@@ -750,7 +1043,6 @@ class PlanningTests(Fixture):
                 self.observations(),
                 self.root,
                 channels=[1, 4],
-                ancillary=False,
                 client=self.client,
             )
         self.assertEqual(plan.meta["channels_without_bcd_links"], ["1234501/ch4"])
@@ -760,7 +1052,7 @@ class PlanningTests(Fixture):
         observations = self.observations()
         observations["channel"] = [4]
         with self.assertRaisesRegex(
-            ArchiveError, "No science BCD links for discovered"
+            ArchiveError, r"No \*_bcd.fits science images for discovered"
         ):
             plan_download(observations, self.root, client=self.client)
 
@@ -782,7 +1074,9 @@ class PlanningTests(Fixture):
     def test_saved_plan_downloads_files_compatible_with_directory_setup(self):
         cube = image_bytes((64, 4, 4))
         self.client.session.get.return_value = response(cube)
-        plan = Table.read(save_plan(self.sia_plan()), format="ascii.ecsv")
+        plan = Table.read(
+            save_plan(self.sia_plan(profile="science-qa")), format="ascii.ecsv"
+        )
         inventory = download_plan(plan, client=self.client)
         self.assertEqual(self.client.session.get.call_count, 4)
         self.assertEqual(
@@ -894,15 +1188,19 @@ class DownloadTests(Fixture):
         self.assertEqual(destination.read_bytes(), b"other")
         self.assertFalse(list(self.root.glob("*.part")))
 
-    def test_inventory_records_ancillary_selection(self):
+    def test_inventory_records_product_selection(self):
         self.client.session.get.return_value = response(image_bytes())
-        inventory = download_plan(self.plan(ancillary=False), client=self.client)
-        expected = {"1234501/ch1": False}
-        self.assertEqual(inventory.meta["ancillary_selection"], expected)
+        inventory = download_plan(self.plan(), client=self.client)
+        expected = {"1234501/ch1": {"profile": "spca", "science_product": "bcd"}}
         persisted = Table.read(
             self.root / "download_inventory.ecsv", format="ascii.ecsv"
         )
-        self.assertEqual(persisted.meta["ancillary_selection"], expected)
+        for table in (inventory, persisted):
+            self.assertEqual(table.meta["product_selection"], expected)
+            self.assertEqual(
+                (table.meta["profile"], table.meta["science_product"]), DEFAULT
+            )
+            self.assertNotIn("ancillary_selection", table.meta)
 
     def killed_before_checkpoint(self):
         """Download 2 of 3 files, then die before their inventory checkpoint."""
@@ -1031,8 +1329,8 @@ class DownloadTests(Fixture):
         summary = inventory_summary(inventory)
         self.assertEqual(summary["science"][0], 1)
         self.assertEqual(summary["mask"][0], 0)
-        self.assertEqual(summary["bcds_without_uncertainty"][0], 1)
-        self.assertEqual(summary["bcds_without_mask"][0], 1)
+        self.assertEqual(summary["images_without_uncertainty"][0], 1)
+        self.assertEqual(summary["images_without_mask"][0], 1)
         persisted = Table.read(
             self.root / "download_completeness.ecsv", format="ascii.ecsv"
         )
@@ -1203,7 +1501,7 @@ class CompareInventoryTests(Fixture):
         return path
 
     def test_archive_index_reports_missing_extra_excluded_and_unplanned(self):
-        plan = self.plan(ancillary=True)
+        plan = self.plan(profile="archive")
         index = "".join(
             f'<li><a href="{name}"> {name}</a></li>'
             for name in (
@@ -1230,9 +1528,10 @@ class CompareInventoryTests(Fixture):
             result = compare_inventory(plan, client=self.client)
         row = result[0]
         self.assertEqual(row["reference"], "irsa_archive_index")
-        self.assertEqual(row["reference_bcds"], 2)
+        self.assertEqual((row["profile"], row["science_product"]), ("archive", "bcd"))
+        self.assertEqual(row["reference_science"], 2)
         self.assertEqual(row["qa_processed_dces"], 2)
-        self.assertEqual(row["planned_bcds"], 1)
+        self.assertEqual(row["planned_science"], 1)
         self.assertEqual(row["expected_files"], 4)
         self.assertEqual(row["matched_files"], 3)
         self.assertEqual(row["missing_files"], 1)
@@ -1266,7 +1565,7 @@ class CompareInventoryTests(Fixture):
             compare_inventory(plan, client=self.client)
 
     def test_sha_zip_reference_matches(self):
-        plan = self.plan(ancillary=True)
+        plan = self.plan(profile="archive")
         prefix = "r1234501/ch1"
         reference = self.zip_reference(
             [
@@ -1283,8 +1582,8 @@ class CompareInventoryTests(Fixture):
         self.assertEqual(result["agreement"][0], "match_without_qa_count")
         self.client.fetch_text.assert_not_called()
 
-    def test_bcd_only_plan_reports_not_requested_and_extra(self):
-        plan = self.plan(ancillary=False)
+    def test_spca_plan_reports_not_requested_and_extra(self):
+        plan = self.plan()
         reference = self.root / "extracted"
         (reference / "r1234501/ch1/bcd").mkdir(parents=True)
         (reference / "r1234501/ch1/bcd/a_bunc.fits").write_bytes(b"")
@@ -1299,20 +1598,20 @@ class CompareInventoryTests(Fixture):
         with self.assertRaisesRegex(ArchiveError, "no r<AOR>/chN/bcd"):
             compare_inventory(self.plan(), self.zip_reference(["README.txt"]))
 
-    def bcd_only_reference(self):
+    def qa_reference(self):
         prefix = "r1234501/ch1/bcd"
         return self.zip_reference(
             [f"{prefix}/a_bcd.fits", f"{prefix}/a_bunc.fits", f"{prefix}/a_bimsk.fits"]
         )
 
-    def test_downloaded_bcd_only_inventory_does_not_report_missing_ancillary(self):
+    def test_downloaded_spca_inventory_does_not_report_missing_qa_files(self):
         self.client.session.get.return_value = response(image_bytes())
-        download_plan(self.plan(ancillary=False), client=self.client)
+        download_plan(self.plan(), client=self.client)
         # Read back from disk, as a user comparing a finished download would.
         inventory = Table.read(
             self.root / "download_inventory.ecsv", format="ascii.ecsv"
         )
-        result = compare_inventory(inventory, self.bcd_only_reference())
+        result = compare_inventory(inventory, self.qa_reference())
         detail = result.meta["details"]["1234501/ch1"]
         self.assertEqual(detail["missing"], [])
         self.assertEqual(
@@ -1320,16 +1619,12 @@ class CompareInventoryTests(Fixture):
         )
         self.assertEqual(result["agreement"][0], "match_without_qa_count")
 
-    def test_unrecorded_ancillary_selection_requires_explicit_choice(self):
+    def test_unrecorded_product_selection_is_error(self):
         self.client.session.get.return_value = response(image_bytes())
-        inventory = download_plan(self.plan(ancillary=False), client=self.client)
+        inventory = download_plan(self.plan(), client=self.client)
         inventory.meta.clear()
-        with self.assertRaisesRegex(ArchiveError, "pass ancillary=True or False"):
-            compare_inventory(inventory, self.bcd_only_reference())
-        result = compare_inventory(
-            inventory, self.bcd_only_reference(), ancillary=False
-        )
-        self.assertEqual(result["missing_files"][0], 0)
+        with self.assertRaisesRegex(ArchiveError, "No product selection recorded"):
+            compare_inventory(inventory, self.qa_reference())
 
 
 @unittest.skipUnless(HAS_REQUESTS, "Install .[download] for HTTP adapter tests")
@@ -1428,10 +1723,15 @@ class InterfaceTests(Fixture):
             patch("SPCA.spitzer_download.ArchiveClient", return_value=self.client),
             patch("SPCA.spitzer_download.download_plan") as download,
         ):
-            status = main(self.cli("--channels", "1", "--bcd-only", "--preview"))
+            status = main(self.cli("--channels", "1", "--preview"))
         self.assertEqual(status, 0)
         download.assert_not_called()
         self.assertTrue((self.root / "download_plan.ecsv").exists())
+        saved = Table.read(self.root / "download_plan.ecsv", format="ascii.ecsv")
+        self.assertEqual(
+            (saved.meta["profile"], saved.meta["science_product"]), DEFAULT
+        )
+        self.assertEqual(sorted(set(saved["product"])), ["science"])
 
     def test_cli_compare_with_reference_writes_report(self):
         reference = self.root / "sha.zip"
@@ -1463,15 +1763,21 @@ class InterfaceTests(Fixture):
     def test_explicit_cli_download_runs_directory_setup(self):
         self.client.session.get.return_value = response(image_bytes())
         with patch("SPCA.spitzer_download.ArchiveClient", return_value=self.client):
-            status = main(self.cli("--channels", "1", "--bcd-only", "--download"))
+            status = main(self.cli("--channels", "1", "--download"))
         self.assertEqual(status, 0)
         self.assertTrue((self.root / "analysis/aorSnippet.txt").is_file())
 
     def test_manifest_cannot_silently_ignore_channel_selection(self):
         path = save_plan(self.plan())
-        with self.assertRaises(SystemExit) as caught:
-            main(["--manifest", str(path), "--channels", "4"])
-        self.assertEqual(caught.exception.code, 2)
+        for selector in (
+            ["--channels", "4"],
+            ["--profile", "spca"],
+            ["--science-product", "cbcd"],
+        ):
+            with self.subTest(selector=selector):
+                with self.assertRaises(SystemExit) as caught:
+                    main(["--manifest", str(path), *selector])
+                self.assertEqual(caught.exception.code, 2)
 
     def test_invalid_manifest_is_actionable_nonzero_error(self):
         path = self.root / "invalid.ecsv"
@@ -1538,11 +1844,12 @@ class InterfaceTests(Fixture):
             )
         download.assert_not_called()
         plan = namespace["plan"]
-        self.assertEqual(
-            list(plan["product"]), ["science", "mask", "uncertainty", "ancillary"]
-        )
+        self.assertEqual((plan.meta["profile"], plan.meta["science_product"]), DEFAULT)
+        self.assertEqual(list(plan["product"]), ["science", "ancillary"])
         self.assertIn("data/ch1/r1234501/ch1/cal/a_sdark.fits", plan["local_path"])
-        self.assertEqual(plan.meta["excluded_products"], {"level0_raw": 1})
+        self.assertEqual(
+            plan.meta["excluded_products"], {"level0_raw": 1, "not_requested": 2}
+        )
         self.assertIn("1234501", plan.meta["time_coverage"])
         self.assertTrue((self.root / "download_plan.ecsv").exists())
         self.assertEqual(

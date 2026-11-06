@@ -39,7 +39,11 @@ def make_directory_structure(rootpath):
             if not re.fullmatch(r"r[0-9]+", directory.name):
                 continue
             bcd = directory / channel / "bcd"
-            if any(path.is_file() for path in bcd.glob("*_bcd.fits")):
+            if any(
+                path.is_file()
+                for pattern in ("*_bcd.fits", "*_cbcd.fits")
+                for path in bcd.glob(pattern)
+            ):
                 channels.add(channel)
                 aors.add(directory.name)
     if not archives and not aors:

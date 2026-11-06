@@ -1,5 +1,7 @@
 import glob
+import hashlib
 import os
+import pickle
 import warnings
 from functools import partial
 from multiprocessing import get_context
@@ -13,6 +15,8 @@ from astropy.stats import sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import skycoord_to_pixel
 from scipy.stats import binned_statistic
+
+from .spitzer_products import validate_science_product
 
 warnings.filterwarnings("ignore")
 
@@ -80,13 +84,14 @@ def create_folder(fullname, auto=False, overwrite=False):
     return fullname
 
 
-def get_fnames(directory, AOR_snip):
+def get_fnames(directory, AOR_snip, science_product="bcd"):
     """Find paths to all the fits files.
 
     Args:
         directory (string): Path to the directory containing all the Spitzer data.
         AOR_snip (string): Common first characters of data directory eg. 'r579'.
-        ch (string): Channel used for the observation eg. 'ch1' for channel 1.
+        science_product (string): Select exactly 'bcd' (default) or 'cbcd',
+            never both processing versions of an exposure.
 
     Returns:
         tuple: fname, lens (list, list).
@@ -94,31 +99,32 @@ def get_fnames(directory, AOR_snip):
 
     """
 
+    validate_science_product(science_product)
     while directory[-1] == "/":
         directory = directory[:-1]
     ch = directory.split("/")[-1]
 
     lst = os.listdir(directory)
-    AOR_list = [folder for folder in lst if AOR_snip == folder[: len(AOR_snip)]]
+    AOR_list = sorted(folder for folder in lst if AOR_snip == folder[: len(AOR_snip)])
     fnames = []
     lens = []
     for i in range(len(AOR_list)):
         path = directory + "/" + AOR_list[i] + "/" + ch + "/bcd"
-        files = np.sort(glob.glob(os.path.join(path, "*bcd.fits")))
+        files = np.sort(glob.glob(os.path.join(path, f"*_{science_product}.fits")))
         if len(files) != 0:
             fnames.extend(files)
             lens.append(len(files))
     return fnames, lens
 
 
-def get_stacks(calDir, dataDir, AOR_snip):
+def get_stacks(calDir, dataDir, AOR_snip, science_product="bcd"):
     """Find paths to all the background subtraction correction stacks FITS files.
 
     Args:
         calDir (string): Path to the directory containing the correction stacks.
         dataDir (string): Path to the directory containing the Spitzer data to be corrected.
         AOR_snip (string): Common first characters of data directory eg. 'r579'.
-        ch (string): Channel used for the observation eg. 'ch1' for channel 1.
+        science_product (string): Match AORs containing the selected image type.
 
     Returns:
         list: List of paths to the relevant correction stacks
@@ -142,7 +148,12 @@ def get_stacks(calDir, dataDir, AOR_snip):
     )  # pull out just the key that says what sdark this stack is for
 
     lst = os.listdir(dataDir)
-    AOR_list = [folder for folder in lst if AOR_snip == folder[: len(AOR_snip)]]
+    fnames, _ = get_fnames(dataDir, AOR_snip, science_product)
+    selected_aors = {
+        os.path.basename(os.path.dirname(os.path.dirname(os.path.dirname(f))))
+        for f in fnames
+    }
+    AOR_list = sorted(folder for folder in lst if folder in selected_aors)
     calFiles = []
     for i in range(len(AOR_list)):
         path = dataDir + "/" + AOR_list[i] + "/" + ch + "/cal/"
@@ -153,7 +164,12 @@ def get_stacks(calDir, dataDir, AOR_snip):
                 + "' does not exist, so automatic correction stack selection cannot be performed"
             )
             return []
-        fname = glob.glob(path + "*sdark.fits")[0]
+        darks = sorted(glob.glob(path + "*_sdark.fits"))
+        if not darks:
+            raise ValueError(
+                f"No sky-dark filename available for correction-stack selection: {path}"
+            )
+        fname = darks[0]
         loc = fname.find("SPITZER_I") + offset
         key = fname[loc:].split("_")[0]
         calFiles.append(
@@ -194,6 +210,14 @@ def get_time(header, ignoreFrames):
 
 def oversampling(image_data, scale=2):
     """First, substitutes all invalid/sigma-clipped pixels by interpolating the value, then linearly oversamples the image.
+
+    Warning:
+        This implementation is currently nonfunctional (it references an
+        undefined scale variable, and its interpolation grid transposes the
+        image) and needs separate scientific validation before use, so
+        ``oversamp=True`` should not be used. When it is corrected, increment
+        ``OVERSAMPLE_CACHE_VERSION`` so caches from the earlier algorithm are
+        never reused.
 
     Args:
         image_data (ndarray): Data cube of images (2D arrays of pixel values).
@@ -391,6 +415,61 @@ def highpassflist(signal, highpassWidth):
     return convolve(signal, g, boundary="extend")
 
 
+# Increment whenever oversampling() or the cached data format changes, so caches
+# produced by an earlier algorithm are never reused. In particular, the current
+# oversampling() is nonfunctional; fixing it requires incrementing this value.
+OVERSAMPLE_CACHE_VERSION = 1
+
+
+def oversample_cache_name(fname, image, scale):
+    """Return the oversampling cache filename for one prepared science image.
+
+    The name combines the image's full archive filename stem (AOR, exposure,
+    pipeline version, and BCD/CBCD version), the oversampling ``scale``, and a
+    SHA-256 digest of the prepared image that is about to be oversampled, e.g.
+    ``SPITZER_I1_28578560_0002_6_C7915448_bcd_x2_<digest>.pkl``. The image is
+    hashed after correction stacks, ignored frames, sigma clipping, unit
+    conversion, and star masking, so any change to those inputs or settings
+    selects a different cache instead of reusing a stale one. Older caches
+    (``0002.pkl`` or names without a digest) are never matched.
+    """
+    digest = hashlib.sha256()
+    digest.update(f"v{OVERSAMPLE_CACHE_VERSION};scale={scale};".encode())
+    digest.update(f"{image.dtype.str};{image.shape};".encode())
+    digest.update(np.ascontiguousarray(np.ma.getmaskarray(image)).tobytes())
+    digest.update(np.ascontiguousarray(np.ma.filled(image, 0)).tobytes())
+    stem = os.path.splitext(os.path.basename(fname))[0]
+    return f"{stem}_x{scale}_{digest.hexdigest()[:16]}.pkl"
+
+
+def _load_oversample_cache(savename, expected_shape):
+    """Return a cached oversampled image, or None if it is missing or unusable."""
+    if not os.path.isfile(savename):
+        return None
+    try:
+        # Caches are pickled masked arrays written by SPCA itself.
+        cached = np.load(savename, allow_pickle=True)
+    except (OSError, EOFError, ValueError, pickle.UnpicklingError) as error:
+        print(f"Warning: ignoring unreadable oversampling cache {savename}: {error}")
+        return None
+    if not isinstance(cached, np.ma.MaskedArray) or cached.shape != expected_shape:
+        print(f"Warning: ignoring malformed oversampling cache {savename}")
+        return None
+    return cached
+
+
+def _save_oversample_cache(image, savename):
+    """Atomically write a cache so interrupted writes never leave a partial file."""
+    os.makedirs(os.path.dirname(savename) or ".", exist_ok=True)
+    temporary = f"{savename}.{os.getpid()}.tmp"
+    try:
+        image.dump(temporary)
+        os.replace(temporary, savename)
+    finally:
+        if os.path.exists(temporary):
+            os.remove(temporary)
+
+
 def prepare_image(
     savepath,
     AOR_snip,
@@ -425,11 +504,10 @@ def prepare_image(
 
     # add background correcting stack if requested
     if addStack:
-        j = 0  # counter to keep track of which correction stack we're using
-        while i > np.sum(lens[: j + 1]):
-            j += 1  # if we've moved onto a new AOR, increment j
-        stackHDU = fits.open(stacks[j])
-        image += np.ma.masked_invalid(stackHDU[0].data)
+        # Index of the AOR containing image i (lens counts images per AOR).
+        j = int(np.searchsorted(np.cumsum(lens), i, side="right"))
+        with fits.open(stacks[j]) as stackHDU:
+            image += np.ma.masked_invalid(stackHDU[0].data)
 
     if image.shape[0] != 1:
         # Sigma clipping within datacubes
@@ -457,37 +535,25 @@ def prepare_image(
 
     # oversampling
     if oversamp:
+        savename = (
+            savepath + "Oversampled/" + oversample_cache_name(fnames[i], image, scale)
+        )
+        n, h, w = image.shape
+        cached = None
         if reuse_oversamp:
-            savename = (
-                savepath
-                + "Oversampled/"
-                + fnames[i].split("/")[-1].split("_")[-4]
-                + ".pkl"
-            )
-            if os.path.isfile(savename):
-                image = np.load(savename)
-            else:
-                print(
-                    "Warning: Oversampled images were not previously saved! Making new ones now..."
-                )
-                image = np.ma.masked_invalid(oversampling(image, scale))
-                if saveoversamp == True:
-                    # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-                    image.dump(savename)
+            cached = _load_oversample_cache(savename, (n, h * scale, w * scale))
+        if cached is not None:
+            image = cached
         else:
-            image = np.ma.masked_invalid(oversampling(image))
+            if reuse_oversamp:
+                print(
+                    "Warning: No valid oversampled image cache for these settings! Making a new one now..."
+                )
+            image = np.ma.masked_invalid(oversampling(image, scale))
+            if saveoversamp:
+                _save_oversample_cache(image, savename)
 
-        if saveoversamp:
-            # THIS CHANGES FROM ONE SET OF DATA TO ANOTHER!!!
-            savename = (
-                savepath
-                + "Oversampled/"
-                + fnames[i].split("/")[-1].split("_")[-4]
-                + ".pkl"
-            )
-            image.dump(savename)
-
-    data = image.reshape(-1, np.product(image.shape[1:]))
+    data = image.reshape(-1, np.prod(image.shape[1:]))
     data = np.append(data, time[:, np.newaxis], axis=1)
 
     return data
@@ -506,7 +572,14 @@ def prepare_images(
     addStack=False,
     maskStars=[],
     ncpu=4,
+    science_product="bcd",
 ):
+    """Prepare exactly one science-image version for photometry.
+
+    ``science_product`` selects 'bcd' (default) or 'cbcd'. Uncertainty and mask
+    archive products are not loaded; optional correction-stack lookup uses
+    sky-dark filenames for the same selected AORs.
+    """
 
     # folder containing properly named correction stacks (will be automatically selected)
     stackPath = basepath + "Calibration/"
@@ -527,7 +600,9 @@ def prepare_images(
         print(", masking bad frames", end="", flush=True)
     print("... ", end="")
     # get list of filenames and number of files
-    fnames, lens = get_fnames(datapath, AOR_snip)
+    fnames, lens = get_fnames(datapath, AOR_snip, science_product)
+    if not fnames:
+        raise ValueError(f"No *_{science_product}.fits images found in {datapath}")
 
     # get path where the aor breaks will be saved
     breakpath = basepath + planet + "/analysis/" + channel + "/aorBreaks.txt"
@@ -545,7 +620,7 @@ def prepare_images(
 
     # if need to add correction stack
     if addStack:
-        stacks = get_stacks(stackPath, datapath, AOR_snip)
+        stacks = get_stacks(stackPath, datapath, AOR_snip, science_product)
     else:
         stacks = []
 

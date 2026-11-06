@@ -30,8 +30,10 @@ from scipy import interpolate
 from scipy import optimize as opt
 from scipy import stats as st
 
+from .spitzer_products import validate_science_product
 
-def get_fnames(directory, AOR_snip, ch):
+
+def get_fnames(directory, AOR_snip, ch, science_product="bcd"):
     """
     Find paths to all the fits files.
 
@@ -47,6 +49,9 @@ def get_fnames(directory, AOR_snip, ch):
     ch        : string objects
         Channel used for the observation eg. 'ch1' for channel 1
 
+    science_product : {'bcd', 'cbcd'}
+        Select exactly one processing version; default is BCD.
+
     Returns
     -------
 
@@ -56,6 +61,7 @@ def get_fnames(directory, AOR_snip, ch):
     len(fnames): int
         Number of fits file found.
     """
+    validate_science_product(science_product)
     lst = os.listdir(directory)
     AOR_list = [k for k in lst if AOR_snip in k]
     # AOR_list = np.delete(AOR_list, [0, 4])                # used to ignore calibration data sets
@@ -63,7 +69,12 @@ def get_fnames(directory, AOR_snip, ch):
     for i in range(len(AOR_list)):
         path = directory + "/" + AOR_list[i] + "/" + ch + "/bcd"
         fnames.extend(
-            [filename for filename in glob.glob(os.path.join(path, "*bcd.fits"))]
+            [
+                filename
+                for filename in glob.glob(
+                    os.path.join(path, f"*_{science_product}.fits")
+                )
+            ]
         )
     fnames.sort()
     return fnames, len(fnames)
@@ -644,6 +655,7 @@ def get_lightcurve(
     plot_name="CoRoT-2b.pdf",
     oversamp=False,
     savecomp=True,
+    science_product="bcd",
     **kwargs,
 ):
     """
@@ -651,6 +663,8 @@ def get_lightcurve(
 
     Parameters
     ----------
+    science_product : {'bcd', 'cbcd'}
+        Select one science-image version; default is BCD.
     datapath : string object
         Directory where the spitzer data is stored.
 
@@ -710,10 +724,10 @@ def get_lightcurve(
     print(kwargs)
     # Ignore warning and starts timing
     warnings.filterwarnings("ignore")
-    tic = tim.clock()
+    tic = tim.perf_counter()
 
     # get list of filenames and nb of files
-    fnames, nfiles = get_fnames(datapath, AOR_snip, channel)
+    fnames, nfiles = get_fnames(datapath, AOR_snip, channel, science_product)
 
     # variables declaration
     percent = 0  # to show progress while running the code
@@ -872,7 +886,7 @@ def get_lightcurve(
         np.savetxt(pathFULL, FULL_data, header=FULL_head)
         np.savetxt(pathBINN, BINN_data, header=BINN_head)
 
-    toc = tim.clock()
+    toc = tim.perf_counter()
     print("Number of discarded frames:", tossed)
     print("Time:", toc - tic, "seconds")
 

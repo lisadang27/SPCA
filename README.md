@@ -193,13 +193,97 @@ reaching it is split in time and repeated until no part is truncated.
 
 Products are classified by their archive path
 (`.../r<AOR>/chN/<bcd|cal|raw|pbcd>/<file>`), not by IVOA `calib_level` (all
-SHA files report level 2). By default, `bcd/` science `*_bcd.fits`, uncertainty
-(`*_bunc`, `*_cbunc`), masks (`*_bimsk`, `*_brmsk`), other `bcd/` FITS products
-(e.g. `*_cbcd`), and the `cal/` dark/mask files that SPCA reads are retained.
-`cal/` files are stored under the science AOR even when the archive serves them
-from a calibration AOR. `--bcd-only` retrieves only `*_bcd.fits`. Level 0
+SHA files report level 2). Which `bcd/` and `cal/` FITS files are downloaded
+depends on the product profile (below). `cal/` files are stored under the
+science AOR even when the archive serves them from a calibration AOR. Level 0
 `raw/`, Level 2 `pbcd/`, logs, and AOR-level documents are never downloaded;
 the preview reports every unplanned file, counted by reason.
+
+#### Product profiles and science-image versions
+
+Choose what to download with `--profile` (Python: `profile=`) and which
+science-image version to analyze with `--science-product` (`science_product=`).
+The default is `spca` with `bcd`, the products SPCA's photometry actually uses:
+
+| Profile | Requested products |
+| --- | --- |
+| `spca` (default) | Selected science images and `cal/*_sdark.fits` for optional `addStack=True` correction-stack lookup |
+| `science-qa` | Everything in `spca`, plus same-exposure uncertainty (`_bunc` for BCD, `_cbunc` for CBCD) and `_bimsk`, `_imsk`, `_brmsk` masks |
+| `archive` | Opt-in: all supported `bcd/` and `cal/` FITS products, including both BCD and CBCD |
+
+`--science-product` is `bcd` (default) or `cbcd`. BCD and CBCD are alternative
+processing versions of the same exposure: only the selected version is
+labelled and counted as `science`; in `archive` downloads the other version is
+kept as `ancillary`. If the selected version is unavailable, planning fails;
+the other version is never substituted. Neither `spca` nor `science-qa`
+requests `_scmsk.fits`, subarray summary products (`_unc2d`, `_msk2d`,
+`_cov2d`, etc.), or other calibration files, and `science-qa` skips orphan QA
+files without a selected same-stem science image.
+See the [IRAC product table](https://irsa.ipac.caltech.edu/data/SPITZER/docs/irac/iracinstrumenthandbook/31/).
+
+Recommended workflows:
+
+```sh
+# Typical SPCA analysis (default spca profile, BCD images):
+python Download_Spitzer_Data.py --ra 06:30:32.797 --dec +29:40:20.26 \
+    --aor 28578560 --channels 3 --output /path/to/campaign --preview
+# Inspect the archive uncertainty and mask products as well:
+python Download_Spitzer_Data.py ... --profile science-qa --preview
+# Artifact-corrected images instead of BCDs:
+python Download_Spitzer_Data.py ... --science-product cbcd --preview
+# Complete archival Level 1 copy:
+python Download_Spitzer_Data.py ... --profile archive --preview
+```
+
+The notebook exposes `PROFILE` and `SCIENCE_PRODUCT` beside the other settings.
+Python callers use `plan_download(..., profile="spca", science_product="bcd")`.
+
+Plans record `profile` and `science_product`; plans without them are rejected
+and must be regenerated. Inventories record the latest selection per
+AOR/channel in `product_selection` and relabel files from it whenever they are
+written or summarized, so counts always refer to the selected version.
+Comparison uses that selection to report deliberately excluded products as
+`not_requested`, not missing. `--manifest` executes a saved plan's selection;
+re-plan to change it. Switching profiles or science versions never removes or
+overwrites existing files or inventory rows: verified files are reused,
+newly selected products are downloaded, and manual untracked files remain
+protected. Batched checkpoints and journal recovery work for every profile.
+
+Photometry defaults to **exact** `*_bcd.fits` matches, never the old
+`*bcd.fits` pattern that also matched CBCDs. Use
+`get_fnames(..., science_product="cbcd")`,
+`prepare_images(..., science_product="cbcd")`, or the aperture, PSF, PLD, and
+companion `get_lightcurve(..., science_product="cbcd")` APIs to choose CBCD.
+Both image versions may remain on disk, but are never jointly loaded.
+Oversampling caches are named after each image's full archive filename stem
+(AOR, exposure, and BCD/CBCD version), the oversampling scale, and a SHA-256
+digest of the prepared image just before oversampling. That digest reflects
+correction stacks, ignored frames, star masks, and the science file contents,
+so changing any of them regenerates the cache rather than reusing a stale one.
+Caches are written atomically; unreadable or malformed caches are regenerated.
+Older sequence-number-only caches (e.g. `Oversampled/0002.pkl`) are ignored and
+can be deleted, as can caches for settings you no longer use. The `Oversampled/`
+directory is created automatically when caches are saved.
+
+**Known limitation:** `oversamp=True` is currently nonfunctional. The existing
+`oversampling()` implementation fails at runtime and, once that is fixed, its
+interpolation grid transposes the image; it needs separate scientific
+validation before use, so leave `oversamp=False` (the default). When it is
+corrected, `OVERSAMPLE_CACHE_VERSION` in `SPCA/Photometry_Common.py` must be
+incremented so caches from the earlier algorithm are never reused.
+Use separate analysis output directories for separate processing-version runs.
+
+SPCA's current image preparation derives masks from the science image and
+does not consume archive uncertainty/mask files. `addStack=True` selects
+external correction stacks from `Calibration/` using each AOR's downloaded
+sky-dark **filename**; the sky-dark's pixels are not read. The `spca` profile
+keeps these small lookup files rather than recording their names as metadata:
+each AOR/channel typically references one sky-dark the size of a single BCD
+frame, and real files keep downloaded trees identical to extracted SHA ZIPs
+and manually organized directories. The `spca` profile does not supply the
+external correction stacks.
+Missing uncertainty/mask counts in inventory summaries are association counts,
+not evidence of incomplete `spca` or science-only downloads.
 
 #### Checking a plan against an independent listing
 
@@ -225,13 +309,15 @@ print(comparison.meta["details"], comparison.meta["unplanned_channels_with_data"
 
 The result (also saved as `inventory_comparison.ecsv`) reports missing files
 (in the reference but not planned), extra files (planned but not in the
-reference), intentionally excluded files (logs, unsupported, or not-requested
-ancillary products), channels holding data that were not planned, and an
+reference), intentionally excluded files (logs, unsupported, or `not_requested` products
+outside the selected profile), channels holding data that were not planned, and an
 `agreement` of `match`, `match_without_qa_count`, `mismatch`, or
 `not_in_reference`. Only `bcd/` files are compared, because `cal/` files are
-served from separate calibration AORs. A saved `download_inventory.ecsv` can
-also be compared; it records whether ancillary files were requested for each
-AOR/channel, so a BCD-only download does not report them as missing. The
+served from separate calibration AORs. Science counts (`reference_science`,
+`planned_science`) refer only to the selected science version. A saved
+`download_inventory.ecsv` can also be compared; it records the product
+selection for each AOR/channel, so an `spca` download does not report
+uncertainty/mask files as missing. The
 archive directory listing is an HTML
 index intended for browsing, not a versioned API, so an unparseable listing is
 an error rather than an empty match.
@@ -276,13 +362,17 @@ The campaign directory contains:
 - `inventory_comparison.ecsv`: optional `--compare`/`--reference` results.
 - `data/chN/r########/chN/bcd/`: science/associated files in SPCA's existing layout.
 
-Preview summaries show estimated bytes, files of unknown size, BCD counts, and
-available PID/date/mode metadata.
+Preview summaries show estimated bytes for the chosen profile, files of
+unknown size, science-image counts, and available PID/date/mode metadata.
+Discovery reports unique `science_exposures`, per-version `bcd_files` and
+`cbcd_files`, and `archive_bytes` for all returned Level 1 files.
 `inventory_summary` counts science, uncertainty, mask, and ancillary files per
 **AOR/channel**. Successful transfer means only that the returned products were
 downloaded: by itself this leaves dataset
 **completeness unverified**, even if science/uncertainty/mask counts match.
-The report also identifies local BCDs lacking same-stem uncertainty/mask files;
+The report also counts selected science images lacking same-stem
+uncertainty/mask files (`images_without_uncertainty`/`images_without_mask`;
+expected for the default `spca` profile);
 this is an association check; use `compare_inventory` for a listing comparison.
 Ancillary associations are not inferred by inventing filename-based download
 URLs. Check the inventory and archive documentation before scientific analysis.

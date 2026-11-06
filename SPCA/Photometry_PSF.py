@@ -184,10 +184,12 @@ def get_lightcurve(
     bg=None,
     bg_err=None,
     time=None,
+    science_product="bcd",
 ):
     """Given a directory, looks for data (bcd.fits files), opens them and performs PSF photometry.
 
     Args:
+        science_product (str): Select 'bcd' (default) or 'cbcd' when loading images.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
         channel (string): Channel used for the observation eg. 'ch1' for channel 1
         planet (string, optional): The name of the planet.
@@ -239,6 +241,7 @@ def get_lightcurve(
             addStack,
             maskStars,
             ncpu,
+            science_product=science_product,
         )
     else:
         image_stack = image_stack_input

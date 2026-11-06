@@ -84,10 +84,12 @@ def get_lightcurve(
     bg=None,
     bg_err=None,
     time=None,
+    science_product="bcd",
 ):
     """Given a directory, looks for data (bcd.fits files), opens them and performs PLD "photometry".
 
     Args:
+        science_product (str): Select 'bcd' (default) or 'cbcd' when loading images.
         datapath (string): Directory where the spitzer data is stored.
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
@@ -139,19 +141,17 @@ def get_lightcurve(
     global image_stack
     if image_stack_input is None:
         # Prepare all of the images
+        # PLD stamps use native pixels, so images are never oversampled here.
         image_stack, bg, bg_err, time = prepare_images(
             basepath,
             planet,
             channel,
             AOR_snip,
             ignoreFrames,
-            oversamp,
-            scale,
-            reuse_oversamp,
-            saveoversamp,
-            addStack,
-            maskStars,
-            ncpu,
+            addStack=addStack,
+            maskStars=maskStars,
+            ncpu=ncpu,
+            science_product=science_product,
         )
     else:
         image_stack = image_stack_input

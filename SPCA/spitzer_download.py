@@ -11,6 +11,10 @@ IRSA truncates at MAXREC without an overflow flag, so queries reaching the limit
 are split in time. SIA offers no AOR-level inventory, so completeness is never
 asserted; `compare_inventory` checks a plan against the archive's per-AOR
 directory index and quality report, or against SHA ZIP downloads.
+
+Downloads use product profiles (see `SPCA.spitzer_products`): ``spca`` by
+default (one science-image version plus sky-dark files), ``science-qa``, or
+``archive``; ``science_product`` selects ``bcd`` (default) or ``cbcd``.
 """
 
 from __future__ import annotations
@@ -35,6 +39,20 @@ import numpy as np
 from astropy.coordinates import SkyCoord
 from astropy.table import Table
 from astropy.time import Time
+
+from .spitzer_products import (
+    DEFAULT_PROFILE,
+    DEFAULT_SCIENCE_PRODUCT,
+    MASK_SUFFIXES,
+    PRODUCT_PROFILES,
+    SCIENCE_PRODUCTS,
+    UNCERTAINTY_SUFFIXES,
+    classify,
+    product_selection,
+    science_stem,
+    science_variant,
+    selected_product,
+)
 
 LOGGER = logging.getLogger(__name__)
 LIMITATION = (
@@ -72,14 +90,17 @@ TIME_COVERAGE = {
 INCLUDED_SUBDIRS = ("bcd", "cal")
 EXCLUDED_SUBDIRS = {"raw": "level0_raw", "pbcd": "level2_pbcd"}
 _ANCILLARY = ("uncertainty", "mask", "ancillary")
+_RETAINED = ("science",) + _ANCILLARY
 OBS_COLUMNS = ("aorkey", "pid", "channel", "date", "mode")
 DISCOVERY_COLUMNS = OBS_COLUMNS + (
-    "science_bcds",
+    "science_exposures",
+    "bcd_files",
+    "cbcd_files",
     "uncertainty_files",
     "mask_files",
     "other_ancillary_files",
     "excluded_files",
-    "estimated_bytes",
+    "archive_bytes",
     "unknown_sizes",
     "ra",
     "dec",
@@ -278,15 +299,23 @@ def _observation(row, channel: int) -> tuple:
 
 
 def _category(subdir: str, filename: str) -> str:
+    """Archive-level class, independent of the selected science version.
+
+    Exclusion reasons, or ``science`` (BCD or CBCD), ``uncertainty``
+    (``_bunc``/``_cbunc``), ``mask`` or ``ancillary``. Planned/inventoried
+    files are labelled with `classify` for their selected version instead.
+    """
     if subdir in EXCLUDED_SUBDIRS:
         return EXCLUDED_SUBDIRS[subdir]
     if filename.lower().endswith(".log"):
         return "pipeline_log"
     if subdir not in INCLUDED_SUBDIRS or not filename.lower().endswith(".fits"):
         return "unsupported"
-    if subdir == "bcd" and filename.endswith("_bcd.fits"):
+    if subdir == "bcd" and science_variant(filename):
         return "science"
-    return _product(filename)
+    if filename.endswith(tuple(UNCERTAINTY_SUFFIXES.values())):
+        return "uncertainty"
+    return "mask" if filename.endswith(MASK_SUFFIXES) else "ancillary"
 
 
 def _record(row) -> dict | None:
@@ -784,12 +813,18 @@ def _aor_records(
 
 
 def _pair_counts(records: list) -> dict:
+    """Count archive products; BCD/CBCD versions are one exposure."""
     counts = dict.fromkeys(
-        ("science", "uncertainty", "mask", "ancillary", "excluded"), 0
+        ("uncertainty", "mask", "ancillary", "excluded") + SCIENCE_PRODUCTS, 0
     )
+    exposures = set()
     for record in records:
         category = record["category"]
+        if category == "science":
+            exposures.add(science_stem(record["filename"]))
+            category = science_variant(record["filename"])
         counts[category if category in counts else "excluded"] += 1
+    counts["science"] = len(exposures)
     return counts
 
 
@@ -839,8 +874,13 @@ def discover_observations(
     Returns
     -------
     Table
-        One row per matching AOR/channel with product counts and size estimates.
-        Counts describe returned metadata, not an authoritative inventory.
+        One row per matching AOR/channel describing what the archive offers,
+        independent of the later download profile. ``science_exposures``
+        counts exposures once even when both ``bcd_files`` and ``cbcd_files``
+        exist; ``archive_bytes`` sums all Level 1 ``bcd/``/``cal/`` FITS files
+        (the ``archive`` profile). `plan_download` reports the selected
+        profile's files and size. Counts describe returned metadata, not an
+        authoritative inventory.
     """
     wanted_channels = _channels(channels)
     wanted_pids, wanted_aors = _ids(pids), _ids(aorkeys)
@@ -982,6 +1022,8 @@ def discover_observations(
                         Time(min(dates), format="mjd").isot if dates else "",
                         ", ".join(sorted({r["mode"] for r in metadata if r["mode"]})),
                         counts["science"],
+                        counts["bcd"],
+                        counts["cbcd"],
                         counts["uncertainty"],
                         counts["mask"],
                         counts["ancillary"],
@@ -1023,7 +1065,8 @@ def plan_download(
     *,
     aorkeys: Sequence[object] | None = None,
     channels: Sequence[int] = (1, 2, 3, 4),
-    ancillary: bool = True,
+    profile: str = DEFAULT_PROFILE,
+    science_product: str = DEFAULT_SCIENCE_PRODUCT,
     expansion_radius: u.Quantity | None = None,
     client: ArchiveClient | None = None,
 ) -> Table:
@@ -1042,10 +1085,15 @@ def plan_download(
         Channels to plan. Requested channels absent from discovery are reported
         informationally, not as incomplete observations: cryogenic IRAC channel
         pairs 1/3 and 2/4 view different fields. Discovered AOR/channel pairs
-        without science BCD links remain errors.
-    ancillary : bool
-        Include uncertainty, mask, and other ``bcd/``/``cal/`` FITS products.
-        False retrieves only science ``*_bcd.fits`` files.
+        without the selected science version remain errors.
+    profile : {'spca', 'science-qa', 'archive'}
+        ``spca`` (default): science images plus ``cal/*_sdark.fits`` files used
+        to select optional correction stacks (``addStack=True``).
+        ``science-qa``: ``spca`` plus each image's uncertainty and mask files.
+        ``archive``: every Level 1 ``bcd/`` and ``cal/`` FITS product.
+    science_product : {'bcd', 'cbcd'}
+        Science-image version (default BCD). Only this version is labelled
+        ``science``; the other is never substituted when this one is missing.
     expansion_radius : Quantity, optional
         SIA expansion radius; defaults to the discovery value.
     client : ArchiveClient, optional
@@ -1056,8 +1104,10 @@ def plan_download(
     Table
         Plan rows. Level 0 (``raw``), Level 2 (``pbcd``), unsupported, and
         not-requested products are counted in ``meta['excluded_products']``;
-        ``meta['time_coverage']`` records how each AOR's span was established.
+        ``meta['time_coverage']`` records how each AOR's span was established;
+        ``meta['profile']`` and ``meta['science_product']`` record the selection.
     """
+    selection = product_selection(profile, science_product)
     wanted_channels = _channels(channels)
     if expansion_radius is None:
         expansion_radius = (
@@ -1086,6 +1136,7 @@ def plan_download(
     rows = []
     seen = {}
     found = set()
+    versions = {}
     excluded = {}
     coverage = {}
     try:
@@ -1100,16 +1151,30 @@ def plan_download(
             records, coverage[aor] = _aor_records(
                 client, aor, hint, expansion_radius, excluded
             )
+            stems = {}
+            for record in records:
+                if record["category"] == "science":
+                    variant = science_variant(record["filename"])
+                    versions.setdefault((aor, record["channel"]), set()).add(variant)
+                    if variant == science_product:
+                        stems.setdefault(record["channel"], set()).add(
+                            science_stem(record["filename"])
+                        )
             for record in _merge(records):
                 channel = record["channel"]
                 if (aor, channel) not in pairs:
                     continue
                 category = record["category"]
-                if category == "science" or (ancillary and category in _ANCILLARY):
-                    pass
-                else:
-                    reason = category if category not in _ANCILLARY else "not_requested"
-                    excluded[reason] = excluded.get(reason, 0) + 1
+                if category not in _RETAINED:
+                    excluded[category] = excluded.get(category, 0) + 1
+                    continue
+                if not selected_product(
+                    record["subdir"],
+                    record["filename"],
+                    selection,
+                    stems.get(channel, set()),
+                ):
+                    excluded["not_requested"] = excluded.get("not_requested", 0) + 1
                     continue
                 filename = record["filename"]
                 if not re.fullmatch(r"[A-Za-z0-9_.-]+\.fits", filename):
@@ -1128,14 +1193,15 @@ def plan_download(
                         raise ArchiveError(f"Conflicting archive URLs for {local}")
                     continue
                 seen[local] = url
-                if category == "science":
+                product = classify(filename, science_product, record["subdir"])
+                if product == "science":
                     found.add((aor, channel))
                 rows.append(
                     tuple(record[name] for name in OBS_COLUMNS)
                     + (
                         filename,
                         url,
-                        category,
+                        product,
                         record["estimated_bytes"],
                         local,
                         "planned",
@@ -1144,9 +1210,15 @@ def plan_download(
                     )
                 )
         if known_pairs - found:
+            lacking = [
+                f"{aor}/ch{channel} (archive has: "
+                f"{', '.join(sorted(versions.get((aor, channel), ()))) or 'none'})"
+                for aor, channel in sorted(known_pairs - found)
+            ]
             raise ArchiveError(
-                "No science BCD links for discovered AOR/channels: "
-                f"{sorted(known_pairs - found)}"
+                f"No *_{science_product}.fits science images for discovered "
+                f"AOR/channels: {'; '.join(lacking)}. The other version is never "
+                "substituted; choose science_product explicitly."
             )
         if not rows:
             raise ArchiveError("No BCD links for the selected AORs/channels")
@@ -1155,7 +1227,7 @@ def plan_download(
         missing = [f"{aor}/ch{channel}" for aor, channel in sorted(pairs - found)]
         result.meta.update(
             output=str(Path(output).resolve()),
-            ancillary=bool(ancillary),
+            **selection,
             excluded_products=dict(sorted(excluded.items())),
             channels_without_bcd_links=missing,
             time_coverage=dict(sorted(coverage.items())),
@@ -1179,20 +1251,17 @@ def plan_download(
 
 
 def _associations(paths: dict) -> tuple[int, int]:
-    """Count science BCDs lacking a same-stem uncertainty or mask file."""
+    """Count science images lacking a same-stem uncertainty or mask file."""
     names = {PurePosixPath(path).name for path in paths}
     missing_uncertainty = missing_mask = 0
     for path, product in paths.items():
         if product != "science":
             continue
-        stem = PurePosixPath(path).name.removesuffix("_bcd.fits")
-        missing_uncertainty += not any(
-            stem + suffix in names for suffix in ("_bunc.fits", "_cbunc.fits")
-        )
-        missing_mask += not any(
-            stem + suffix in names
-            for suffix in ("_bimsk.fits", "_imsk.fits", "_brmsk.fits")
-        )
+        name = PurePosixPath(path).name
+        stem = science_stem(name)
+        uncertainty = UNCERTAINTY_SUFFIXES[science_variant(name)]
+        missing_uncertainty += stem + uncertainty not in names
+        missing_mask += not any(stem + suffix in names for suffix in MASK_SUFFIXES)
     return missing_uncertainty, missing_mask
 
 
@@ -1210,7 +1279,10 @@ def _groups(table: Table) -> dict:
 
 
 def observation_summary(plan: Table) -> Table:
-    """Summarize planned files/sizes per AOR/channel; never assert completeness."""
+    """Summarize planned files/sizes per AOR/channel; never assert completeness.
+
+    ``science_images`` counts only the plan's selected science version.
+    """
     rows = []
     for (aor, channel), group in _groups(plan).items():
         products = [str(row["product"]) for row in group]
@@ -1227,6 +1299,8 @@ def observation_summary(plan: Table) -> Table:
                     (str(row["date"]) for row in group if str(row["date"])), default=""
                 ),
                 ", ".join(sorted({str(row["mode"]) for row in group} - {""})),
+                str(plan.meta.get("profile", "")),
+                str(plan.meta.get("science_product", "")),
                 products.count("science"),
                 products.count("uncertainty"),
                 products.count("mask"),
@@ -1241,12 +1315,14 @@ def observation_summary(plan: Table) -> Table:
         rows,
         OBS_COLUMNS
         + (
-            "science_bcds",
+            "profile",
+            "science_product",
+            "science_images",
             "uncertainty_files",
             "mask_files",
             "other_ancillary_files",
-            "bcds_without_uncertainty",
-            "bcds_without_mask",
+            "images_without_uncertainty",
+            "images_without_mask",
             "estimated_bytes",
             "unknown_sizes",
             "completeness",
@@ -1410,16 +1486,6 @@ def _validate_fits(path: Path) -> None:
         raise ArchiveError(f"Invalid FITS product: {path}: {exc}") from exc
 
 
-def _product(name: str) -> str:
-    if name.endswith("_bcd.fits"):
-        return "science"
-    if name.endswith(("_bunc.fits", "_cbunc.fits")):
-        return "uncertainty"
-    if name.endswith(("_bimsk.fits", "_imsk.fits", "_brmsk.fits")):
-        return "mask"
-    return "ancillary"
-
-
 def _verified(row, root: Path) -> bool:
     path = _destination(root, str(row["local_path"]))
     return (
@@ -1438,6 +1504,14 @@ def _validate_plan(plan: Table) -> None:
         )
     if not len(plan):
         raise ArchiveError("Download plan is empty")
+    try:
+        science_product = product_selection(
+            plan.meta.get("profile"), plan.meta.get("science_product")
+        )["science_product"]
+    except ValueError as exc:
+        raise ArchiveError(
+            f"Invalid download plan product selection ({exc}); regenerate the plan"
+        ) from exc
     root = Path(plan.meta["output"])
     paths = {}
     for row in plan:
@@ -1456,13 +1530,11 @@ def _validate_plan(plan: Table) -> None:
             / filename
         ).as_posix()
         _destination(root, str(row["local_path"]))
-        science = row["product"] == "science"
         if (
             str(row["local_path"]) != expected
             or subdir not in INCLUDED_SUBDIRS
             or not re.fullmatch(r"[A-Za-z0-9_.-]+\.fits", filename)
-            or science != (subdir == "bcd" and filename.endswith("_bcd.fits"))
-            or row["product"] not in ("science",) + _ANCILLARY
+            or row["product"] != classify(filename, science_product, subdir)
         ):
             raise ArchiveError(f"Invalid Level 1 output layout: {row['local_path']}")
         _url(str(row["url"]))
@@ -1514,9 +1586,11 @@ def download_plan(
     -------
     Table
         File inventory. Local hashes (computed while streaming) detect changes
-        on restarts; they are not archive-supplied checksums. Its
-        ``meta['ancillary_selection']`` records, per ``AOR/chN``, whether
-        uncertainty/mask/ancillary files were requested.
+        on restarts; they are not archive-supplied checksums.
+        ``meta['product_selection']`` records the last requested profile and
+        science version per ``AOR/chN``; ``product`` labels are recomputed from
+        it, so only the selected version counts as ``science``. Files from
+        earlier selections are kept (never deleted) and labelled accordingly.
 
     Raises
     ------
@@ -1539,26 +1613,18 @@ def download_plan(
     manifest_path = root / "download_manifest.ecsv"
     inventory_path = root / "download_inventory.ecsv"
     inventory = {}
-    selection = {}
+    products = {}
     if inventory_path.exists():
         existing = Table.read(inventory_path, format="ascii.ecsv")
-        selection.update(existing.meta.get("ancillary_selection", {}))
+        products.update(existing.meta.get("product_selection", {}))
         for item in existing:
             inventory[str(item["local_path"])] = {
                 name: item[name] for name in INVENTORY_COLUMNS
             }
-    ancillary = plan.meta.get("ancillary")
+    choice = product_selection(plan.meta["profile"], plan.meta["science_product"])
     planned_keys = {_selection_key(row["aorkey"], row["channel"]) for row in plan}
-    changed = False
-    # Plans without the selection leave it unrecorded; compare_inventory then
-    # requires it explicitly instead of assuming one.
-    if ancillary is not None:
-        changed = any(selection.get(k) != bool(ancillary) for k in planned_keys)
-        selection.update(dict.fromkeys(planned_keys, bool(ancillary)))
-    else:
-        changed = bool(planned_keys & set(selection))
-        for key in planned_keys:
-            selection.pop(key, None)
+    changed = any(products.get(key) != choice for key in planned_keys)
+    products.update({key: choice.copy() for key in planned_keys})
     journal_path = root / JOURNAL_NAME
     recovered = _recover_journal(journal_path, root, inventory)
     if recovered:
@@ -1580,7 +1646,7 @@ def download_plan(
         manifest["error"] = errors
         _write_table(manifest, manifest_path)
         if changed:
-            _write_table(_inventory_table(inventory, selection), inventory_path)
+            _write_table(_inventory_table(inventory, products), inventory_path)
             changed = False
             # Journal entries are now in the durable inventory.
             if journal is not None and journal.tell():
@@ -1663,7 +1729,7 @@ def download_plan(
                     persist()
                     pending, last = 0, time.monotonic()
         index = None
-        table = _inventory_table(inventory, selection)
+        table = _inventory_table(inventory, products)
         summary = inventory_summary(table)
         summary.meta["limitation"] = LIMITATION
         _write_table(summary, root / "download_completeness.ecsv")
@@ -1745,49 +1811,77 @@ def _selection_key(aorkey, channel) -> str:
     return f"{_identifier(aorkey)}/ch{int(channel)}"
 
 
-def _inventory_table(inventory: dict, selection: dict | None = None) -> Table:
-    rows = [
-        tuple(inventory[path][name] for name in INVENTORY_COLUMNS)
-        for path in sorted(inventory)
-    ]
+def _label(row, products: dict) -> str:
+    """Product label under the AOR/channel's recorded science version."""
+    selection = products.get(_selection_key(row["aorkey"], row["channel"]))
+    if selection is None:
+        return str(row["product"])
+    path = PurePosixPath(str(row["local_path"]))
+    return classify(path.name, selection["science_product"], path.parent.name)
+
+
+def _inventory_table(inventory: dict, products: dict) -> Table:
+    rows = []
+    for path in sorted(inventory):
+        item = inventory[path]
+        # Relabel so a changed science version never leaves stale classes.
+        item["product"] = _label(item, products)
+        rows.append(tuple(item[name] for name in INVENTORY_COLUMNS))
     table = _table(rows, INVENTORY_COLUMNS)
-    if selection:
-        table.meta["ancillary_selection"] = {
-            key: bool(value) for key, value in sorted(selection.items())
-        }
+    table.meta["product_selection"] = dict(sorted(products.items()))
+    choices = list(products.values())
+    keys = {_selection_key(row["aorkey"], row["channel"]) for row in inventory.values()}
+    if choices and keys <= products.keys() and all(c == choices[0] for c in choices):
+        table.meta.update(choices[0])
     return table
 
 
 def inventory_summary(inventory: Table) -> Table:
     """Count local science, uncertainty and masks per AOR/channel.
 
+    ``science`` counts only the AOR/channel's recorded science version
+    (``meta['product_selection']``); the other version counts as ancillary.
+
     Notes
     -----
     Counts describe only verified local files, not authoritative archive totals.
     Even matching science/uncertainty/mask counts do not prove completeness.
     """
+    products = inventory.meta.get("product_selection", {})
     rows = []
     for (aor, channel), group in _groups(inventory).items():
-        paths = {str(row["local_path"]): str(row["product"]) for row in group}
+        paths = {str(row["local_path"]): _label(row, products) for row in group}
         counts = [
             list(paths.values()).count(kind)
             for kind in ("science", "uncertainty", "mask", "ancillary")
         ]
         missing_uncertainty, missing_mask = _associations(paths)
+        selection = products.get(_selection_key(aor, channel), {})
         rows.append(
-            (aor, channel, *counts, missing_uncertainty, missing_mask, "unverified")
+            (
+                aor,
+                channel,
+                selection.get("profile", ""),
+                selection.get("science_product", ""),
+                *counts,
+                missing_uncertainty,
+                missing_mask,
+                "unverified",
+            )
         )
     return _table(
         rows,
         (
             "aorkey",
             "channel",
+            "profile",
+            "science_product",
             "science",
             "uncertainty",
             "mask",
             "ancillary",
-            "bcds_without_uncertainty",
-            "bcds_without_mask",
+            "images_without_uncertainty",
+            "images_without_mask",
             "completeness",
         ),
     )
@@ -1798,11 +1892,13 @@ _HREF = re.compile(r'href="([^"?#/]+)"', re.IGNORECASE)
 COMPARISON_COLUMNS = (
     "aorkey",
     "channel",
+    "profile",
+    "science_product",
     "reference",
     "reference_files",
-    "reference_bcds",
+    "reference_science",
     "qa_processed_dces",
-    "planned_bcds",
+    "planned_science",
     "expected_files",
     "matched_files",
     "missing_files",
@@ -1860,7 +1956,6 @@ def compare_inventory(
     plan: Table,
     reference=None,
     *,
-    ancillary: bool | None = None,
     client: ArchiveClient | None = None,
 ) -> Table:
     """Compare planned or downloaded ``bcd/`` filenames with an independent list.
@@ -1869,7 +1964,10 @@ def compare_inventory(
     ----------
     plan : Table
         Download plan or inventory (``aorkey``, ``channel``, ``local_path`` and
-        ``url`` columns).
+        ``url`` columns). Expected files follow its recorded product selection:
+        an inventory's per-AOR/channel ``meta['product_selection']``, else the
+        plan's ``meta['profile']``/``meta['science_product']``. Files outside
+        the selection are reported as ``not_requested``, not missing.
     reference : path or sequence, optional
         None (default) reads, for each planned AOR/channel, the IRSA archive's
         HTML directory index of ``r<AOR>/chN/bcd/`` (the directory holding the
@@ -1877,25 +1975,26 @@ def compare_inventory(
         processed-DCE count. Otherwise SHA ZIP files, extracted directories
         (searched recursively, including ZIPs), or relative paths containing
         ``r<AOR>/chN/bcd/<file>``.
-    ancillary : bool, optional
-        Whether uncertainty/mask/ancillary ``bcd/`` files were requested. By
-        default it is read from the table: a download inventory's per-AOR/channel
-        ``meta['ancillary_selection']``, else a plan's ``meta['ancillary']``.
-        If neither is recorded, an `ArchiveError` is raised rather than
-        guessing, so BCD-only downloads are not reported as missing files.
     client : ArchiveClient, optional
         Client for archive references.
 
     Returns
     -------
     Table
-        One row per planned AOR/channel. ``missing_files`` are reference files
-        the plan should contain but does not; ``extra_files`` are planned but
-        absent from the reference; ``excluded_files`` are intentionally not
-        planned (logs, unsupported, or not-requested ancillary files).
+        One row per planned AOR/channel. ``reference_science`` and
+        ``planned_science`` count only the selected science version, so
+        BCD/CBCD pairs are never counted twice. ``missing_files`` are reference
+        files the selection should contain but does not; ``extra_files`` are
+        planned but absent from the reference; ``excluded_files`` are
+        intentionally not planned (logs, unsupported, or not-requested files).
         ``agreement`` is ``match`` only if nothing is missing or extra and the
-        quality-report count (when known) equals the reference BCD count.
-        ``meta['details']`` lists the filenames for each category.
+        quality-report processed-DCE count (when known) equals
+        ``reference_science``. ``meta['details']`` lists the filenames.
+
+    Raises
+    ------
+    ArchiveError
+        The table records no product selection for a compared AOR/channel.
 
     Notes
     -----
@@ -1903,7 +2002,7 @@ def compare_inventory(
     calibration AORs. The archive directory index is HTML intended for
     browsing, not a formally versioned API; parse failures are errors.
     """
-    recorded = plan.meta.get("ancillary_selection", {})
+    products = plan.meta.get("product_selection", {})
     planned, directories, selections = {}, {}, {}
     for row in plan:
         key = (_identifier(row["aorkey"]), int(row["channel"]))
@@ -1915,15 +2014,17 @@ def compare_inventory(
     if not planned:
         raise ArchiveError("Nothing to compare: the plan/inventory is empty")
     for key in planned:
-        choice = ancillary
-        if choice is None:
-            choice = recorded.get(_selection_key(*key), plan.meta.get("ancillary"))
-        if choice is None:
+        setting = products.get(_selection_key(*key))
+        if setting is None and "profile" in plan.meta:
+            setting = plan.meta
+        if setting is None:
             raise ArchiveError(
-                f"Ancillary selection for {key[0]}/ch{key[1]} is not recorded; "
-                "pass ancillary=True or False to compare_inventory"
+                f"No product selection recorded for {key[0]}/ch{key[1]}; "
+                "regenerate the plan with plan_download"
             )
-        selections[key] = bool(choice)
+        selections[key] = product_selection(
+            setting["profile"], setting["science_product"]
+        )
     reports = {}
     if reference is None:
         owned = client is None
@@ -1949,21 +2050,25 @@ def compare_inventory(
     for key in sorted(planned):
         aor, channel = key
         available = names.get(key, set())
+        selection = selections[key]
+        version = selection["science_product"]
+        stems = {science_stem(n) for n in available if science_variant(n) == version}
         expected, excluded = set(), {}
         for name in available:
             category = _category("bcd", name)
-            if category == "science" or (selections[key] and category in _ANCILLARY):
+            if category not in _RETAINED:
+                excluded.setdefault(category, []).append(name)
+            elif selected_product("bcd", name, selection, stems):
                 expected.add(name)
             else:
-                reason = "not_requested" if category in _ANCILLARY else category
-                excluded.setdefault(reason, []).append(name)
+                excluded.setdefault("not_requested", []).append(name)
         have = planned[key]
         missing, extra = sorted(expected - have), sorted(have - available)
-        reference_bcds = sum(_category("bcd", n) == "science" for n in available)
+        reference_science = len(stems)
         qa = reports.get(aor, {}).get("processed", {}).get(channel, -1)
         if not available:
             agreement = "not_in_reference"
-        elif missing or extra or (qa >= 0 and qa != reference_bcds):
+        elif missing or extra or (qa >= 0 and qa != reference_science):
             agreement = "mismatch"
         else:
             agreement = "match" if qa >= 0 else "match_without_qa_count"
@@ -1971,11 +2076,13 @@ def compare_inventory(
             (
                 aor,
                 channel,
+                selection["profile"],
+                version,
                 source,
                 len(available),
-                reference_bcds,
+                reference_science,
                 qa,
-                sum(_category("bcd", n) == "science" for n in have),
+                sum(science_variant(n) == version for n in have),
                 len(expected),
                 len(expected & have),
                 len(missing),
@@ -1991,8 +2098,8 @@ def compare_inventory(
         }
         if agreement != "match":
             LOGGER.warning(
-                "AOR %s/ch%d vs %s: %s (%d missing, %d extra, QA BCDs %d, "
-                "reference BCDs %d)",
+                "AOR %s/ch%d vs %s: %s (%d missing, %d extra, QA DCEs %d, "
+                "reference %s images %d)",
                 aor,
                 channel,
                 source,
@@ -2000,7 +2107,8 @@ def compare_inventory(
                 len(missing),
                 len(extra),
                 qa,
-                reference_bcds,
+                version,
+                reference_science,
             )
     aors = {aor for aor, _ in planned}
     unplanned = {key for key in names if key[0] in aors and key not in planned}
@@ -2056,9 +2164,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         "overlap it during the AOR are retrieved",
     )
     parser.add_argument(
-        "--bcd-only",
-        action="store_true",
-        help="Retrieve only science *_bcd.fits, not uncertainty/mask/cal files",
+        "--profile",
+        choices=PRODUCT_PROFILES,
+        help="spca (default): science images + sky-dark files for addStack; "
+        "science-qa: also uncertainty/mask files; archive: all Level 1 bcd/cal",
+    )
+    parser.add_argument(
+        "--science-product",
+        choices=SCIENCE_PRODUCTS,
+        help="Science-image version to select (default: bcd); never substituted",
     )
     parser.add_argument(
         "--preview",
@@ -2111,9 +2225,10 @@ def main(argv: Sequence[str] | None = None) -> int:
                 args.aor,
                 args.start,
                 args.end,
-                args.bcd_only,
                 args.channels,
                 args.output,
+                args.profile,
+                args.science_product,
             )
             if any(selectors):
                 parser.error(
@@ -2153,7 +2268,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 observations,
                 output,
                 channels=channels,
-                ancillary=not args.bcd_only,
+                profile=args.profile or DEFAULT_PROFILE,
+                science_product=args.science_product or DEFAULT_SCIENCE_PRODUCT,
                 client=client,
             )
         observation_summary(plan).pprint(max_lines=-1, max_width=-1)

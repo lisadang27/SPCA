@@ -544,10 +544,12 @@ def get_lightcurve(
     bg=None,
     bg_err=None,
     time=None,
+    science_product="bcd",
 ):
     """Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
 
     Args:
+        science_product (str): Select 'bcd' (default) or 'cbcd' when loading images.
         datapath (string): Directory where the spitzer data is stored.
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
@@ -565,6 +567,7 @@ def get_lightcurve(
         plot (bool, optional): True if you want to plot the time resolved lightcurve. Default is True.
         plot_name (string, optional): If plot and save is True, the filename of the plot to be saved as. Default is True.
         oversamp (bool, optional): True if you want to oversample the image by a factor of 2. Default is False.
+            Currently nonfunctional pending separate scientific validation; leave False.
         save_oversamp (bool, optional): True if you want to save oversampled images. Default is True.
         reuse_oversamp (bool, optional): True if you want to reuse oversampled images that were previously saved.
             Default is False.
@@ -661,6 +664,7 @@ def get_lightcurve(
             addStack,
             maskStars,
             ncpu,
+            science_product=science_product,
         )
     else:
         image_stack = image_stack_input
