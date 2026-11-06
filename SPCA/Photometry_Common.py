@@ -483,6 +483,56 @@ def _save_oversample_cache(image, savename):
             os.remove(temporary)
 
 
+def full_frame_crop(header, target_coord):
+    """Return fixed (y, x) slices for a target-centered 32x32 stamp.
+
+    ``target_coord`` is a scalar SkyCoord or an (RA, Dec) pair in degrees.
+    WCS pixels use zero-based (x, y); array slices use (y, x). The target
+    falls between stamp pixels 15 and 16. A crop crossing an image boundary
+    is rejected rather than shifted or padded.
+    """
+    if target_coord is None:
+        raise ValueError(
+            "Full-frame images require target_coord (SkyCoord or RA/Dec in degrees)"
+        )
+    if not isinstance(target_coord, SkyCoord):
+        target_coord = SkyCoord(*target_coord, unit="deg", frame="icrs")
+    if not target_coord.isscalar:
+        raise ValueError("target_coord must specify one target")
+    wcs = WCS(header, naxis=2).celestial
+    if not wcs.has_celestial:
+        raise ValueError("Full-frame image has no celestial WCS")
+    x, y = skycoord_to_pixel(target_coord, wcs, origin=0, mode="all")
+    if not np.all(np.isfinite([x, y])):
+        raise ValueError("Target has no finite pixel position in the FITS WCS")
+    x0, y0 = int(np.floor(x)) - 15, int(np.floor(y)) - 15
+    crop = (slice(y0, y0 + 32), slice(x0, x0 + 32))
+    _validate_crop(crop, (header["NAXIS2"], header["NAXIS1"]))
+    return crop
+
+
+def _validate_crop(crop, shape):
+    if any(
+        s.start < 0 or s.stop > n or s.stop - s.start != 32 for s, n in zip(crop, shape)
+    ):
+        raise ValueError(
+            f"Target-centered 32x32 crop {crop} lies outside image {shape}"
+        )
+
+
+def _aor_crops(fnames, lens, target_coord):
+    """Choose each AOR's crop once, from its first selected BCD header."""
+    crops = []
+    index = 0
+    for length in lens:
+        header = fits.getheader(fnames[index])
+        crops.append(
+            full_frame_crop(header, target_coord) if header["NAXIS"] == 2 else None
+        )
+        index += length
+    return crops
+
+
 def prepare_image(
     savepath,
     AOR_snip,
@@ -498,18 +548,41 @@ def prepare_image(
     stackPath="",
     maskStars=[],
     i=0,
+    target_coord=None,
+    aor_crops=None,
 ):
 
+    # Index of the AOR containing image i (lens counts files, not frames).
+    j = int(np.searchsorted(np.cumsum(lens), i, side="right"))
+    crop = None
     # open fits file
     with fits.open(fnames[i]) as hdu_list:
         header = hdu_list[0].header
+        full_frame = hdu_list[0].data.ndim == 2
+        if full_frame and len(ignoreFrames):
+            raise ValueError(
+                "ignoreFrames selects subarray cube positions; use [] for full-frame data"
+            )
         time = get_time(header, ignoreFrames)
 
-        if len(hdu_list[0].data.shape) == 2:
-            # Reshape fullframe data so that it can be used with our routines
-            # Getting just the stamp around the sweet spot
-            image = np.ma.masked_invalid(hdu_list[0].data[np.newaxis, 217:249, 9:41])
+        if full_frame:
+            if aor_crops is None:
+                # Also keep standalone prepare_image calls fixed within an AOR.
+                first = sum(lens[:j])
+                crop = full_frame_crop(fits.getheader(fnames[first]), target_coord)
+            else:
+                crop = aor_crops[j]
+            if crop is None:
+                raise ValueError(
+                    "Cannot mix full-frame images and subarray cubes within an AOR"
+                )
+            _validate_crop(crop, hdu_list[0].data.shape)
+            image = np.ma.masked_invalid(hdu_list[0].data[crop][np.newaxis])
         else:
+            if aor_crops is not None and aor_crops[j] is not None:
+                raise ValueError(
+                    "Cannot mix full-frame images and subarray cubes within an AOR"
+                )
             image = hdu_list[0].data
             # ignore any consistently bad frames in datacubes
             image[ignoreFrames] = np.nan
@@ -517,10 +590,18 @@ def prepare_image(
 
     # add background correcting stack if requested
     if addStack:
-        # Index of the AOR containing image i (lens counts images per AOR).
-        j = int(np.searchsorted(np.cumsum(lens), i, side="right"))
         with fits.open(stacks[j]) as stackHDU:
-            image += np.ma.masked_invalid(stackHDU[0].data)
+            correction = stackHDU[0].data
+            if full_frame:
+                if correction.shape == (1, header["NAXIS2"], header["NAXIS1"]):
+                    correction = correction[0]
+                if correction.shape == (header["NAXIS2"], header["NAXIS1"]):
+                    correction = correction[crop]
+                if correction.shape not in ((32, 32), (1, 32, 32)):
+                    raise ValueError(
+                        "Full-frame correction stack must match the image or its 32x32 stamp"
+                    )
+            image += np.ma.masked_invalid(correction)
 
     if image.shape[0] != 1:
         # Sigma clipping within datacubes
@@ -532,14 +613,25 @@ def prepare_image(
 
     # Mask any other stars in the frame to avoid them influencing the background subtraction
     if maskStars != []:
-        header["CTYPE3"] = (
-            "Time-SIP"  # Just need to add a type so astropy doesn't complain
-        )
+        if not full_frame:
+            header["CTYPE3"] = (
+                "Time-SIP"  # Just need to add a type so astropy doesn't complain
+            )
         w = WCS(header, naxis=[1, 2])
         mask = np.ma.getmaskarray(image)
         for st in maskStars:
             coord = SkyCoord(st[0], st[1])
             x, y = np.rint(skycoord_to_pixel(coord, w)).astype(int)
+            if full_frame:
+                x, y = x - crop[1].start, y - crop[0].start
+                # Clip the mask footprint to the stamp; don't wrap negative indices.
+                if -1 <= x <= 32 and -1 <= y <= 32:
+                    mask[
+                        :,
+                        max(0, y - 1) : min(32, y + 2),
+                        max(0, x - 1) : min(32, x + 2),
+                    ] = True
+                continue
             x = x + np.arange(-1, 2)
             y = y + np.arange(-1, 2)
             x, y = np.meshgrid(x, y)
@@ -586,12 +678,16 @@ def prepare_images(
     maskStars=[],
     ncpu=4,
     science_product="bcd",
+    target_coord=None,
 ):
     """Prepare exactly one science-image version for photometry.
 
     ``science_product`` selects 'bcd' (default) or 'cbcd'. Uncertainty and mask
     archive products are not loaded; optional correction-stack lookup uses
-    sky-dark filenames for the same selected AORs.
+    sky-dark filenames for the same selected AORs. Full-frame images require
+    ``target_coord`` (scalar SkyCoord or RA/Dec in degrees). Each AOR uses its
+    first selected image's WCS to choose one fixed 32x32 crop for all exposures.
+    Subarray images ignore target_coord and retain their original stamp.
     """
 
     # folder containing properly named correction stacks (will be automatically selected)
@@ -616,6 +712,11 @@ def prepare_images(
     fnames, lens = get_fnames(datapath, AOR_snip, science_product)
     if not fnames:
         raise ValueError(f"No *_{science_product}.fits images found in {datapath}")
+    crops = _aor_crops(fnames, lens, target_coord)
+    if len(ignoreFrames) and any(crop is not None for crop in crops):
+        raise ValueError(
+            "ignoreFrames selects subarray cube positions; use [] for full-frame data"
+        )
 
     # get path where the aor breaks will be saved
     breakpath = basepath + planet + "/analysis/" + channel + "/aorBreaks.txt"
@@ -654,6 +755,7 @@ def prepare_images(
             addStack,
             stackPath,
             maskStars,
+            aor_crops=crops,
         )
         inds = range(len(fnames))
         results = np.ma.concatenate(pool.map(func, inds), axis=0)

@@ -2,12 +2,13 @@ import warnings
 
 import matplotlib.pyplot as plt
 import numpy as np
+from astropy.io import fits
 from astropy.stats import sigma_clip
 from matplotlib.ticker import MaxNLocator
 
 # SPCA libraries
 from .Photometry_Aperture import get_lightcurve
-from .Photometry_Common import create_folder
+from .Photometry_Common import create_folder, get_fnames
 
 warnings.filterwarnings("ignore")
 
@@ -23,6 +24,7 @@ def run_diagnostics(
     ncpu=4,
     showPlot=False,
     savePlot=True,
+    science_product="bcd",
 ):
     """Run frame diagnostics and choose which frames within a datacube are consistently bad and should be discarded.
 
@@ -33,11 +35,34 @@ def run_diagnostics(
         basepath (string): The full path to the folder containing folders for each planet.
         addStack (bool): Whether or not to add a background subtraction correction stack (will be automatically selected if present).
         nsigma (float): The number of sigma a frame's median value must be off from the median frame in order to be added to ignore_frames.
+        science_product (str): Select exactly 'bcd' (default) or 'cbcd'.
 
     Returns:
         list: The frames whose photometry is typically nsigma above/below the median frame and should be removed from photometry.
+            Returns [] without extracting photometry if any selected image is
+            not a 64x32x32 subarray cube.
 
     """
+
+    # Cube-position diagnostics only describe 64-frame subarrays. Inspect all
+    # selected files so mixed selections and full-frame counts divisible by 64
+    # cannot accidentally be interpreted as subarray cubes.
+    datapath = f"{basepath.rstrip('/')}/{planet}/data/{channel}"
+    fnames, _ = get_fnames(datapath, AOR_snip, science_product)
+    if not fnames:
+        raise ValueError(f"No *_{science_product}.fits images found in {datapath}")
+    for fname in fnames:
+        header = fits.getheader(fname)
+        if (
+            header["NAXIS"] != 3
+            or header.get("NAXIS3") != 64
+            or header["NAXIS1"] != 32
+            or header["NAXIS2"] != 32
+        ):
+            print(
+                "Skipping cube-position diagnostics: data are not exclusively 64x32x32 subarrays."
+            )
+            return []
 
     # get lightcurve, centroids, psf width, npp
     flux, time, xo, yo, xw, yw, bg, npp = get_lightcurve(
@@ -56,6 +81,7 @@ def run_diagnostics(
         moveCentroids=[True],
         highpassWidth=highpassWidth,
         ncpu=ncpu,
+        science_product=science_product,
     )[0].T
     # sigma clipping & reshape
     try:

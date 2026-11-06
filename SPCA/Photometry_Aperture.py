@@ -599,11 +599,15 @@ def get_lightcurve(
     bg_err=None,
     time=None,
     science_product="bcd",
+    target_coord=None,
 ):
     """Given a directory, looks for data (bcd.fits files), opens them and performs photometry.
 
     Args:
         science_product (str): Select 'bcd' (default) or 'cbcd' when loading images.
+        target_coord (SkyCoord or pair): Target RA/Dec in degrees for a fixed
+            WCS-based 32x32 crop per full-frame AOR. Ignored for subarray cubes
+            and image_stack_input. Required when loading full-frame images.
         datapath (string): Directory where the spitzer data is stored.
         savepath (string): Directory the outputs will be saved.
         AORsnip (string):  Common first characters of data directory eg. 'r579'
@@ -733,6 +737,7 @@ def get_lightcurve(
             maskStars,
             ncpu,
             science_product=science_product,
+            target_coord=target_coord,
         )
     else:
         image_stack = image_stack_input

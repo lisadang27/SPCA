@@ -255,6 +255,48 @@ Photometry defaults to **exact** `*_bcd.fits` matches, never the old
 `prepare_images(..., science_product="cbcd")`, or the aperture, PSF, PLD, and
 companion `get_lightcurve(..., science_product="cbcd")` APIs to choose CBCD.
 Both image versions may remain on disk, but are never jointly loaded.
+
+Full-frame IRAC BCDs (256×256, one exposure per file) require explicit target
+coordinates. Pass a scalar Astropy `SkyCoord` or an `(RA, Dec)` pair in degrees:
+
+```python
+from SPCA.Photometry_Aperture import get_lightcurve
+
+get_lightcurve(
+    basepath, aor_snippet, "ch2", planet,
+    target_coord=(target_ra_deg, target_dec_deg),
+    ignoreFrames=[], addStack=False, oversamp=False,
+    r=[2.0, 2.5, 3.0], moveCentroids=[True, False],
+)
+```
+
+`prepare_images(..., target_coord=...)` accepts the same setting. In
+`Everything_Photometry.py`, set the planet's entry in `target_coords`.
+For each AOR, the first selected BCD's celestial WCS (including distortion)
+defines a fixed 32×32 crop, placing the target between zero-based stamp pixels
+15 and 16 in each axis. Later exposures use those same detector pixels;
+the existing centroids track pointing drift. Crops use NumPy `[y, x]` ordering
+and must fit entirely within the original image; missing coordinates, missing
+celestial WCS, and crops crossing the image edge raise errors. Other-star
+masks and full-frame correction stacks use the same crop offsets.
+
+The existing 64×32×32 subarray stamps, timing calculation, clipping, and
+photometry are unchanged and need no target coordinates. Cube-position
+diagnostics automatically return no exclusions for full-frame or mixed
+selections, and full-frame extraction requires `ignoreFrames=[]` (or `None`).
+Baseline aperture photometry retains radius optimization, fixed/moving
+centroids, the existing background-scatter/photon-noise error model, and the
+same unbinned and binned output columns. Full-frame times are
+`BMJD_OBS + FRAMTIME / (2 * 86400)`; `Flux std` remains within-bin scatter.
+Use separate analysis output directories when comparing target coordinates
+or crop settings, since output filenames retain their existing structure.
+
+Synthetic full-frame and subarray regressions can be run without science data:
+
+```bash
+MPLBACKEND=Agg python -m pytest tests/test_full_frame_photometry.py tests/test_aperture_masks.py tests/test_photometry_products.py -q
+```
+
 Oversampling caches are named after each image's full archive filename stem
 (AOR, exposure, and BCD/CBCD version), the oversampling scale, and a SHA-256
 digest of the prepared image just before oversampling. That digest reflects

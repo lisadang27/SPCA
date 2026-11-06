@@ -69,6 +69,10 @@ nsigma = 4
 # An array-like object where each element is an array-like object with the RA and DEC coordinates of a nearby star which should be masked out when computing background subtraction.
 maskStars = None
 
+# Required for full-frame AORs: map each planet name to a SkyCoord or an
+# (RA, Dec) pair in degrees. Subarray processing does not use this setting.
+target_coords = {}
+
 # Whether to use Aperture photometry, PSF photometry, or PLD photometry
 photometryMethods = ["Aperture", "PSF", "PLD"]
 
@@ -174,6 +178,7 @@ def main():
                     addStack,
                     maskStars,
                     ncpu,
+                    target_coord=target_coords.get(planet),
                 )
 
                 # Try all of the different photometry methods
