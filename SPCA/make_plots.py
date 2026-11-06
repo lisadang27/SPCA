@@ -1,5 +1,5 @@
 # Some code to make plots look a bit nicer
-from distutils.spawn import find_executable
+from shutil import which as find_executable
 
 import matplotlib
 
