@@ -6,7 +6,6 @@ from functools import partial
 
 import matplotlib.pyplot as plt
 import numpy as np
-from astropy.stats import sigma_clip
 from photutils.aperture import (
     CircularAperture,
     EllipticalAperture,
@@ -16,7 +15,6 @@ from photutils.aperture import (
 from photutils.utils import calc_total_error
 from tqdm import tqdm
 
-from .make_plots import plot_photometry
 from .Photometry_Common import (
     _get_pool,
     bin_array,
@@ -180,16 +178,15 @@ def A_photometry(
         img_data (3D array): The image stack being analyzed if not using the global variable to allow for parallel computing.
 
     Returns:
-        tuple: results (2D array) Array of flux and flux errors, of shape (nMethods*nSizes, 2), where the nSizes loop
-            is nested inside the nMethods loop which is itself nested inside the moveCentoids loop.
+        ndarray: Fluxes in moveCentroids/method/size order (a 1D array).
+            Missing centroids, invalid background errors, and apertures with
+            masked or nonfinite contributing pixels return NaN. No correction
+            for missing aperture area is attempted. Formal errors are computed
+            by Photutils, but this API historically returns only fluxes.
 
     """
 
-    # Access the global variable
-    if img_data is None:
-        global image_stack
-    else:
-        image_stack = img_data
+    stack = image_stack if img_data is None else img_data
 
     if not isinstance(r, Iterable):
         r = [r]
@@ -207,13 +204,31 @@ def A_photometry(
         h_r = [h_r]
     if not isinstance(theta, Iterable):
         theta = [theta]
-    if not isinstance(methods, Iterable):
+    if isinstance(methods, str) or not isinstance(methods, Iterable):
         methods = [methods]
 
-    # Photutils requires the background-error image to match the data.
-    frame = image_stack[i, :, :]
-    background_error = np.full(frame.shape, bg_err[i], dtype=float)
-    data_error = calc_total_error(frame, background_error, effective_gain=1)
+    sizes = {"Circular": r, "Elliptical": a, "Rectangular": w_r}
+    if shape not in sizes:
+        raise ValueError(f"Unsupported aperture shape: {shape}")
+    nsize = len(sizes[shape])
+    nresult = len(moveCentroids) * len(methods) * nsize
+
+    # Photutils expects ordinary ndarrays plus an explicit boolean mask.
+    # Keep invalid science values excluded; never impute pixels for photometry.
+    frame = np.asarray(np.ma.getdata(stack[i]), dtype=float)
+    mask = np.ma.getmaskarray(stack[i]) | ~np.isfinite(frame)
+    background = np.ma.asarray(bg_err)[i]
+    if (
+        mask.all()
+        or np.ma.is_masked(background)
+        or not np.isfinite(background)
+        or background < 0
+    ):
+        return np.full(nresult, np.nan)
+    background_error = np.full(frame.shape, background, dtype=float)
+    with np.errstate(invalid="ignore", over="ignore"):
+        data_error = calc_total_error(frame, background_error, effective_gain=1)
+    mask |= ~np.isfinite(data_error)
 
     results = []
 
@@ -221,9 +236,19 @@ def A_photometry(
         # Set up aperture(s)
         apertures = []
         if not moveCentroid:
-            position = [cx_med * scale, cy_med * scale]
+            xpos, ypos = cx_med, cy_med
         else:
-            position = [cx[i] * scale, cy[i] * scale]
+            xpos = cx[0 if len(cx) == 1 else i]
+            ypos = cy[0 if len(cy) == 1 else i]
+        position = (
+            np.ma.concatenate((np.ma.atleast_1d(xpos), np.ma.atleast_1d(ypos)))
+            .astype(float)
+            .filled(np.nan)
+            * scale
+        )
+        if not np.all(np.isfinite(position)):
+            results.extend([np.nan] * (len(methods) * nsize))
+            continue
         if shape == "Circular":
             for j in range(len(r)):
                 apertures.append(CircularAperture(position, r=r[j] * scale))
@@ -244,11 +269,29 @@ def A_photometry(
 
         for method in methods:
             phot_table = aperture_photometry(
-                image_stack[i, :, :], apertures, error=data_error, method=method
+                frame, apertures, error=data_error, mask=mask, method=method
             )
-            results.extend(
-                [float(phot_table[f"aperture_sum_{j}"][0]) for j in range(len(apertures))]
-            )
+            for j, aperture in enumerate(apertures):
+                # A masked sum would underestimate the target's total flux.
+                # Use exactly the same pixel weights as Photutils, including
+                # fractional edge pixels, to reject incomplete apertures.
+                weights = aperture.to_mask(method=method)
+                large, small = weights.get_overlap_slices(frame.shape)
+                incomplete = large is None
+                if not incomplete:
+                    contributing = weights.data > 0
+                    incomplete = (
+                        np.any(mask[large] & contributing[small])
+                        or np.count_nonzero(contributing[small])
+                        != np.count_nonzero(contributing)
+                        or not np.any(contributing[small])
+                    )
+                value = phot_table[f"aperture_sum_{j}"][0]
+                results.append(
+                    np.nan
+                    if incomplete or np.ma.is_masked(value) or not np.isfinite(value)
+                    else float(value)
+                )
 
     return np.array(results)
 
@@ -270,14 +313,19 @@ def compare_RMS(
     savePlots=True,
 ):
 
-    RMS = np.zeros(len(Run_list))
+    RMS = np.full(len(Run_list), np.inf)
 
     for i, foldername in enumerate(Run_list):
-        flux = fluxes[:, i]
+        flux = np.ma.masked_invalid(fluxes[:, i])
+        if flux.count() < 2:
+            continue
         smooth = highpassflist(flux, highpassWidth)
         smoothed = (flux - smooth) + np.ma.median(flux)
         #         RMS[i] = np.ma.sqrt(np.ma.median((flux-smooth)**2.))/np.ma.median(smoothed)
-        RMS[i] = np.ma.std(flux - smooth) / np.ma.median(smoothed)
+        residual = np.ma.masked_invalid(flux - smooth)
+        normalization = np.ma.median(smoothed)
+        if residual.count() >= 2 and np.isfinite(normalization) and normalization > 0:
+            RMS[i] = np.ma.std(residual) / normalization
 
     exact_moving = np.array(
         [
@@ -388,7 +436,7 @@ def compare_RMS(
             plt.show()
         plt.close()
 
-    if save:
+    if save and np.any(np.isfinite(RMS)):
         if np.any(exact_moving):
             print(
                 "\tExact Moving - Best RMS (ppm):",
@@ -489,35 +537,38 @@ def bin_all_data(
 ):
 
     binned_flux, binned_flux_std = bin_array(flux, bin_size)
-    binned_time, binned_time_std = np.copy(binned_time), np.copy(binned_time_std)
-    binned_xo, binned_xo_std = np.copy(binned_xo), np.copy(binned_xo_std)
-    binned_yo, binned_yo_std = np.copy(binned_yo), np.copy(binned_yo_std)
-    binned_xw, binned_xw_std = np.copy(binned_xw), np.copy(binned_xw_std)
-    binned_yw, binned_yw_std = np.copy(binned_yw), np.copy(binned_yw_std)
-    binned_bg, binned_bg_std = np.copy(binned_bg), np.copy(binned_bg_std)
-    binned_npp, binned_npp_std = np.copy(binned_npp), np.copy(binned_npp_std)
 
     # Do a rolling median based sigma clipping to remove bad data
-    binned_flux = clip_data(binned_flux, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-
-    return np.c_[
+    binned_flux = clip_data(
         binned_flux,
-        binned_flux_std,
-        binned_time,
-        binned_time_std,
-        binned_xo,
-        binned_xo_std,
-        binned_yo,
-        binned_yo_std,
-        binned_xw,
-        binned_xw_std,
-        binned_yw,
-        binned_yw_std,
-        binned_bg,
-        binned_bg_std,
-        binned_npp,
-        binned_npp_std,
-    ]
+        highpassWidth,
+        sigma1=10,
+        sigma2=5,
+        maxiters=3,
+        replace_masked=False,
+    )
+    binned_flux_std[np.ma.getmaskarray(binned_flux)] = np.nan
+
+    return np.ma.column_stack(
+        (
+            binned_flux,
+            binned_flux_std,
+            binned_time,
+            binned_time_std,
+            binned_xo,
+            binned_xo_std,
+            binned_yo,
+            binned_yo_std,
+            binned_xw,
+            binned_xw_std,
+            binned_yw,
+            binned_yw_std,
+            binned_bg,
+            binned_bg_std,
+            binned_npp,
+            binned_npp_std,
+        )
+    ).filled(np.nan)
 
 
 def get_lightcurve(
@@ -571,6 +622,13 @@ def get_lightcurve(
         plot_name (string, optional): If plot and save is True, the filename of the plot to be saved as. Default is True.
         oversamp (bool, optional): True if you want to oversample the image by a factor of 2. Default is False.
             Currently nonfunctional pending separate scientific validation; leave False.
+        scale (int, optional): Sampling factor used only when oversamp=True.
+            With oversamp=False, native pixel coordinates are always used,
+            even if scale is supplied. Default is 2 for oversampled data.
+        image_stack_input (3D array, optional): Already prepared, background-subtracted
+            frames. No resampling or background subtraction is applied to this
+            stack. For a preloaded oversampled stack, set oversamp=True and
+            supply its sampling factor as scale.
         save_oversamp (bool, optional): True if you want to save oversampled images. Default is True.
         reuse_oversamp (bool, optional): True if you want to reuse oversampled images that were previously saved.
             Default is False.
@@ -580,20 +638,27 @@ def get_lightcurve(
             frame to remove first-frame systematic).
         maskStars (list, optional): An array-like object where each element is an array-like object with the RA and DEC
             coordinates of a nearby star which should be masked out when computing background subtraction.
-        moveCentroids (iterable, optional): True if you want the centroid to be
-            centered on the flux-weighted mean centroids (will default to median
-            centroid when a NaN is returned), otherwise aperture will be centered
-            on 15,15 (or 30,30 for 2x oversampled images). Default is [True].
+        moveCentroids (iterable, optional): True centers each aperture on its
+            frame's flux-weighted centroid. Missing/clipped centroids produce
+            NaN fluxes. False uses the median valid centroid. Default is [True].
         rerun_photometry (bool, optional): Whether to overwrite old photometry if it exists. Default is False.
         ncpu (int, optional): The number of aperture radii to try at the same time with multiprocessing. Default is 4.
 
     Raises:
         Error: If Photometry method is not supported/recognized by this pipeline.
 
+    Notes:
+        Rejected fluxes are saved/returned as NaN, without median replacement.
+        Bins use only surviving flux samples (and their corresponding metadata);
+        empty bins remain NaN. The saved ``Flux std`` is within-bin scatter,
+        not a propagated formal uncertainty, and is zero for a single sample.
+
     """
 
     # Currently only circular apertures are supported!
     shape = "Circular"
+    # Both loaded and supplied native frames need native centroid bounds,
+    # positions, and radii, regardless of the oversampling-only scale default.
     if not oversamp:
         scale = 1
 
@@ -676,8 +741,16 @@ def get_lightcurve(
     #                                                    oversamp, scale, reuse_oversamp, saveoversamp,
     #                                                    addStack, maskStars, ncpu)
 
-    bg = clip_data(bg, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-    bg_err = clip_data(bg_err, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    clip = partial(
+        clip_data,
+        highpassWidth=highpassWidth,
+        sigma1=10,
+        sigma2=5,
+        maxiters=3,
+        replace_masked=False,
+    )
+    bg = clip(bg)
+    bg_err = clip(bg_err)
 
     # get centroids & PSF width
     print("\tGetting centroids... ", end="", flush=True)
@@ -687,11 +760,11 @@ def get_lightcurve(
     print("Getting noise pixel parameter... ", end="", flush=True)
     npp = noisepixparam(image_stack)
 
-    npp = clip_data(npp, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-    xo = clip_data(xo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-    xw = clip_data(xw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-    yo = clip_data(yo, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
-    yw = clip_data(yw, highpassWidth, sigma1=10, sigma2=5, maxiters=3)
+    npp = clip(npp)
+    xo = clip(xo)
+    xw = clip(xw)
+    yo = clip(yo)
+    yw = clip(yw)
 
     # perform aperture photometry
     print("Starting photometry!", flush=True)
@@ -740,7 +813,8 @@ def get_lightcurve(
         pool.terminate()
         pool.join()
         raise
-    pbar.close()
+    finally:
+        pbar.close()
     sys.stderr.flush()
 
     # Free up some RAM
@@ -754,13 +828,10 @@ def get_lightcurve(
     print("\tSigma clipping fluxes... ", end="", flush=True)
 
     # Sometimes we get points that are so close to zero that they break the code (even the sigma clipping)
-    fluxes[fluxes < 0.1 * np.ma.median(fluxes)] = np.nan
-    fluxes[fluxes < 0.1 * np.ma.median(fluxes)].mask = True
-
     for i in range(fluxes.shape[1]):
-        fluxes[:, i] = clip_data(
-            fluxes[:, i], highpassWidth, sigma1=10, sigma2=5, maxiters=3
-        )
+        flux = fluxes[:, i]
+        flux = np.ma.masked_where(flux < 0.1 * np.ma.median(flux), flux)
+        fluxes[:, i] = clip(flux)
 
     # Make a folder name for each method
     techniques = []
@@ -789,16 +860,22 @@ def get_lightcurve(
         highpassWidth_tmp = highpassWidth / bin_size
 
         print("Binning... ", end="", flush=True)
-        binned_time, binned_time_std = bin_array(time, bin_size)
-        binned_xo, binned_xo_std = bin_array(xo, bin_size)
-        binned_yo, binned_yo_std = bin_array(yo, bin_size)
-        binned_xw, binned_xw_std = bin_array(xw, bin_size)
-        binned_yw, binned_yw_std = bin_array(yw, bin_size)
-        binned_bg, binned_bg_std = bin_array(bg, bin_size)
-        binned_npp, binned_npp_std = bin_array(npp, bin_size)
-
         for i in range(fluxes.shape[1]):
             flux = fluxes[:, i]
+            # Bin metadata from the same surviving frames as this flux series.
+            binned = [
+                bin_array(np.ma.masked_where(np.ma.getmaskarray(flux), data), bin_size)
+                for data in (time, xo, yo, xw, yw, bg, npp)
+            ]
+            (
+                (binned_time, binned_time_std),
+                (binned_xo, binned_xo_std),
+                (binned_yo, binned_yo_std),
+                (binned_xw, binned_xw_std),
+                (binned_yw, binned_yw_std),
+                (binned_bg, binned_bg_std),
+                (binned_npp, binned_npp_std),
+            ) = binned
             BIN_data = bin_all_data(
                 highpassWidth_tmp,
                 flux,
@@ -819,27 +896,8 @@ def get_lightcurve(
                 bin_size,
             )
 
-            (
-                binned_flux,
-                binned_flux_std,
-                binned_time,
-                binned_time_std,
-                binned_xo,
-                binned_xo_std,
-                binned_yo,
-                binned_yo_std,
-                binned_xw,
-                binned_xw_std,
-                binned_yw,
-                binned_yw_std,
-                binned_bg,
-                binned_bg_std,
-                binned_npp,
-                binned_npp_std,
-            ) = BIN_data.T
-
-            RMS_fluxes = np.append(RMS_fluxes, binned_flux[:, np.newaxis], axis=1)
-            RMS_times = binned_time
+            RMS_fluxes = np.append(RMS_fluxes, BIN_data[:, 0, np.newaxis], axis=1)
+            RMS_times = BIN_data[:, 2]
             BIN_datas.append(BIN_data)
     else:
         RMS_fluxes = fluxes
@@ -864,8 +922,10 @@ def get_lightcurve(
         showPlots,
         savePlots,
     )
+    if not np.any(np.isfinite(RMSs)):
+        print("No photometry method has enough valid measurements to rank.")
 
-    if onlyBest:
+    if onlyBest and np.any(np.isfinite(RMSs)):
         # Keep these as arrays so they can be indexed lated
         # If the user only want's to save the best results, discard the rest
         fluxes = fluxes[:, np.argmin(RMSs) : np.argmin(RMSs) + 1]
@@ -878,7 +938,9 @@ def get_lightcurve(
     FULL_datas = []
     for i in range(fluxes.shape[1]):
         flux = fluxes[:, i]
-        FULL_data = np.c_[flux, time, xo, yo, xw, yw, bg, npp]
+        FULL_data = np.ma.column_stack((flux, time, xo, yo, xw, yw, bg, npp)).filled(
+            np.nan
+        )
 
         if save or savePlots:
             print("\tSaving... ", end="", flush=True)
@@ -901,19 +963,19 @@ def get_lightcurve(
         # Plot the photometry if requested
         if savePlots or showPlots:
             if bin_data:
-                plotx = binned_time
-                ploty0 = binned_flux
-                ploty1 = binned_xo
-                ploty2 = binned_yo
-                ploty3 = binned_xw
-                ploty4 = binned_yw
+                plotx = BIN_datas[i][:, 2]
+                ploty0 = BIN_datas[i][:, 0]
+                ploty1 = BIN_datas[i][:, 4]
+                ploty2 = BIN_datas[i][:, 6]
+                ploty3 = BIN_datas[i][:, 8]
+                ploty4 = BIN_datas[i][:, 10]
             else:
-                plotx = time
-                ploty0 = flux
-                ploty1 = xo
-                ploty2 = yo
-                ploty3 = xw
-                ploty4 = yw
+                plotx = FULL_data[:, 1]
+                ploty0 = FULL_data[:, 0]
+                ploty1 = FULL_data[:, 2]
+                ploty2 = FULL_data[:, 3]
+                ploty3 = FULL_data[:, 4]
+                ploty4 = FULL_data[:, 5]
 
             fig, axes = plt.subplots(nrows=5, ncols=1, sharex=True, figsize=(15, 15))
 
@@ -997,24 +1059,22 @@ class TestAperturehotometryMethods(unittest.TestCase):
         xo = np.ones(image_stack.shape[0]) * 15
         yo = np.arange(14, 18)
         with _get_pool(1) as pool:
-            func = partial(
-                A_photometry,
-                np.zeros_like(xo),
-                xo,
-                yo,
-                [1.0, 2.0, 3.0],
-                [],
-                [],
-                [],
-                [],
-                [],
-                1,
-                "Circular",
-                methods=["center"],
-            )
-            inds = range(image_stack.shape[0])
-            results = np.array(pool.map(func, inds))
-        flux = results[:, :, 0]
+            jobs = [
+                pool.apply_async(
+                    A_photometry,
+                    kwds={
+                        "bg_err": np.zeros_like(xo),
+                        "cx": xo,
+                        "cy": yo,
+                        "r": [1.0, 2.0, 3.0],
+                        "methods": ["center"],
+                        "i": i,
+                        "img_data": image_stack,
+                    },
+                )
+                for i in range(image_stack.shape[0])
+            ]
+            flux = np.array([job.get() for job in jobs])
 
         self.assertTrue(np.all(flux == np.ones_like(flux) * 2.0))
 

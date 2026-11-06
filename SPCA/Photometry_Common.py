@@ -14,7 +14,6 @@ from astropy.io import fits
 from astropy.stats import sigma_clip
 from astropy.wcs import WCS
 from astropy.wcs.utils import skycoord_to_pixel
-from scipy.stats import binned_statistic
 
 from .spitzer_products import validate_science_product
 
@@ -264,6 +263,7 @@ def sigma_clipping(image_stack, bounds=(13, 18, 13, 18), sigma=5, maxiters=3):
 
     """
 
+    image_stack = np.ma.masked_invalid(image_stack, copy=False)
     lbx, ubx, lby, uby = bounds
 
     # Using a nested for-loop to significantly reduce RAM
@@ -294,7 +294,16 @@ def sigma_clipping(image_stack, bounds=(13, 18, 13, 18), sigma=5, maxiters=3):
     return image_stack
 
 
-def clip_data(arr, highpassWidth, sigma1=5, sigma2=5, maxiters=3):
+def clip_data(arr, highpassWidth, sigma1=5, sigma2=5, maxiters=3, replace_masked=True):
+    """Clip outliers, optionally retaining rejections instead of imputing them.
+
+    Aperture extraction uses ``replace_masked=False`` so missing measurements
+    and clipped outliers never become synthetic science measurements. The
+    default retains the legacy replacement behavior for other callers.
+    """
+    arr = np.ma.masked_invalid(np.ma.array(arr, dtype=float, copy=True))
+    if arr.count() == 0:
+        return arr
     try:
         arr = sigma_clip(
             arr,
@@ -307,9 +316,11 @@ def clip_data(arr, highpassWidth, sigma1=5, sigma2=5, maxiters=3):
         arr = sigma_clip(
             arr, sigma=sigma1, iters=maxiters, cenfunc=np.ma.median, stdfunc=np.ma.std
         )
-    arr = replace_clipped(arr)
+    if replace_masked:
+        arr = replace_clipped(arr)
     arr = rolling_clip(arr, highpassWidth, sigma=sigma2, maxiters=maxiters)
-    arr = replace_clipped(arr)
+    if replace_masked:
+        arr = replace_clipped(arr)
 
     return arr
 
@@ -340,7 +351,7 @@ def rolling_clip(arr, highpassWidth, sigma=5, maxiters=3):
             cenfunc=np.ma.median,
             stdfunc=np.ma.std,
         )
-    except:
+    except TypeError:
         smoothed = sigma_clip(
             smoothed,
             sigma=sigma,
@@ -353,20 +364,16 @@ def rolling_clip(arr, highpassWidth, sigma=5, maxiters=3):
 
 
 def bgsubtract(bounds=(11, 19, 11, 19), i=0):
-    """Measure the background level and subtracts the background from each frame.
+    """Measure background level and scatter for subtraction in the parent.
 
     Args:
         bounds (tuple, optional): Bounds of box around the target. Default is (11, 19, 11, 19).
 
     Returns:
-        tuple: bgsub_data (3D array) Data cube of background subtracted images.
-            bg_flux (1D array)  Updated array of background flux measurements for previous images.
-            bg_err (1D array) Updated array of uncertainties on background measurements for previous images.
+        ndarray: Background median and per-pixel standard deviation. Both are
+            NaN if no background pixels are available.
 
     """
-
-    # Access global variable
-    global image_stack
 
     lbx, ubx, lby, uby = bounds
 
@@ -380,10 +387,8 @@ def bgsubtract(bounds=(11, 19, 11, 19), i=0):
     bg = np.ma.median(image)
     bg_err = np.ma.std(image)
 
-    # Subtract background
-    image_stack[i] -= bg
-
-    return np.array([bg, bg_err])
+    # Workers measure only; the parent subtracts from its own image stack.
+    return np.ma.stack((bg, bg_err)).filled(np.nan)
 
 
 def bin_array(data, size):
@@ -399,19 +404,27 @@ def bin_array(data, size):
 
     """
 
-    data = np.ma.masked_invalid(np.ma.copy(data))
-    x = np.arange(data.shape[0])
-    bins = size * np.arange(np.ceil(len(x) / size) + 1) - 0.5
-
-    binned_data = binned_statistic(x, data, statistic=np.ma.median, bins=bins)[0]
-
-    binned_data_std = binned_statistic(x, data, statistic=np.ma.std, bins=bins)[0]
+    if size < 1 or int(size) != size:
+        raise ValueError("Bin size must be a positive integer")
+    size = int(size)
+    data = np.ma.masked_invalid(np.ma.array(data, dtype=float))
+    nbin = (len(data) + size - 1) // size
+    binned_data = np.full(nbin, np.nan)
+    binned_data_std = np.full(nbin, np.nan)
+    # scipy.stats.binned_statistic converts masked arrays to ndarrays, exposing
+    # the rejected values underneath the mask. Reduce each masked bin directly.
+    for i in range(nbin):
+        values = data[i * size : (i + 1) * size]
+        if values.count():
+            binned_data[i] = np.ma.median(values)
+            binned_data_std[i] = np.ma.std(values)
 
     return binned_data, binned_data_std
 
 
 def highpassflist(signal, highpassWidth):
     g = Box1DKernel(highpassWidth)
+    signal = np.ma.array(signal, dtype=float).filled(np.nan)
     return convolve(signal, g, boundary="extend")
 
 
@@ -554,7 +567,7 @@ def prepare_image(
                 _save_oversample_cache(image, savename)
 
     data = image.reshape(-1, np.prod(image.shape[1:]))
-    data = np.append(data, time[:, np.newaxis], axis=1)
+    data = np.ma.concatenate((data, time[:, np.newaxis]), axis=1)
 
     return data
 
@@ -643,7 +656,7 @@ def prepare_images(
             maskStars,
         )
         inds = range(len(fnames))
-        results = np.ma.masked_array(pool.map(func, inds)).reshape(-1, int(32**2 + 1))
+        results = np.ma.concatenate(pool.map(func, inds), axis=0)
 
     # Access global variable
     global image_stack
@@ -670,6 +683,10 @@ def prepare_images(
         func = partial(bgsubtract, (11, 19, 11, 19))
         inds = range(image_stack.shape[0])
         bg, bg_err = np.array(pool.map(func, inds)).T
+
+    # Forked workers do not modify the parent's memory. Subtract here, masking
+    # frames for which no background could be measured.
+    image_stack -= np.ma.masked_invalid(bg)[:, np.newaxis, np.newaxis]
 
     print("Frames loaded!", flush=True)
 
