@@ -210,7 +210,10 @@ def A_photometry(
     if not isinstance(methods, Iterable):
         methods = [methods]
 
-    data_error = calc_total_error(image_stack[i, :, :], bg_err[i], effective_gain=1)
+    # Photutils requires the background-error image to match the data.
+    frame = image_stack[i, :, :]
+    background_error = np.full(frame.shape, bg_err[i], dtype=float)
+    data_error = calc_total_error(frame, background_error, effective_gain=1)
 
     results = []
 
@@ -720,10 +723,23 @@ def get_lightcurve(
     )
 
     pool = _get_pool(ncpu)
-    for i in range(N):
-        pool.apply_async(wrapMyFunc, args=(i,), callback=update)
-    pool.close()
-    pool.join()
+    try:
+        first = pool.apply_async(wrapMyFunc, args=(0,), callback=update)
+        first.get()
+
+        jobs = [
+            pool.apply_async(wrapMyFunc, args=(i,), callback=update)
+            for i in range(1, N)
+        ]
+        pool.close()
+
+        for job in jobs:
+            job.get()
+        pool.join()
+    except BaseException:
+        pool.terminate()
+        pool.join()
+        raise
     pbar.close()
     sys.stderr.flush()
 
